@@ -37,6 +37,7 @@ set(CMAKE_CXX_FLAGS --coverage)
 # Set up doxygen: download doxygen 1.9.3 and add it to the PATH
 option(BUILD_DOC "Build documentation" ON)
 IF(BUILD_DOC)
+  
   find_package(Doxygen)
 
   # Disable all preprocessing so doxygen will read all statements
@@ -45,13 +46,18 @@ IF(BUILD_DOC)
   # set(DOXYGEN_ENABLE_PREPROCESSING NO)
   set(DOXYGEN_QUIET YES)
   set(DOXYGEN_USE_MATHJAX YES)
+  set(DOXYGEN_EXTRA_ARGS
+  -HTML_EXTRA_STYLESHEET=${PROJECT_SOURCE_DIR}/custom_doxygen.css
+  )
 
   doxygen_add_docs(fims_doxygen
     inst/include
     src
     ALL
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    COMMENT "Building documentation with Doxygen.")
+    COMMENT "Building documentation with Doxygen."
+    DOXYGEN_ARGS ${DOXYGEN_EXTRA_ARGS}
+  )
 ENDIF()
 
 # Set up Rcpp
