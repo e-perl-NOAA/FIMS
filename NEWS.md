@@ -1,3 +1,13 @@
+# FIMS 0.6.3
+
+* Fixes bugs in fims_math.hpp when using TMBad library to use the standard
+  library functions (exp, log, cos, sqrt, pow) when necessary.
+
+# FIMS 0.6.2
+
+* Fixes bug where `unfished_biomass` was not initialized.
+* Adds TMBad flag to windows Make file.
+
 # FIMS 0.6.1
 
 * Fixes FIMS log file where the user was not known on certain operating systems.
