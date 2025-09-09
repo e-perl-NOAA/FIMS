@@ -36,14 +36,14 @@ body {
     min-width: 250px;
     min-height: 100vh;
     overflow-y: auto;
-    background-color: #f8f9fa;
+    background-color: white;
     border-right: 1px solid #dee2e6;
     padding: 1rem;
 }
 
 #doc-content {
     flex-grow: 1;
-    padding: 1rem 2rem 1rem 2rem;
+    padding: 1rem;
     overflow-y: auto;
     width: auto;
     margin: 0;
@@ -278,7 +278,7 @@ ul {
 }
 
 pre.fragment {
-        border: 1px solid #C4CFE5;
+        border: 1px solid #ebeeef;
         background-color: white;
         padding: 4px 6px;
         margin: 4px 8px 4px 2px;
