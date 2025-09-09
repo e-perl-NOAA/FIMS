@@ -21,7 +21,7 @@ body, table, div, p, dl, th, td, input, select, textarea, ul, ol, li, a, span, h
 /* ---------------------------------------------------------------------------------- */
 body {
     background-color: white;
-    color: black;
+    color: #213f4b;
     margin: 0;
     display: flex;
     flex-direction: row;
@@ -32,8 +32,8 @@ body {
     flex-direction: column;
     position: sticky;
     top: 0;
-    width: 250px;
-    min-height: 200vh;
+    width: 350px;
+    min-height: 100vh;
     overflow-y: auto;
     background-color: #f8f9fa;
     border-right: 1px solid #dee2e6;
@@ -98,7 +98,7 @@ h1.groupheader {
 }
 
 h2.groupheader {
-	border-bottom: 1px solid #879ECB;
+	border-bottom: 1px solid #ebeeef;
 	color: #354C7B;
 	font-size: 150%;
 	font-weight: normal;
@@ -278,7 +278,7 @@ ul {
 
 pre.fragment {
         border: 1px solid #C4CFE5;
-        background-color: #FBFCFD;
+        background-color: white;
         padding: 4px 6px;
         margin: 4px 8px 4px 2px;
         overflow: auto;
@@ -292,7 +292,7 @@ pre.fragment {
 div.fragment {
   padding: 0 0 1px 0; /*Fixed: last line underline overlap border*/
   margin: 4px 8px 4px 2px;
-	background-color: #FBFCFD;
+	background-color: white;
 	border: 1px solid #C4CFE5;
 }
 
