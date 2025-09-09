@@ -53,4 +53,12 @@ jobs:
     #     destination_branch: 'main'
     #     user_email: 'kelli.johnson@noaa.gov' # your email
     #     user_name: 'Kelli Johnson'           # your login
-    #     commit_message: 'Docs: run Doxygen'    
+    #     commit_message: 'Docs: run Doxygen'  
+
+    - name: Commit and push docs folder
+      if: ${{ github.ref == 'refs/heads/main' }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add docs
+        git push  
