@@ -60,7 +60,6 @@ IF(BUILD_DOC)
     ALL
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     COMMENT "Building documentation with Doxygen."
-    DOXYGEN_ARGS ${DOXYGEN_EXTRA_ARGS}
   )
 ENDIF()
 
