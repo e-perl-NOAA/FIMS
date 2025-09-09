@@ -388,20 +388,26 @@ div.classindex span.ai {
 }
 
 div.groupHeader {
-	margin-left: 16px;
-	margin-top: 12px;
+	/* margin-left: 16px;
+	margin-top: 12px; */
+        margin: 0;
+        padding: 0;
 	font-weight: bold;
 }
 
 div.groupText {
-	margin-left: 16px;
+	/* margin-left: 16px; */
+        margin: 0;
+        padding: 0;
 	font-style: italic;
 }
 
 div.contents {
-	margin-top: 10px;
+	/* margin-top: 10px;
 	margin-left: 12px;
-	margin-right: 8px;
+	margin-right: 8px; */
+        margin: 0;
+        padding: 0;
 }
 
 td.indexkey {
@@ -507,19 +513,15 @@ span.vhdllogic {
 blockquote {
         background-color: #FFFFFF;
         border-left: 2px solid #9CAFD4;
-        margin: 0;
-        padding: 0;
-        /* margin: 0 24px 0 4px;
-        padding: 0 12px 0 16px; */
+        margin: 0 24px 0 4px;
+        padding: 0 12px 0 16px;
 }
 
 blockquote.DocNodeRTL {
    border-left: 0;
    border-right: 2px solid #9CAFD4;
-   margin: 0;
-   padding: 0;
-   /* margin: 0 4px 0 24px;
-   padding: 0 16px 0 12px; */
+   margin: 0 4px 0 24px;
+   padding: 0 16px 0 12px;
 }
 
 /* @end */
