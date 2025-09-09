@@ -32,7 +32,8 @@ body {
     flex-direction: column;
     position: sticky;
     top: 0;
-    width: 350px;
+    width: 25%;
+    min-width: 250px;
     min-height: 100vh;
     overflow-y: auto;
     background-color: #f8f9fa;
@@ -42,7 +43,7 @@ body {
 
 #doc-content {
     flex-grow: 1;
-    padding: 1rem 1rem 1rem 5px;
+    padding: 1rem 2rem 1rem 2rem;
     overflow-y: auto;
     width: auto;
     margin: 0;
