@@ -23,6 +23,7 @@ body {
     background-color: white;
     color: #213f4b;
     margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: row;
 }
