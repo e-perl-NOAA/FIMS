@@ -40,7 +40,7 @@ jobs:
       if: ${{ github.ref == 'refs/heads/main' }}
       run: |
         mv build/html ./
-        rm -rf ./docs 
+        ls ./
         mv ./html/* ./docs/
 
     # - name: Push docs to FIMS-docs repo
