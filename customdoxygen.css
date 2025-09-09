@@ -37,8 +37,8 @@ body {
     min-width: 250px;
     min-height: 100vh;
     overflow-y: auto;
-    background-color: white;
-    border-right: 1px solid #dee2e6;
+    background-color: white !important;
+    border-right: 1px solid #dee2e6 !important;
     padding: 1rem;
 }
 
@@ -1188,9 +1188,9 @@ div.header
 {
         background-image:url('nav_h.png');
         background-repeat:repeat-x;
-	background-color: #FFFFFF;
+	background-color: #FFFFFF !important;
 	margin:  0px;
-	border-bottom: 1px solid #dee2e6;
+	border-bottom: 1px solid #dee2e6 !important;;
 }
 
 div.headertitle
