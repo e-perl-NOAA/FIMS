@@ -28,7 +28,7 @@ body {
     flex-direction: row;
 }
 
-#side-nav {
+#side-nav *, #side-nav {
     display: flex;
     flex-direction: column;
     position: sticky;
