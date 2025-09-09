@@ -45,9 +45,10 @@ body {
 #doc-content {
     flex-grow: 1;
     padding: 1rem;
+    min-height: 100vh;
     overflow-y: auto;
     width: auto;
-    margin: 0;
+    margin-left: 0 !important;
 }
 
 /* ---------------------------------------------------------------------------------- */
@@ -388,26 +389,20 @@ div.classindex span.ai {
 }
 
 div.groupHeader {
-	/* margin-left: 16px;
-	margin-top: 12px; */
-        margin: 0;
-        padding: 0;
+	margin-left: 16px;
+	margin-top: 12px;
 	font-weight: bold;
 }
 
 div.groupText {
-	/* margin-left: 16px; */
-        margin: 0;
-        padding: 0;
+	margin-left: 16px;
 	font-style: italic;
 }
 
 div.contents {
-	/* margin-top: 10px;
+	margin-top: 10px;
 	margin-left: 12px;
-	margin-right: 8px; */
-        margin: 0;
-        padding: 0;
+	margin-right: 8px;
 }
 
 td.indexkey {
