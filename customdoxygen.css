@@ -1215,7 +1215,7 @@ div.header
         background-repeat:repeat-x;
 	background-color: #FFFFFF !important;
 	margin:  0px;
-	border-bottom: 1px solid #ebeeef ;
+	border-bottom: 1px solid #ebeeef !important;
 }
 
 div.headertitle
