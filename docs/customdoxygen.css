@@ -1200,11 +1200,11 @@ div.ingroups a
 
 div.header
 {
-        background-image:url('nav_h.png');
+        background-image: none !important;
         background-repeat:repeat-x;
 	background-color: #FFFFFF !important;
 	margin:  0px;
-	border-bottom: 1px solid #dee2e6 ;
+	border-bottom: 1px solid #ebeeef ;
 }
 
 div.headertitle
