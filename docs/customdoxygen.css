@@ -25,7 +25,7 @@ body {
     margin: 0;
     padding: 0;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
 }
 
 #side-nav {
@@ -71,7 +71,7 @@ body, table, div, p, dl {
 }
 
 p.reference, p.definition {
-	font-family: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-family: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     font-weight: 400;
     font-size: 14px;
     line-height: 22px;
@@ -116,19 +116,19 @@ h3.groupheader {
 }
 
 h1, h2, h3, h4, h5, h6 {
-	-webkit-transition: text-shadow 0.5s linear;
+	/* -webkit-transition: text-shadow 0.5s linear;
 	-moz-transition: text-shadow 0.5s linear;
 	-ms-transition: text-shadow 0.5s linear;
 	-o-transition: text-shadow 0.5s linear;
-	transition: text-shadow 0.5s linear;
+	transition: text-shadow 0.5s linear; */
 	margin-right: 15px;
 	color: #159957;
 	font-weight: normal;
 }
 
-h1.glow, h2.glow, h3.glow, h4.glow, h5.glow, h6.glow {
+/* h1.glow, h2.glow, h3.glow, h4.glow, h5.glow, h6.glow {
 	text-shadow: 0 0 15px cyan;
-}
+} */
 
 dt {
 	font-weight: bold;
@@ -331,10 +331,10 @@ div.line:after {
     white-space: pre;
 }
 
-div.line.glow {
+/* div.line.glow {
 	background-color: cyan;
 	box-shadow: 0 0 10px cyan;
-}
+} */
 
 
 span.lineno {
@@ -585,10 +585,10 @@ table.memberdecls {
 	transition-duration: 0.5s;
 }
 
-.memberdecls td.glow, .fieldtable tr.glow {
+/* .memberdecls td.glow, .fieldtable tr.glow {
 	background-color: cyan;
 	box-shadow: 0 0 15px cyan;
-}
+} */
 
 .mdescLeft, .mdescRight,
 .memItemLeft, .memItemRight,
@@ -687,9 +687,9 @@ table.memberdecls {
         width: 100%;
 }
 
-.memitem.glow {
+/* .memitem.glow {
          box-shadow: 0 0 15px cyan;
-}
+} */
 
 .memname {
         font-weight: 400;
@@ -710,13 +710,13 @@ table.memberdecls {
         text-shadow: 0px 1px 1px rgba(255, 255, 255, 0.9);
         background-color: #FFFFFF;
         /* opera specific markup */
-        box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15);
+        /* box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15); */
         border-top-right-radius: 4px;
         /* firefox specific markup */
-        -moz-box-shadow: rgba(0, 0, 0, 0.15) 5px 5px 5px;
+        /* -moz-box-shadow: rgba(0, 0, 0, 0.15) 5px 5px 5px; */
         -moz-border-radius-topright: 4px;
         /* webkit specific markup */
-        -webkit-box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15);
+        /* -webkit-box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15); */
         -webkit-border-top-right-radius: 4px;
 
 }
@@ -739,15 +739,15 @@ table.memberdecls {
         /* opera specific markup */
         border-bottom-left-radius: 4px;
         border-bottom-right-radius: 4px;
-        box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15);
+        /* box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15); */
         /* firefox specific markup */
         -moz-border-radius-bottomleft: 4px;
         -moz-border-radius-bottomright: 4px;
-        -moz-box-shadow: rgba(0, 0, 0, 0.15) 5px 5px 5px;
+        /* -moz-box-shadow: rgba(0, 0, 0, 0.15) 5px 5px 5px; */
         /* webkit specific markup */
         -webkit-border-bottom-left-radius: 4px;
         -webkit-border-bottom-right-radius: 4px;
-        -webkit-box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15);
+        /* -webkit-box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15); */
 }
 
 dl.reflist dt {
@@ -1021,9 +1021,9 @@ table.fieldtable {
         -moz-border-radius: 4px;
         -webkit-border-radius: 4px;
         border-radius: 4px;
-        -moz-box-shadow: rgba(0, 0, 0, 0.15) 2px 2px 2px;
+        /* -moz-box-shadow: rgba(0, 0, 0, 0.15) 2px 2px 2px;
         -webkit-box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.15);
-        box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.15);
+        box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.15); */
 }
 
 .fieldtable td, .fieldtable th {
