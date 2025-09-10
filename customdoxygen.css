@@ -67,21 +67,19 @@ body {
     width: 6px;
 }
 
-#nav-tree .label {
-    color: #213f4b !important;
+#nav-tree a {
+    color: #213f4b;
 }
 
 #nav-tree .selected {
     background-image: none !important;
     background-repeat: repeat-x;
-    color: #4896a1 !important;
     text-shadow: none !important;
 }
 
-/* #nav-tree .selected a { */
-    /* text-decoration: none;
-    color: #4896a1 !important;
-} */
+#nav.tree .selected a {
+    color: #4896a1;
+}
 
 /* ---------------------------------------------------------------------------------- */
 /* 2. Hide Doxygen's Top Navigation Elements */
