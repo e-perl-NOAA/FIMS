@@ -55,6 +55,18 @@ body {
     margin-left: 0 !important;
 }
 
+.ui-resizable-e {
+    background-image: none !important;
+    color: #ebeeef !important;
+    background-repeat: repeat-y;
+    background-attachment: scroll;
+    cursor: ew-resize;
+    height: 100%;
+    right: 0;
+    top: 0;
+    width: 6px;
+}
+
 /* ---------------------------------------------------------------------------------- */
 /* 2. Hide Doxygen's Top Navigation Elements */
 /* ---------------------------------------------------------------------------------- */
