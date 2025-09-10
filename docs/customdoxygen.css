@@ -74,6 +74,15 @@ body {
     text-shadow: none !important;
 }
 
+#nav-tree .selected a {
+    text-decoration: none;
+    color: #4896a1 !important;
+}
+
+#nav-tree .label a {
+    color: #99a6ac !important;
+}
+
 /* ---------------------------------------------------------------------------------- */
 /* 2. Hide Doxygen's Top Navigation Elements */
 /* ---------------------------------------------------------------------------------- */
@@ -85,16 +94,12 @@ body {
 /* ---------------------------------------------------------------------------------- */
 /* 3. General Element Styling */
 /* ---------------------------------------------------------------------------------- */
-body, table, p, dl {
+body, table, div, p, dl {
     font-family: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     font-weight: 400;
     font-size: 14px;
     line-height: 22px;
     color: #213f4b;
-}
-
-div {
-    color: #99a6ac;
 }
 
 p.reference, p.definition {
