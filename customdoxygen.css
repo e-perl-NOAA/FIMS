@@ -42,6 +42,10 @@ body {
     padding: 1rem;
 }
 
+#nav-tree {
+    background-color: white !important;
+}
+
 #doc-content {
     flex-grow: 1;
     padding: 1rem;
@@ -1388,10 +1392,9 @@ dl.section dd {
 	padding: 0px;
 	margin: 0px;
 	width: 100%;
-	border-bottom: 1px solid #5373B4;
-	/* quetzal settings */
-	overflow:hidden;
-	color: #fff;
+	border-bottom: 1px solid #0e6876;
+	color: white;
+        display: flex;
 	background-color: #0e6876;
 }
 
