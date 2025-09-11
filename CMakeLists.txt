@@ -34,6 +34,14 @@ FetchContent_MakeAvailable(googlebenchmark)
 # Set up Gcov to get coverage results with Google Test
 set(CMAKE_CXX_FLAGS --coverage)
 
+# Get latest tag from GitHub
+execute_process(
+  COMMAND git describe --tags --always
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 # Set up doxygen: download doxygen 1.9.3 and add it to the PATH
 option(BUILD_DOC "Build documentation" ON)
 IF(BUILD_DOC)
