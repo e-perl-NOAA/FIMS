@@ -34,15 +34,15 @@ FetchContent_MakeAvailable(googlebenchmark)
 # Set up Gcov to get coverage results with Google Test
 set(CMAKE_CXX_FLAGS --coverage)
 
-# Get latest tag from git and set the version
+# Get the latest tag from github
 execute_process(
   COMMAND git ls-remote --tags --sort='v:refname' https://github.com/noaa-fims/fims.git
-  OUTPUT_VARIABLE LATEST_TAG
+  OUTPUT_VARIABLE TAG_LIST
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-# Extract the full tag (e.g., v3.30.24) from the output
-string(REGEX MATCH "v[0-9.]+$" LATEST_TAG_MATCH "${LATEST_TAG}")
+# Extract the last line (the latest tag) and store it
+string(REGEX MATCH "v[0-9.]+$" LATEST_TAG_MATCH "${TAG_LIST}")
 if(LATEST_TAG_MATCH)
     set(VERSION "${LATEST_TAG_MATCH}")
 else()
