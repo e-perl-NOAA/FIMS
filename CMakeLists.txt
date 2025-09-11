@@ -50,9 +50,9 @@ IF(BUILD_DOC)
   set(DOXYGEN_DISABLE_INDEX "NO")
   set(DOXYGEN_FULL_SIDEBAR "NO")
   set(DOXYGEN_PROJECT_NAME "FIMS")
+  set(DOXYGEN_PROJECT_LOGO "FIMS_logo3.png")
   set(DOXYGEN_HTML_DYNAMIC_SECTIONS "NO")
-  set(DOXYGEN_HTML_HEADER "header.html")
-  set(DOXYGEN_HTML_EXTRA_STYLESHEET "doxygen-awesome.css")
+  set(DOXYGEN_HTML_EXTRA_STYLESHEET "doxygen-awesome.css" "doxygen-awesome-sidebar-only.css" "custom.css")
   set(DOXYGEN_HTML_COLORSTYLE "LIGHT")
 
   doxygen_add_docs(fims_doxygen
