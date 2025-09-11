@@ -34,21 +34,6 @@ FetchContent_MakeAvailable(googlebenchmark)
 # Set up Gcov to get coverage results with Google Test
 set(CMAKE_CXX_FLAGS --coverage)
 
-# Get the latest tag from github
-execute_process(
-  COMMAND git ls-remote --tags --sort='v:refname' https://github.com/noaa-fims/fims.git
-  OUTPUT_VARIABLE TAG_LIST
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-# Extract the last line (the latest tag) and store it
-string(REGEX MATCH "v[0-9.]+$" LATEST_TAG_MATCH "${TAG_LIST}")
-if(LATEST_TAG_MATCH)
-    set(VERSION "${LATEST_TAG_MATCH}")
-else()
-    set(VERSION "N/A")
-endif()
-
 # Set up doxygen: download doxygen 1.9.3 and add it to the PATH
 option(BUILD_DOC "Build documentation" ON)
 IF(BUILD_DOC)
