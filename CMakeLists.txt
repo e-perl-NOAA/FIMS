@@ -36,7 +36,7 @@ set(CMAKE_CXX_FLAGS --coverage)
 
 # Get latest tag from GitHub
 execute_process(
-  COMMAND git describe --tags --always
+  COMMAND git describe --tags --abbrev=0
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   OUTPUT_VARIABLE VERSION
   OUTPUT_STRIP_TRAILING_WHITESPACE
