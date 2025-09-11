@@ -78,7 +78,7 @@ body {
 }
 
 #nav.tree .selected a {
-    color: #4896a1;
+    color: #4896a1 !important;
 }
 
 /* ---------------------------------------------------------------------------------- */
@@ -932,7 +932,7 @@ div.directory {
 }
 
 .arrow {
-    color: #4896a1;
+    color: #213f4b;
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
@@ -1218,7 +1218,7 @@ div.header
         background-repeat:repeat-x;
 	background-color: #FFFFFF !important;
 	margin:  0px;
-	border-bottom: 1px solid #ebeeef !important;
+	border-bottom: 1.1px solid #ebeeef !important;
 }
 
 div.headertitle
