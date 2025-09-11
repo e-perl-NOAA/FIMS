@@ -35,15 +35,16 @@ FetchContent_MakeAvailable(googlebenchmark)
 set(CMAKE_CXX_FLAGS --coverage)
 
 # Get latest tag from git and set the version
-EXECUTE_PROCESS(
-  COMMAND git ls-remote --tags --sort='v:refname' https://github.com/nmfs-ost/ss3-source-code.git
-  OUTPUT_VARIABLE TAG_LIST
+execute_process(
+  COMMAND git ls-remote --tags --sort='v:refname' https://github.com/noaa-fims/fims.git
+  OUTPUT_VARIABLE LATEST_TAG
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-string(REGEX MATCH "v([0-9.]+)$" LATEST_TAG_MATCH "${TAG_LIST}")
+# Extract the full tag (e.g., v3.30.24) from the output
+string(REGEX MATCH "v[0-9.]+$" LATEST_TAG_MATCH "${LATEST_TAG}")
 if(LATEST_TAG_MATCH)
-    set(VERSION "${CMAKE_MATCH_1}")
+    set(VERSION "${LATEST_TAG_MATCH}")
 else()
     set(VERSION "N/A")
 endif()
