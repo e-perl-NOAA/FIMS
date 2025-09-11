@@ -34,6 +34,20 @@ FetchContent_MakeAvailable(googlebenchmark)
 # Set up Gcov to get coverage results with Google Test
 set(CMAKE_CXX_FLAGS --coverage)
 
+# Get latest tag from git and set the version
+EXECUTE_PROCESS(
+  COMMAND git ls-remote --tags --sort='v:refname' https://github.com/nmfs-ost/ss3-source-code.git
+  OUTPUT_VARIABLE TAG_LIST
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+string(REGEX MATCH "v([0-9.]+)$" LATEST_TAG_MATCH "${TAG_LIST}")
+if(LATEST_TAG_MATCH)
+    set(VERSION "${CMAKE_MATCH_1}")
+else()
+    set(VERSION "N/A")
+endif()
+
 # Set up doxygen: download doxygen 1.9.3 and add it to the PATH
 option(BUILD_DOC "Build documentation" ON)
 IF(BUILD_DOC)
@@ -49,6 +63,7 @@ IF(BUILD_DOC)
   set(DOXYGEN_GENERATE_TREEVIEW "YES")
   set(DOXYGEN_DISABLE_INDEX "NO")
   set(DOXYGEN_FULL_SIDEBAR "NO")
+  set(DOXYGEN_PROJECT_NUMBER ${VERSION})
   set(DOXYGEN_PROJECT_NAME "FIMS")
   set(DOXYGEN_PROJECT_LOGO "FIMS_logo3.png")
   set(DOXYGEN_HTML_DYNAMIC_SECTIONS "NO")
