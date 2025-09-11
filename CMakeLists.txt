@@ -43,18 +43,17 @@ IF(BUILD_DOC)
   # Disable all preprocessing so doxygen will read all statements
   # when evaluating conditional compilation statements
   # (e.g., #ifdef in fims_math.h)
-  # set(DOXYGEN_ENABLE_PREPROCESSING NO)
-  set(DOXYGEN_QUIET YES)
-  set(DOXYGEN_USE_MATHJAX YES)
-  set(DOXYGEN_HTML_COLORSTYLE_HUE 220)
-  set(DOXYGEN_HTML_COLORSTYLE_SAT 100)
-  set(DOXYGEN_HTML_COLORSTYLE_GAMMA 80)
-  set(DOXYGEN_GENERATE_TREEVIEW YES)
+  # set(DOXYGEN_ENABLE_PREPROCESSING "NO")
+  set(DOXYGEN_QUIET "YES")
+  set(DOXYGEN_USE_MATHJAX "YES")
+  set(DOXYGEN_GENERATE_TREEVIEW "YES")
+  set(DOXYGEN_DISABLE_INDEX "NO")
+  set(DOXYGEN_FULL_SIDEBAR "NO")
   set(DOXYGEN_PROJECT_NAME "FIMS")
-  set(DOXYGEN_HTML_DYNAMIC_SECTIONS NO)
+  set(DOXYGEN_HTML_DYNAMIC_SECTIONS "NO")
   set(DOXYGEN_HTML_HEADER "header.html")
-  set(DOXYGEN_HTML_FOOTER "footer.html")
-  set(DOXYGEN_HTML_EXTRA_STYLESHEET "customdoxygen.css")
+  set(DOXYGEN_HTML_EXTRA_STYLESHEET "doxygen_awesome.css")
+  set(DOXYGEN_HTML_COLORSTYLE "LIGHT")
 
   doxygen_add_docs(fims_doxygen
     inst/include

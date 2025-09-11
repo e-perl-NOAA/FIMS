@@ -40,6 +40,7 @@ body {
     background-color: white !important;
     border-right: 1px solid #dee2e6 !important;
     padding: 1rem;
+    font-size: 110%;
 }
 
 #nav-tree {
