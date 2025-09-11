@@ -75,6 +75,7 @@ body {
     background-image: none !important;
     background-repeat: repeat-x;
     text-shadow: none !important;
+    color: #4896a1 !important;
 }
 
 #nav.tree .selected a {
@@ -270,7 +271,8 @@ a.qindexHL {
 }
 
 a.el {
-	font-weight: bold;
+	font-weight: normal;
+        text-decoration: underline;
 }
 
 a.elRef {
@@ -1218,7 +1220,7 @@ div.header
         background-repeat:repeat-x;
 	background-color: #FFFFFF !important;
 	margin:  0px;
-	border-bottom: 1.1px solid #ebeeef !important;
+	border-bottom: 1.3px solid #ebeeef !important;
 }
 
 div.headertitle
