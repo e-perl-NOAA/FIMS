@@ -66,6 +66,7 @@ IF(BUILD_DOC)
   set(DOXYGEN_HTML_COLORSTYLE "LIGHT")
   set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "inst/include/common/MAIN.md")
   set(DOXYGEN_HTML_HEADER "header.html")
+  set(DOXYGEN_LAYOUT_FILE "DoxygenLayout.xml")
 
   doxygen_add_docs(fims_doxygen
     inst/include
