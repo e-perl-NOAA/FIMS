@@ -25,7 +25,6 @@
 var NAVTREE =
 [
   [ "FIMS", "index.html", [
-    [ "C++ source code documentation", "index.html", null ],
     [ "Common", "md_inst_2include_2common_2README.html", null ],
     [ "Distributions", "md_inst_2include_2distributions_2README.html", null ],
     [ "Interface", "md_inst_2include_2interface_2README.html", null ],
@@ -64,8 +63,8 @@ var NAVTREEINDEX =
 "classLogisticMaturityInterface.html#ab8f3bf35c6aa55a9f079018ccccc3f6f",
 "classSharedReal.html#afcce29f9d176c19bed365f8ff60574ca",
 "classfims__popdy_1_1CatchAtAge.html#addf4f18252cba85c7b770a215d828f02",
-"rcpp__growth_8hpp.html",
-"structfims__popdy_1_1Fleet.html#ad3d8e4059148458c08627f0ba7d3e3f5"
+"rcpp__growth_8hpp_source.html",
+"structfims__popdy_1_1Fleet.html#ad5f69e99a81800ae0d5b904192eb2ab7"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
