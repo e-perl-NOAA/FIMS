@@ -45,7 +45,7 @@ jobs:
         mv build/html ./
         rm -rf ./docs/*
         mv ./html/* ./docs/
-        mvDoxygenLayout.xml ./docs/
+        mv DoxygenLayout.xml ./docs/
 
     # - name: Push docs to FIMS-docs repo
     #   if: ${{ github.ref == 'refs/heads/main' }}
