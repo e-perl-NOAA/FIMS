@@ -24,6 +24,10 @@ html {
         height: 50px;
     }
 }
+
+#projectname {
+    color: #51595d
+}
 /* 
 #MSearchBox {
     margin-right: 200px;
