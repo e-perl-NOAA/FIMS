@@ -26,9 +26,21 @@ html {
 }
 
 #projectname {
-    color: #51595d
+    color: #51595d;
 }
-/* 
-#MSearchBox {
-    margin-right: 200px;
-} */
+
+.navbar-nav {
+    color: #51595d;
+}
+
+.a:link {
+    color: #51595d;
+}
+
+a:hover {
+    color: #0e6270cc;
+}
+
+a:active {
+    color: #0e6270;
+}
