@@ -9,5 +9,5 @@ from the main documentation site at
 **Copyright**
 
 This file is part of the NOAA, National Marine Fisheries Service
-Fisheries Integrated Modeling System project. See LICENSE in the source
+Fisheries Integrated Modeling System project. See [LICENSE](https://github.com/NOAA-FIMS/FIMS?tab=GPL-3.0-1-ov-file) in the source
 folder for reuse information.
