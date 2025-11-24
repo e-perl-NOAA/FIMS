@@ -277,7 +277,7 @@ stockplotr::plot_spawning_biomass(
 
 # Plot of log fishing mortality
 stockplotr::plot_timeseries(
-  stockplotr::filter_data(
+  stockplotr::prepare_data(
     output |> dplyr::filter(module_id == 1),
     label_name = "log_Fmort$",
     geom = "line"
@@ -290,7 +290,7 @@ stockplotr::plot_timeseries(
 
 # Plot the index of abundance against the observed values
 stockplotr::plot_timeseries(
-  stockplotr::filter_data(
+  stockplotr::prepare_data(
     output |> dplyr::filter(module_id == 2),
     label_name = "^index_expected$",
     geom = "line"
@@ -311,7 +311,7 @@ stockplotr::plot_timeseries(
 
 # Plot the landings estimates
 stockplotr::plot_timeseries(
-  stockplotr::filter_data(
+  stockplotr::prepare_data(
     output |> dplyr::filter(module_id == 1),
     label_name = "^landings_expected$",
     geom = "line"
