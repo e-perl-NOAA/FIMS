@@ -205,13 +205,15 @@ struct SpatiotemporalSPDELognormal : public DensityComponentBase<Type> {
       int node_k = A_j[nz];
       int year_t = obs_year_idx[static_cast<size_t>(obs_idx)];
       eta[static_cast<size_t>(obs_idx)] +=
-          static_cast<Type>(A_v[nz]) *
-          this->omega[year_t * n_nodes + node_k];
+          static_cast<Type>(A_v[nz]) * this->omega[year_t * n_nodes + node_k];
     }
 
     for (size_t i = 0; i < n_obs; i++) {
       if (this->y_obs[i] > 0.0) {
         Type y_i = static_cast<Type>(this->y_obs[i]);
+        // Lognormal log-density: dnorm(log(y_i), eta_i, sigma) - log(y_i)
+        // The Jacobian term -log(y_i) converts from the density of log(y_i)
+        // to the density of y_i (change-of-variables).
         Type lpi = dnorm(log(y_i), eta[i], sigma_obs, true) - log(y_i);
         this->report_lpdf_vec[i] = lpi;
         this->lpdf += lpi;

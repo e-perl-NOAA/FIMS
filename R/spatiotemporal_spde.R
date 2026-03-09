@@ -82,7 +82,7 @@ sparse_to_triplets <- function(mat) {
 #'   observation (length n_obs).
 #' @param beta0_init Initial value for the log-scale intercept. Default `0`.
 #' @param rho_logit_init Initial value for the AR1 correlation (logit scale).
-#'   Default `0` (corresponds to rho = 0 = no temporal correlation).
+#'   Default `0` (corresponds to rho = 0, meaning no temporal correlation).
 #' @param log_kappa_init Initial value for log(kappa). Default `0`.
 #' @param log_tau_init Initial value for log(tau). Default `0`.
 #' @param log_sigma_obs_init Initial value for log(sigma_obs). Default

@@ -145,7 +145,8 @@ class Model {  // may need singleton
     }
 
     // Loop over and evaluate spatio-temporal joint negative log-likelihoods
-    // (self-contained distributions managing their own random and fixed effects)
+    // (self-contained distributions managing their own random and fixed
+    // effects)
     int n_spatiotemporal = 0;
     for (d_it = this->fims_information->density_components.begin();
          d_it != this->fims_information->density_components.end(); ++d_it) {

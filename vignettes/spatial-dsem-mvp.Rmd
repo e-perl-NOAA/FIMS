@@ -45,12 +45,14 @@ from the mesh.
 **Observation likelihood**: For observation $i$ at location $\mathbf{s}_i$
 in year $t_i$:
 
-$$\log y_i \sim \mathcal{N}(\eta_i,\; \sigma_\text{obs}^2) - \log y_i$$
+$$\log y_i \sim \mathcal{N}(\eta_i,\; \sigma_\text{obs}^2)$$
 
 $$\eta_i = \beta_0 + (\mathbf{A} \boldsymbol{\omega}_{t_i})_i$$
 
 where $\mathbf{A}$ is the bilinear projector from mesh nodes to observation
-locations.
+locations. The contribution to the joint log-density includes a
+change-of-variables Jacobian $-\log y_i$ to convert from the density of
+$\log y_i$ to the density of $y_i$.
 
 ### Parameters
 
@@ -215,7 +217,7 @@ spde_obj <- create_spatiotemporal_spde(
   y_obs             = y_obs,
   obs_year_idx      = obs_year_idx,
   beta0_init        = 1.0,
-  rho_logit_init    = 0.0,       # rho = tanh(0) = 0
+  rho_logit_init    = 0.0,       # corresponds to rho = 0 (no temporal correlation)
   log_kappa_init    = 0.0,
   log_tau_init      = 0.0,
   log_sigma_obs_init = log(0.3),

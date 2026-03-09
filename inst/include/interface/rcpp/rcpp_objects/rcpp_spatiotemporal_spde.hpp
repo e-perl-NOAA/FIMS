@@ -225,8 +225,7 @@ class SpatiotemporalSPDEInterface : public DistributionsInterfaceBase {
     // Observations
     for (R_xlen_t k = 0; k < this->y_obs.size(); k++) {
       dist.y_obs.push_back(static_cast<double>(this->y_obs[k]));
-      dist.obs_year_idx.push_back(
-          static_cast<int>(this->obs_year_idx[k]));
+      dist.obs_year_idx.push_back(static_cast<int>(this->obs_year_idx[k]));
     }
 
     size_t n_omega = this->omega.size();
@@ -413,8 +412,7 @@ class SpatiotemporalSPDEInterface : public DistributionsInterfaceBase {
 
     // --- Fixed effects ---
     // beta0
-    distribution->beta0 =
-        static_cast<Type>(this->beta0[0].initial_value_m);
+    distribution->beta0 = static_cast<Type>(this->beta0[0].initial_value_m);
     if (this->beta0[0].estimation_type_m.get() == "fixed_effects") {
       ss.str("");
       ss << "spde." << this->id_m << ".beta0";
@@ -443,8 +441,7 @@ class SpatiotemporalSPDEInterface : public DistributionsInterfaceBase {
     }
 
     // log_tau
-    distribution->log_tau =
-        static_cast<Type>(this->log_tau[0].initial_value_m);
+    distribution->log_tau = static_cast<Type>(this->log_tau[0].initial_value_m);
     if (this->log_tau[0].estimation_type_m.get() == "fixed_effects") {
       ss.str("");
       ss << "spde." << this->id_m << ".log_tau";
