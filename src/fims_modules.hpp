@@ -19,6 +19,7 @@
 #include "../inst/include/interface/rcpp/rcpp_objects/rcpp_recruitment.hpp"
 #include "../inst/include/interface/rcpp/rcpp_objects/rcpp_selectivity.hpp"
 #include "../inst/include/interface/rcpp/rcpp_objects/rcpp_distribution.hpp"
+#include "../inst/include/interface/rcpp/rcpp_objects/rcpp_spatiotemporal_spde.hpp"
 #include "../inst/include/interface/rcpp/rcpp_objects/rcpp_interface_base.hpp"
 #include "../inst/include/interface/rcpp/rcpp_interface.hpp"
 
@@ -29,6 +30,7 @@ RCPP_EXPOSED_CLASS(SharedInt)
 RCPP_EXPOSED_CLASS(SharedString)
 RCPP_EXPOSED_CLASS(SharedReal)
 RCPP_EXPOSED_CLASS(SharedBoolean)
+RCPP_EXPOSED_CLASS(SpatiotemporalSPDEInterface)
 
 /**
  * @brief Define fims C++ functions and classes exposed in R
@@ -449,6 +451,68 @@ RCPP_MODULE(fims) {
       .method("GetId", &CatchAtAgeInterface::get_id)
       .method("DoReporting", &CatchAtAgeInterface::DoReporting)
       .method("IsReporting", &CatchAtAgeInterface::IsReporting);
+
+  Rcpp::class_<SpatiotemporalSPDEInterface>(
+      "SpatiotemporalSPDE",
+      "Spatio-temporal SPDE lognormal distribution. Combines a Matern SPDE "
+      "prior on a latent field omega(node, year) with AR1 temporal evolution "
+      "and a lognormal observation likelihood.")
+      .constructor()
+      .method("get_id", &SpatiotemporalSPDEInterface::get_id,
+              "Returns the unique ID of this distribution interface.")
+      .method("evaluate", &SpatiotemporalSPDEInterface::evaluate,
+              "Evaluates the log-density using double arithmetic (no TMB).")
+      .method("set_distribution_links",
+              &SpatiotemporalSPDEInterface::set_distribution_links,
+              "Not used; provided for interface compliance.")
+      .field("n_nodes", &SpatiotemporalSPDEInterface::n_nodes,
+             "Number of mesh nodes.")
+      .field("n_years", &SpatiotemporalSPDEInterface::n_years,
+             "Number of years.")
+      .field("C0_i", &SpatiotemporalSPDEInterface::C0_i,
+             "Row indices (0-based) for C0 sparse triplets.")
+      .field("C0_j", &SpatiotemporalSPDEInterface::C0_j,
+             "Column indices (0-based) for C0 sparse triplets.")
+      .field("C0_v", &SpatiotemporalSPDEInterface::C0_v,
+             "Non-zero values of C0.")
+      .field("C1_i", &SpatiotemporalSPDEInterface::C1_i,
+             "Row indices (0-based) for C1 sparse triplets.")
+      .field("C1_j", &SpatiotemporalSPDEInterface::C1_j,
+             "Column indices (0-based) for C1 sparse triplets.")
+      .field("C1_v", &SpatiotemporalSPDEInterface::C1_v,
+             "Non-zero values of C1.")
+      .field("C2_i", &SpatiotemporalSPDEInterface::C2_i,
+             "Row indices (0-based) for C2 sparse triplets.")
+      .field("C2_j", &SpatiotemporalSPDEInterface::C2_j,
+             "Column indices (0-based) for C2 sparse triplets.")
+      .field("C2_v", &SpatiotemporalSPDEInterface::C2_v,
+             "Non-zero values of C2.")
+      .field("A_i", &SpatiotemporalSPDEInterface::A_i,
+             "Row (observation) indices (0-based) for A sparse triplets.")
+      .field("A_j", &SpatiotemporalSPDEInterface::A_j,
+             "Column (node) indices (0-based) for A sparse triplets.")
+      .field("A_v", &SpatiotemporalSPDEInterface::A_v,
+             "Non-zero values of A (projection weights).")
+      .field("y_obs", &SpatiotemporalSPDEInterface::y_obs,
+             "Positive observed values (length n_obs).")
+      .field("obs_year_idx", &SpatiotemporalSPDEInterface::obs_year_idx,
+             "0-based year index for each observation.")
+      .field("beta0", &SpatiotemporalSPDEInterface::beta0,
+             "Intercept on the log scale (ParameterVector, 1 element).")
+      .field("rho_logit", &SpatiotemporalSPDEInterface::rho_logit,
+             "AR1 correlation logit-scale; rho = tanh(rho_logit).")
+      .field("log_kappa", &SpatiotemporalSPDEInterface::log_kappa,
+             "Log SPDE range parameter; kappa = exp(log_kappa).")
+      .field("log_tau", &SpatiotemporalSPDEInterface::log_tau,
+             "Log SPDE variance parameter; tau = exp(log_tau).")
+      .field("log_sigma_obs", &SpatiotemporalSPDEInterface::log_sigma_obs,
+             "Log observation standard deviation.")
+      .field("omega", &SpatiotemporalSPDEInterface::omega,
+             "Latent field (ParameterVector, n_nodes * n_years elements).")
+      .field("lpdf_value", &SpatiotemporalSPDEInterface::lpdf_value,
+             "Total log-density after model run.")
+      .field("report_lpdf_vec", &SpatiotemporalSPDEInterface::report_lpdf_vec,
+             "Per-observation log-density values after model run.");
 }
 
 #endif /* SRC_FIMS_MODULES_HPP */

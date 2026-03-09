@@ -41,6 +41,7 @@
 #' @export SharedInt
 #' @export SharedReal
 #' @export SharedString
+#' @export SpatiotemporalSPDE
 #' @import methods
 #' @import stats
 #' @importFrom ggplot2 .data

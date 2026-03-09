@@ -1,0 +1,333 @@
+---
+title: "Spatial DSEM MVP: Spatio-temporal SPDE Lognormal Model"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Spatial DSEM MVP: Spatio-temporal SPDE Lognormal Model}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Overview
+
+This vignette demonstrates a minimal viable implementation of a spatial
+density-surface evaluation model (DSEM) within FIMS. The model combines:
+
+1. **Spatial SPDE prior**: A Matérn covariance field represented via SPDE
+   finite-element matrices from `fmesher`.
+2. **AR1 temporal evolution**: The latent spatial field evolves over years
+   with first-order auto-regressive structure.
+3. **Lognormal observation likelihood**: Positive survey observations are
+   modelled as lognormal with a linear predictor on the log scale.
+
+### Model specification
+
+Let $\omega_{tk}$ denote the latent field at mesh node $k$ in year $t$
+($t = 1, \ldots, T$; $k = 1, \ldots, n$).
+
+**SPDE precision**: $\mathbf{Q} = \tau^2(\kappa^4 \mathbf{C}_0 +
+2\kappa^2 \mathbf{C}_1 + \mathbf{C}_2)$
+
+where $\mathbf{C}_0$, $\mathbf{C}_1$, $\mathbf{C}_2$ are FEM matrices
+from the mesh.
+
+**Initial condition** ($t = 0$): $\boldsymbol{\omega}_0 \sim \text{GMRF}(\mathbf{Q})$
+
+**AR1 evolution** ($t > 0$): $\boldsymbol{\omega}_t - \rho \boldsymbol{\omega}_{t-1}
+\sim \text{GMRF}(\mathbf{Q})$
+
+**Observation likelihood**: For observation $i$ at location $\mathbf{s}_i$
+in year $t_i$:
+
+$$\log y_i \sim \mathcal{N}(\eta_i,\; \sigma_\text{obs}^2) - \log y_i$$
+
+$$\eta_i = \beta_0 + (\mathbf{A} \boldsymbol{\omega}_{t_i})_i$$
+
+where $\mathbf{A}$ is the bilinear projector from mesh nodes to observation
+locations.
+
+### Parameters
+
+| Parameter     | Scale            | Description                               |
+|---------------|------------------|-------------------------------------------|
+| $\beta_0$     | log              | Intercept                                 |
+| $\rho$        | logit            | AR1 temporal correlation ($\in (-1, 1)$) |
+| $\kappa$      | log              | SPDE range parameter                      |
+| $\tau$        | log              | SPDE variance parameter                   |
+| $\sigma_\text{obs}$ | log        | Observation error standard deviation      |
+| $\boldsymbol{\omega}$ | natural  | Latent field (random effects)             |
+
+## Setup
+
+```{r setup}
+library(FIMS)
+```
+
+The following packages are required for this vignette:
+
+```{r check-packages, eval=FALSE}
+# Install fmesher if needed:
+# install.packages("fmesher")
+library(fmesher)
+library(Matrix)
+library(TMB)
+```
+
+```{r load-packages, include=FALSE}
+has_fmesher <- requireNamespace("fmesher", quietly = TRUE)
+has_matrix  <- requireNamespace("Matrix",  quietly = TRUE)
+has_tmb     <- requireNamespace("TMB",     quietly = TRUE)
+run_full    <- has_fmesher && has_matrix && has_tmb
+```
+
+## Build a simple mesh with `fmesher`
+
+We create a small mesh over a 2D domain using a grid of known locations.
+
+```{r build-mesh, eval=run_full}
+library(fmesher)
+library(Matrix)
+library(TMB)
+
+set.seed(42)
+
+# Define a small set of known spatial locations on the unit square
+n_loc <- 9
+loc <- as.matrix(expand.grid(x = seq(0, 1, length.out = 3),
+                              y = seq(0, 1, length.out = 3)))
+
+# Build a mesh with fmesher (max.edge controls triangle size)
+mesh <- fmesher::fm_mesh_2d(
+  loc     = loc,
+  max.edge = c(0.5, 1.5),   # inner / outer max edge lengths
+  offset   = c(0.2, 0.5)
+)
+
+cat("Mesh nodes:", mesh$n, "\n")
+```
+
+## Build SPDE matrices and projector A
+
+```{r spde-matrices, eval=run_full}
+# Compute FEM matrices from the mesh
+fem <- fmesher::fm_fem(mesh)
+# fem$c0: mass matrix     (n x n)
+# fem$g1: mixed           (n x n)
+# fem$g2: stiffness       (n x n)
+
+# Build projection matrix A: n_loc x n_nodes
+# A[i, k] = basis-function weight for location i at node k
+A_mat <- fmesher::fm_basis(mesh, loc = loc)
+
+cat("C0 dimensions:", dim(fem$c0), "\n")
+cat("A  dimensions:", dim(A_mat), "\n")
+```
+
+## Simulate toy observations
+
+We simulate observations from the true model to have something to fit.
+
+```{r simulate-data, eval=run_full}
+n_years <- 3L
+n_loc_per_year <- nrow(loc)
+n_obs <- n_loc_per_year * n_years
+
+# True parameters
+beta0_true        <- 1.0
+rho_true          <- 0.7
+log_kappa_true    <- log(2.0)
+log_tau_true      <- log(1.0)
+log_sigma_obs_true <- log(0.2)
+
+# Build Q from true kappa/tau
+kappa_true <- exp(log_kappa_true)
+tau_true   <- exp(log_tau_true)
+C0 <- fem$c0
+G1 <- fem$g1
+G2 <- fem$g2
+Q_true <- tau_true^2 * (kappa_true^4 * C0 + 2 * kappa_true^2 * G1 + G2)
+Q_true <- (Q_true + Matrix::t(Q_true)) / 2 + Diagonal(nrow(Q_true)) * 1e-6
+
+# Simulate spatial fields via Cholesky of precision
+n_nodes_mesh <- mesh$n
+R_chol <- Matrix::chol(Q_true)  # upper-triangular Cholesky of Q
+
+# Simulate omega: AR1 over years
+omega_sim <- matrix(0, nrow = n_years, ncol = n_nodes_mesh)
+for (t in seq_len(n_years)) {
+  z <- rnorm(n_nodes_mesh)
+  # Solve R^T * R * omega = z  => omega = R^{-1} * R^{-T} * z
+  omega_sim[t, ] <- as.numeric(Matrix::solve(R_chol, z))
+  if (t > 1) {
+    omega_sim[t, ] <- rho_true * omega_sim[t - 1, ] + omega_sim[t, ]
+  }
+}
+
+# Generate observations
+y_obs       <- numeric(n_obs)
+obs_year_idx <- integer(n_obs)
+for (t in seq_len(n_years)) {
+  idx  <- ((t - 1) * n_loc_per_year + 1):(t * n_loc_per_year)
+  eta  <- beta0_true + as.numeric(A_mat %*% omega_sim[t, ])
+  y_obs[idx]        <- exp(rnorm(n_loc_per_year, mean = eta,
+                                  sd = exp(log_sigma_obs_true)))
+  obs_year_idx[idx] <- t - 1L  # 0-based year index
+}
+
+cat("Observations simulated:", n_obs, "\n")
+cat("Min/max y_obs:", round(min(y_obs), 3), "/", round(max(y_obs), 3), "\n")
+```
+
+## Convert sparse matrices to FIMS triplets
+
+```{r convert-triplets, eval=run_full}
+C0_trips <- sparse_to_triplets(fem$c0)
+C1_trips <- sparse_to_triplets(fem$g1)
+C2_trips <- sparse_to_triplets(fem$g2)
+A_trips  <- sparse_to_triplets(
+  # Stack A for all observations (same spatial locations each year)
+  do.call(rbind, replicate(n_years, A_mat, simplify = FALSE))
+)
+
+# Note: obs_year_idx already aligns with the stacked rows of A
+cat("C0 non-zeros:", length(C0_trips$v), "\n")
+cat("A  non-zeros:", length(A_trips$v), "\n")
+```
+
+## Configure the FIMS spatiotemporal SPDE model
+
+```{r configure-fims, eval=run_full}
+clear()  # Reset FIMS state
+
+spde_obj <- create_spatiotemporal_spde(
+  n_nodes           = mesh$n,
+  n_years           = n_years,
+  C0_triplets       = C0_trips,
+  C1_triplets       = C1_trips,
+  C2_triplets       = C2_trips,
+  A_triplets        = A_trips,
+  y_obs             = y_obs,
+  obs_year_idx      = obs_year_idx,
+  beta0_init        = 1.0,
+  rho_logit_init    = 0.0,       # rho = tanh(0) = 0
+  log_kappa_init    = 0.0,
+  log_tau_init      = 0.0,
+  log_sigma_obs_init = log(0.3),
+  estimate_beta0    = TRUE,
+  estimate_rho      = TRUE,
+  estimate_log_kappa = FALSE,    # fix log_kappa
+  estimate_log_tau   = FALSE,    # fix log_tau
+  estimate_log_sigma_obs = TRUE
+)
+
+cat("SPDE object ID:", spde_obj$get_id(), "\n")
+```
+
+## Build the TMB model
+
+```{r create-tmb, eval=run_full}
+CreateTMBModel()
+
+p  <- get_fixed()
+re <- get_random()
+
+cat("Fixed-effect parameters:", length(p), "\n")
+cat("Random-effect parameters (omega):", length(re),
+    "(=", mesh$n, "nodes x", n_years, "years)\n")
+```
+
+## Fit the model
+
+```{r fit-model, eval=run_full}
+obj <- TMB::MakeADFun(
+  data       = list(),
+  parameters = list(p = p, re = re),
+  random     = "re",
+  DLL        = "FIMS",
+  silent     = TRUE
+)
+
+# Evaluate NLL at initial values
+nll_init <- obj$fn(obj$par)
+cat("NLL at initial values:", round(nll_init, 3), "\n")
+
+# Optimise
+opt <- nlminb(
+  start     = obj$par,
+  objective = obj$fn,
+  gradient  = obj$gr,
+  control   = list(iter.max = 300, eval.max = 500)
+)
+cat("Convergence:", opt$convergence,
+    "(0 = success)\n")
+cat("NLL at optimum:", round(opt$objective, 3), "\n")
+```
+
+## Extract parameter estimates
+
+```{r estimates, eval=run_full}
+# Update Information with final parameter values
+set_fixed(opt$par)
+set_random(rep(0, length(re)))  # RE marginalised by TMB
+
+# SD report for uncertainty
+sdr    <- TMB::sdreport(obj)
+est    <- summary(sdr, "fixed")
+
+cat("\nFixed-effect parameter estimates:\n")
+print(round(est, 4))
+
+# Extract estimated beta0 and rho
+p_names <- get_parameter_names()
+beta0_est     <- est[grep("beta0",     p_names), "Estimate"]
+rho_logit_est <- est[grep("rho_logit", p_names), "Estimate"]
+rho_est       <- tanh(rho_logit_est)
+
+cat("\nEstimated beta0:", round(beta0_est, 3),
+    "(true:", beta0_true, ")\n")
+cat("Estimated rho:  ", round(rho_est, 3),
+    "(true:", rho_true, ")\n")
+```
+
+## Visualise fitted spatial field (year 1)
+
+```{r plot-field, eval=run_full, fig.width=6, fig.height=4}
+# Get marginal estimates of omega
+omega_est <- summary(sdr, "random")[, "Estimate"]
+omega_mat <- matrix(omega_est, nrow = n_years, ncol = mesh$n, byrow = FALSE)
+
+# Predicted log-density at observation locations for year 1
+eta_pred_y1 <- beta0_est + as.numeric(A_mat %*% omega_mat[1, ])
+plot(loc[, 1], loc[, 2],
+     pch  = 21,
+     bg   = colorRampPalette(c("blue", "white", "red"))(20)[
+       cut(eta_pred_y1, 20)],
+     cex  = 2,
+     xlab = "x", ylab = "y",
+     main = "Fitted log-density (Year 1)")
+```
+
+## Cleanup
+
+```{r cleanup, eval=run_full}
+clear()
+```
+
+## Summary
+
+This vignette demonstrated a working MVP spatial DSEM in FIMS:
+
+- **fmesher** was used to build the mesh and compute FEM matrices.
+- **FIMS** estimated the fixed effects ($\beta_0$, $\rho$) and marginalised
+  the random effects ($\boldsymbol{\omega}$) via TMB's Laplace approximation.
+- The model recovers the simulated parameters reasonably well for a small
+  mesh and few years.
+
+For a real application, use a finer mesh (more nodes), more years of data,
+and consider estimating $\kappa$ and $\tau$ jointly.
