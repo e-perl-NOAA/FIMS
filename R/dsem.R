@@ -35,7 +35,8 @@ build_DSEM <- function(
 #' Construct DSEM-ready data from a `FIMSFrame` object and optional environmental
 #' covariates. This helper mirrors the data-shaping behavior used in Rceattle:
 #' it pads years to the FIMS model range and prepends recruitment-deviation
-#' placeholder columns (`recdevs*`).
+#' placeholder columns (`recdevs*`). When a default SEM is generated, equations
+#' are concatenated with `"; "` separators.
 #'
 #' @param dsem_settings A list returned by [build_DSEM()].
 #' @param data A `FIMSFrame` object used to determine model start and end years.
@@ -72,6 +73,11 @@ build_dsem_objects <- function(
       cli::cli_abort("{.var env_data} must be a data frame when provided.")
     }
     if (!"Year" %in% names(env_data)) {
+      if (nrow(env_data) > length(years)) {
+        cli::cli_abort(
+          "{.var env_data} has more rows than model years and no {.field Year} column."
+        )
+      }
       env_data <- dplyr::mutate(env_data, Year = years[seq_len(nrow(env_data))])
     }
     dsem_data <- env_data |>
@@ -81,12 +87,17 @@ build_dsem_objects <- function(
 
   dsem_data <- dplyr::select(dsem_data, -"Year")
 
-  for (sp in seq(from = n_recdevs, to = 1L)) {
-    dsem_data <- dsem_data |>
-      dplyr::mutate(recdevs = NA_real_) |>
-      dplyr::relocate(.data$recdevs)
-    names(dsem_data)[1] <- paste0("recdevs", sp)
-  }
+  recdev_cols <- paste0("recdevs", seq_len(n_recdevs))
+  recdev_df <- as.data.frame(
+    setNames(
+      rep(list(rep(NA_real_, nrow(dsem_data))), n_recdevs),
+      recdev_cols
+    )
+  )
+  dsem_data <- dplyr::bind_cols(
+    tibble::as_tibble(recdev_df),
+    dsem_data
+  )
 
   if (length(dsem_settings$family) == 1) {
     dsem_settings$family <- rep(dsem_settings$family, ncol(dsem_data))
@@ -102,10 +113,10 @@ build_dsem_objects <- function(
     for (sp in seq_len(n_recdevs)) {
       sem <- c(
         sem,
-        paste0("recdevs", sp, " <-> recdevs", sp, ", 0, sigmaR", sp, ", 1\n")
+        paste0("recdevs", sp, " <-> recdevs", sp, ", 0, sigmaR", sp, ", 1")
       )
     }
-    dsem_settings$sem <- paste0(sem, collapse = " ")
+    dsem_settings$sem <- paste0(sem, collapse = "; ")
   }
 
   list(
