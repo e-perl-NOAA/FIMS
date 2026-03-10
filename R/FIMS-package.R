@@ -6,6 +6,8 @@
 #' @export CatchAtAge
 #' @export clear
 #' @export CreateTMBModel
+#' @export build_DSEM
+#' @export build_dsem_objects
 #' @export DlnormDistribution
 #' @export DmultinomDistribution
 #' @export DnormDistribution
