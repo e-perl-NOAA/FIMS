@@ -144,25 +144,6 @@ class Model {  // may need singleton
       }
     }
 
-    // Loop over and evaluate spatio-temporal joint negative log-likelihoods
-    // (self-contained distributions managing their own random and fixed
-    // effects)
-    int n_spatiotemporal = 0;
-    for (d_it = this->fims_information->density_components.begin();
-         d_it != this->fims_information->density_components.end(); ++d_it) {
-      std::shared_ptr<fims_distributions::DensityComponentBase<Type>> d =
-          (*d_it).second;
-#ifdef TMB_MODEL
-      d->of = this->of;
-#endif
-      if (d->input_type == "spatiotemporal") {
-        nll_vec[nll_vec_idx] = -d->evaluate();
-        jnll += nll_vec[nll_vec_idx];
-        n_spatiotemporal += 1;
-        nll_vec_idx += 1;
-      }
-    }
-
 // report out nll components
 #ifdef TMB_MODEL
     vector<Type> nll_components = nll_vec.to_tmb();
