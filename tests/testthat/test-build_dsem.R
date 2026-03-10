@@ -29,7 +29,7 @@ test_that("`build_dsem_objects()` creates recdev columns and pads years", {
     n_recdevs = 1
   )
 
-  expect_named(result, c("dsem_settings", "dsem_data"))
+  expect_named(result, c("dsem_settings", "dsem_data", "tmb_inputs"))
   expect_true("recdevs1" %in% names(result$dsem_data))
   expect_equal(nrow(result$dsem_data), get_n_years(frame))
   expect_equal(length(result$dsem_settings$family), ncol(result$dsem_data))
@@ -37,6 +37,8 @@ test_that("`build_dsem_objects()` creates recdev columns and pads years", {
     result$dsem_settings$sem,
     "recdevs1 <-> recdevs1, 0, sigmaR1, 1"
   )
+  expect_true(is.list(result$tmb_inputs))
+  expect_true(all(c("RAM", "RAMstart", "familycode_j", "y_tj", "parameters") %in% names(result$tmb_inputs)))
 })
 
 test_that("`build_dsem_objects()` validates family length", {
@@ -69,4 +71,22 @@ test_that("`build_dsem_objects()` errors when env_data rows exceed model years",
     ),
     "more rows than model years"
   )
+})
+
+test_that("`initialize_dsem_distribution()` builds an Rcpp DSEM module", {
+  frame <- FIMSFrame(data1)
+  dsem <- build_dsem_objects(
+    dsem_settings = build_DSEM(),
+    data = frame,
+    env_data = tibble::tibble(
+      Year = c(get_start_year(frame), get_end_year(frame)),
+      Temp = c(1, 2)
+    ),
+    n_recdevs = 1
+  )
+
+  module <- initialize_dsem_distribution(dsem)
+  expect_equal(class(module)[1], "Rcpp_DSEMDistribution")
+  expect_true(module$get_id() >= 1)
+  clear()
 })

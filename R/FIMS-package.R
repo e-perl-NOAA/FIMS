@@ -10,6 +10,7 @@
 #' @export build_dsem_objects
 #' @export DlnormDistribution
 #' @export DmultinomDistribution
+#' @export DSEMDistribution
 #' @export DnormDistribution
 #' @export DoubleLogisticSelectivity
 #' @export EWAAGrowth

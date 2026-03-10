@@ -652,6 +652,9 @@ initialize_comp <- function(data,
 #'   [FIMSFrame()]. Passing the data is required because initialization of the
 #'   modules requires passing the data and information regarding the uncertainty
 #'   of that data, i.e., input sample sizes for the multinomial distribution.
+#' @param dsem An optional list returned by [build_dsem_objects()]. When
+#'   supplied, a DSEM density module is initialized and added to the objective
+#'   function before `CreateTMBModel()` is called.
 #' @return
 #' A list is returned with two elements, `parameters` and `model`. The list can
 #' be passed to the `input` argument of [fit_fims()] to fit the model. The first
@@ -683,7 +686,7 @@ initialize_comp <- function(data,
 #'   initialize_fims(data = data_4_model)
 #' clear()
 #' }
-initialize_fims <- function(parameters, data) {
+initialize_fims <- function(parameters, data, dsem = NULL) {
   # Validate parameters input
   if (missing(parameters) || !tibble::is_tibble(parameters)) {
     cli::cli_abort("The {.var parameters} argument must be a tibble.")
@@ -966,6 +969,10 @@ initialize_fims <- function(parameters, data) {
     # parameters tibble
     linked_ids = population_module_ids
   )
+
+  if (!is.null(dsem)) {
+    initialize_dsem_distribution(dsem = dsem)
+  }
 
   # Set-up TMB
   # Hard code to be a catch-at-age model

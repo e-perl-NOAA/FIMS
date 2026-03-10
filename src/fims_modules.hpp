@@ -10,6 +10,7 @@
 #define SRC_FIMS_MODULES_HPP
 
 #include "../inst/include/interface/rcpp/rcpp_objects/rcpp_data.hpp"
+#include "../inst/include/interface/rcpp/rcpp_objects/rcpp_dsem.hpp"
 #include "../inst/include/interface/rcpp/rcpp_objects/rcpp_fleet.hpp"
 #include "../inst/include/interface/rcpp/rcpp_objects/rcpp_growth.hpp"
 #include "../inst/include/interface/rcpp/rcpp_objects/rcpp_math.hpp"
@@ -438,6 +439,29 @@ RCPP_MODULE(fims) {
       .field("expected_values",
              &DmultinomDistributionsInterface::expected_values)
       .field("dims", &DmultinomDistributionsInterface::dims);
+
+  Rcpp::class_<DSEMDistributionInterface>(
+      "DSEMDistribution",
+      "DSEM density component used to integrate SEM-linked recruitment signals.")
+      .constructor()
+      .method("get_id", &DSEMDistributionInterface::get_id)
+      .method("evaluate", &DSEMDistributionInterface::evaluate)
+      .field("options", &DSEMDistributionInterface::options)
+      .field("RAM", &DSEMDistributionInterface::RAM)
+      .field("RAM_n_rows", &DSEMDistributionInterface::RAM_n_rows)
+      .field("RAMstart", &DSEMDistributionInterface::RAMstart)
+      .field("familycode_j", &DSEMDistributionInterface::familycode_j)
+      .field("y_tj", &DSEMDistributionInterface::y_tj)
+      .field("n_t", &DSEMDistributionInterface::n_t)
+      .field("n_j", &DSEMDistributionInterface::n_j)
+      .field("beta_z", &DSEMDistributionInterface::beta_z)
+      .field("lnsigma_j", &DSEMDistributionInterface::lnsigma_j)
+      .field("mu_j", &DSEMDistributionInterface::mu_j)
+      .field("delta0_j", &DSEMDistributionInterface::delta0_j)
+      .field("x_tj", &DSEMDistributionInterface::x_tj)
+      .field("z_tj_report", &DSEMDistributionInterface::z_tj_report)
+      .field("jnll_dsem", &DSEMDistributionInterface::jnll_dsem)
+      .field("jnll_gmrf_dsem", &DSEMDistributionInterface::jnll_gmrf_dsem);
 
   Rcpp::class_<CatchAtAgeInterface>(
       "CatchAtAge",
