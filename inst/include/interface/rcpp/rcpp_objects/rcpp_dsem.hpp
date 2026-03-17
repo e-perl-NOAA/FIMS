@@ -78,7 +78,8 @@ class DSEMDistributionInterface : public DistributionsInterfaceBase {
     // The optimization path uses add_to_fims_tmb_internal<Type>() below.
     fims_distributions::DSEMLikelihood<double> dsem;
     dsem.options.resize(this->options.size());
-    for (size_t i = 0; i < this->options.size(); i++) dsem.options[i] = this->options[i];
+    for (size_t i = 0; i < this->options.size(); i++)
+      dsem.options[i] = this->options[i];
     dsem.RAM.resize(this->RAM.size());
     for (size_t i = 0; i < this->RAM.size(); i++) dsem.RAM[i] = this->RAM[i];
     dsem.RAM_n_rows = this->RAM_n_rows;
@@ -91,20 +92,26 @@ class DSEMDistributionInterface : public DistributionsInterfaceBase {
       dsem.familycode_j[i] = this->familycode_j[i];
     }
     dsem.y_tj.resize(this->y_tj.size());
-    for (size_t i = 0; i < this->y_tj.size(); i++) dsem.y_tj[i] = this->y_tj[i].initial_value_m;
+    for (size_t i = 0; i < this->y_tj.size(); i++)
+      dsem.y_tj[i] = this->y_tj[i].initial_value_m;
     dsem.n_t = this->n_t;
     dsem.n_j = this->n_j;
 
     dsem.beta_z.resize(this->beta_z.size());
-    for (size_t i = 0; i < this->beta_z.size(); i++) dsem.beta_z[i] = this->beta_z[i].initial_value_m;
+    for (size_t i = 0; i < this->beta_z.size(); i++)
+      dsem.beta_z[i] = this->beta_z[i].initial_value_m;
     dsem.lnsigma_j.resize(this->lnsigma_j.size());
-    for (size_t i = 0; i < this->lnsigma_j.size(); i++) dsem.lnsigma_j[i] = this->lnsigma_j[i].initial_value_m;
+    for (size_t i = 0; i < this->lnsigma_j.size(); i++)
+      dsem.lnsigma_j[i] = this->lnsigma_j[i].initial_value_m;
     dsem.mu_j.resize(this->mu_j.size());
-    for (size_t i = 0; i < this->mu_j.size(); i++) dsem.mu_j[i] = this->mu_j[i].initial_value_m;
+    for (size_t i = 0; i < this->mu_j.size(); i++)
+      dsem.mu_j[i] = this->mu_j[i].initial_value_m;
     dsem.delta0_j.resize(this->delta0_j.size());
-    for (size_t i = 0; i < this->delta0_j.size(); i++) dsem.delta0_j[i] = this->delta0_j[i].initial_value_m;
+    for (size_t i = 0; i < this->delta0_j.size(); i++)
+      dsem.delta0_j[i] = this->delta0_j[i].initial_value_m;
     dsem.x_tj.resize(this->x_tj.size());
-    for (size_t i = 0; i < this->x_tj.size(); i++) dsem.x_tj[i] = this->x_tj[i].initial_value_m;
+    for (size_t i = 0; i < this->x_tj.size(); i++)
+      dsem.x_tj[i] = this->x_tj[i].initial_value_m;
 
     return dsem.evaluate();
   }

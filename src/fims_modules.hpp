@@ -442,7 +442,8 @@ RCPP_MODULE(fims) {
 
   Rcpp::class_<DSEMDistributionInterface>(
       "DSEMDistribution",
-      "DSEM density component used to integrate SEM-linked recruitment signals.")
+      "DSEM density component used to integrate SEM-linked recruitment "
+      "signals.")
       .constructor()
       .method("get_id", &DSEMDistributionInterface::get_id)
       .method("evaluate", &DSEMDistributionInterface::evaluate)

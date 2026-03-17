@@ -74,7 +74,8 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
       matrix<Type> dense_matrix(sparse_matrix.rows(), sparse_matrix.cols());
       dense_matrix.setZero();
       for (int k = 0; k < sparse_matrix.outerSize(); ++k) {
-        for (typename Eigen::SparseMatrix<Type>::InnerIterator it(sparse_matrix, k);
+        for (typename Eigen::SparseMatrix<Type>::InnerIterator it(sparse_matrix,
+                                                                  k);
              it; ++it) {
           dense_matrix(it.row(), it.col()) = it.value();
         }
@@ -114,7 +115,8 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
         tmp = this->beta_z[pidx - 1];
       }
       if (ram_type == 1) {
-        // Directed path (->) contributes to autoregressive/transition structure.
+        // Directed path (->) contributes to autoregressive/transition
+        // structure.
         Rho_kk.coeffRef(i, j) = tmp;
       } else if (ram_type == 2) {
         // Variance/covariance path (<->) contributes to process covariance.
@@ -124,9 +126,8 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
     Eigen::SparseMatrix<Type> IminusRho_kk = I_kk - Rho_kk;
 
     // Rescale matrices when options(1) is 1 or 2 (constant marginal variance).
-    if (this->options.size() > 1 &&
-        ((CppAD::Integer(this->options[1]) == 1) ||
-         (CppAD::Integer(this->options[1]) == 2))) {
+    if (this->options.size() > 1 && ((CppAD::Integer(this->options[1]) == 1) ||
+                                     (CppAD::Integer(this->options[1]) == 2))) {
       matrix<Type> I_dense(n_k, n_k);
       I_dense.setIdentity();
       matrix<Type> invIminusRho_dense =
@@ -182,10 +183,12 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
       }
     }
 
-    array<Type> xhat_tj(static_cast<int>(this->n_t), static_cast<int>(this->n_j));
+    array<Type> xhat_tj(static_cast<int>(this->n_t),
+                        static_cast<int>(this->n_j));
     array<Type> delta_tj(static_cast<int>(this->n_t),
                          static_cast<int>(this->n_j));
-    array<Type> x_array(static_cast<int>(this->n_t), static_cast<int>(this->n_j));
+    array<Type> x_array(static_cast<int>(this->n_t),
+                        static_cast<int>(this->n_j));
     for (size_t j = 0; j < this->n_j; j++) {
       for (size_t t = 0; t < this->n_t; t++) {
         const size_t k = this->k_index(t, j);
@@ -246,11 +249,13 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
     for (size_t t = 0; t < this->n_t; t++) {
       for (size_t j = 0; j < this->n_j; j++) {
         const size_t k = this->k_index(t, j);
-        const int family = CppAD::Integer(this->familycode_j.get_force_scalar(j));
+        const int family =
+            CppAD::Integer(this->familycode_j.get_force_scalar(j));
         const Type y = this->y_tj.get_force_scalar(k);
 
         if (family == 0) {
-          // "fixed": observed value is treated as latent mean (no data density).
+          // "fixed": observed value is treated as latent mean (no data
+          // density).
           mu_tj(t, j) = z_tj(t, j);
         } else if (family == 1) {
           // Gaussian response on identity scale.
@@ -274,8 +279,8 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
           // Gamma response with log-linked mean and sigma-driven shape/scale.
           mu_tj(t, j) = exp(z_tj(t, j));
           if (!R_IsNA(asDouble(y))) {
-            loglik_tj_dsem(t, j) = dgamma(y, pow(sigma_j(j), -2),
-                                          mu_tj(t, j) * pow(sigma_j(j), 2), true);
+            loglik_tj_dsem(t, j) = dgamma(
+                y, pow(sigma_j(j), -2), mu_tj(t, j) * pow(sigma_j(j), 2), true);
           }
         }
       }
