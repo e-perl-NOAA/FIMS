@@ -8,7 +8,7 @@
 #ifndef FIMS_DISTRIBUTIONS_DSEM_HPP
 #define FIMS_DISTRIBUTIONS_DSEM_HPP
 
-#include <Eigen/SparseLU>
+#include <Eigen/IterativeLinearSolvers>
 
 #include "density_components_base.hpp"
 
@@ -71,6 +71,35 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
     }
 
     const int n_k = static_cast<int>(this->n_t * this->n_j);
+    auto sparse_to_dense = [](const Eigen::SparseMatrix<Type> &sparse_matrix) {
+      matrix<Type> dense_matrix(sparse_matrix.rows(), sparse_matrix.cols());
+      dense_matrix.setZero();
+      for (int k = 0; k < sparse_matrix.outerSize(); ++k) {
+        for (typename Eigen::SparseMatrix<Type>::InnerIterator it(sparse_matrix, k);
+             it; ++it) {
+          dense_matrix(it.row(), it.col()) = it.value();
+        }
+      }
+      return dense_matrix;
+    };
+    auto solve_linear_system = [&](const Eigen::SparseMatrix<Type> &lhs_matrix,
+                                   const matrix<Type> &rhs_matrix) {
+      Eigen::BiCGSTAB<Eigen::SparseMatrix<Type>> solver;
+      solver.compute(lhs_matrix);
+      if (solver.info() != Eigen::Success) {
+        FIMS_WARNING_LOG(
+            "DSEMLikelihood sparse solve decomposition failed; results may be "
+            "unreliable.");
+      }
+      matrix<Type> solution = solver.solve(rhs_matrix);
+      if (solver.info() != Eigen::Success) {
+        FIMS_WARNING_LOG(
+            "DSEMLikelihood sparse solve iteration failed for one or more RHS "
+            "columns; results may be unreliable.");
+      }
+      return solution;
+    };
+
     matrix<Type> loglik_tj_dsem(this->n_t, this->n_j);
     loglik_tj_dsem.setZero();
     vector<Type> sigma_j(this->n_j);
@@ -106,24 +135,18 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
     }
     Eigen::SparseMatrix<Type> IminusRho_kk = I_kk - Rho_kk;
 
-    Eigen::SparseLU<Eigen::SparseMatrix<Type>, Eigen::COLAMDOrdering<int>>
-        inverseIminusRho_kk;
-    inverseIminusRho_kk.compute(IminusRho_kk);
-
     // Rescale matrices when options(1) is 1 or 2 (constant marginal variance).
     if (this->options.size() > 1 &&
         ((CppAD::Integer(this->options[1]) == 1) ||
          (CppAD::Integer(this->options[1]) == 2))) {
-      Eigen::SparseMatrix<Type> invIminusRho_kk;
-      invIminusRho_kk = inverseIminusRho_kk.solve(I_kk);
-
-      Eigen::SparseMatrix<Type> squared_invIminusRho_kk(n_k, n_k);
-      squared_invIminusRho_kk =
-          invIminusRho_kk.cwiseProduct(invIminusRho_kk);
-
-      Eigen::SparseLU<Eigen::SparseMatrix<Type>, Eigen::COLAMDOrdering<int>>
-          invsquared_invIminusRho_kk;
-      invsquared_invIminusRho_kk.compute(squared_invIminusRho_kk);
+      matrix<Type> I_dense(n_k, n_k);
+      I_dense.setIdentity();
+      matrix<Type> invIminusRho_dense =
+          solve_linear_system(IminusRho_kk, I_dense);
+      matrix<Type> squared_invIminusRho_dense =
+          invIminusRho_dense.cwiseProduct(invIminusRho_dense);
+      Eigen::ColPivHouseholderQR<matrix<Type>> invsq_solver(
+          squared_invIminusRho_dense);
 
       if (CppAD::Integer(this->options[1]) == 1) {
         matrix<Type> ones_k1(n_k, 1);
@@ -131,7 +154,7 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
         Eigen::SparseMatrix<Type> squared_Gamma_kk =
             Gamma_kk.cwiseProduct(Gamma_kk);
         matrix<Type> sigma2_k1 = squared_Gamma_kk.transpose() * ones_k1;
-        matrix<Type> margvar_k1 = invsquared_invIminusRho_kk.solve(sigma2_k1);
+        matrix<Type> margvar_k1 = invsq_solver.solve(sigma2_k1);
 
         Eigen::SparseMatrix<Type> invmargsd_kk(n_k, n_k);
         Eigen::SparseMatrix<Type> invsigma_kk(n_k, n_k);
@@ -141,15 +164,13 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
         }
         IminusRho_kk = invmargsd_kk * IminusRho_kk;
         Gamma_kk = invsigma_kk * Gamma_kk;
-        inverseIminusRho_kk.compute(IminusRho_kk);
       } else {
         matrix<Type> targetvar_k1(n_k, 1);
         for (int k = 0; k < n_k; k++) {
           targetvar_k1(k, 0) =
               Gamma_kk.coeffRef(k, k) * Gamma_kk.coeffRef(k, k);
         }
-        matrix<Type> margvar_k1 =
-            invsquared_invIminusRho_kk.solve(targetvar_k1);
+        matrix<Type> margvar_k1 = invsq_solver.solve(targetvar_k1);
         for (int k = 0; k < n_k; k++) {
           Gamma_kk.coeffRef(k, k) = pow(margvar_k1(k, 0), 0.5);
         }
@@ -167,7 +188,7 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
         size_t k = j * this->n_t;
         delta0_k1(k, 0) = this->delta0_j.get_force_scalar(j);
       }
-      matrix<Type> x = inverseIminusRho_kk.solve(delta0_k1);
+      matrix<Type> x = solve_linear_system(IminusRho_kk, delta0_k1);
       for (int k = 0; k < n_k; k++) {
         delta_k(k) = x(k, 0);
       }
@@ -223,7 +244,7 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
         }
       }
       matrix<Type> z2_k1 = Gamma_kk * z_k1;
-      matrix<Type> z3_k1 = inverseIminusRho_kk.solve(z2_k1);
+      matrix<Type> z3_k1 = solve_linear_system(IminusRho_kk, z2_k1);
       for (size_t j = 0; j < this->n_j; j++) {
         for (size_t t = 0; t < this->n_t; t++) {
           z_tj(t, j) = z3_k1(this->k_index(t, j), 0);
