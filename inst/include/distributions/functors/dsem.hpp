@@ -20,24 +20,43 @@ namespace fims_distributions {
  * @details This module follows the sparse precision-matrix implementation used
  * in Rceattle for integrating dsem-style latent dynamics and observation
  * families into the joint negative log-likelihood.
+ *
+ * Why this is a header (`.hpp`) in FIMS:
+ * - FIMS likelihood components are templated (`Type`) so they can be compiled
+ *   for both ordinary doubles and automatic-differentiation types.
+ * - Templated definitions must be visible at compile/instantiation time, so the
+ *   full implementation is kept in a header instead of split into a `.cpp`.
+ * - Rceattle's `.cpp` organization is tied to a single TMB model translation
+ *   unit, while FIMS composes many reusable modules from headers.
  */
 template <typename Type>
 struct DSEMLikelihood : public DensityComponentBase<Type> {
+  // Runtime options from dsem/tmb inputs.
+  // options[0] controls whether x_tj is already transformed or needs mapping.
+  // options[1] controls optional marginal-variance scaling.
   fims::Vector<Type> options;
+  // Flattened RAM triplets/quads that define SEM links.
+  // Stored as rows of: [ram_type, row_k, col_k, parameter_index].
   fims::Vector<Type> RAM;
   size_t RAM_n_rows = 0;
+  // Default/fixed RAM values used when no estimable beta_z parameter is mapped.
   fims::Vector<Type> RAMstart;
+  // Observation family code per variable j (fixed, normal, bernoulli, ...).
   fims::Vector<Type> familycode_j;
+  // Observed data stacked by variable-major k = j*n_t + t indexing.
   fims::Vector<Type> y_tj;
   size_t n_t = 0;
   size_t n_j = 0;
 
+  // DSEM parameters.
   fims::Vector<Type> beta_z;
   fims::Vector<Type> lnsigma_j;
   fims::Vector<Type> mu_j;
   fims::Vector<Type> delta0_j;
+  // Latent state vector (random effects in typical configurations).
   fims::Vector<Type> x_tj;
 
+  // Report outputs for downstream summaries/debugging.
   fims::Vector<Type> z_tj_report;
   Type jnll_dsem = static_cast<Type>(0.0);
   Type jnll_gmrf_dsem = static_cast<Type>(0.0);
@@ -78,8 +97,10 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
         tmp = this->beta_z[pidx - 1];
       }
       if (ram_type == 1) {
+        // Directed path (->) contributes to autoregressive/transition structure.
         Rho_kk.coeffRef(i, j) = tmp;
       } else if (ram_type == 2) {
+        // Variance/covariance path (<->) contributes to process covariance.
         Gamma_kk.coeffRef(i, j) = tmp;
       }
     }
@@ -138,6 +159,8 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
     vector<Type> delta_k(n_k);
     delta_k.setZero();
     if (this->delta0_j.size() > 0) {
+      // delta0_j are initial-condition offsets at t = 1 for each series j.
+      // They are propagated through (I - Rho)^-1 to create full-state offsets.
       matrix<Type> delta0_k1(n_k, 1);
       delta0_k1.setZero();
       for (size_t j = 0; j < this->n_j; j++) {
@@ -164,6 +187,8 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
 
     array<Type> z_tj(this->n_t, this->n_j);
     if (this->options.size() > 0 && CppAD::Integer(this->options[0]) == 0) {
+      // Standard mode: x_tj is on the data scale and receives a sparse GMRF
+      // prior with precision Q = (I-Rho)' V^-1 (I-Rho).
       Eigen::SparseMatrix<Type> V_kk = Gamma_kk.transpose() * Gamma_kk;
       matrix<Type> V_dense(n_k, n_k);
       V_dense.setZero();
@@ -188,6 +213,8 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
       this->jnll_gmrf_dsem = GMRF(Q_kk)(x_array - xhat_tj - delta_tj);
       z_tj = x_array;
     } else {
+      // Alternative mode: x_tj is standardized, so apply identity GMRF prior
+      // first and then transform into z_tj via Gamma and (I-Rho)^-1.
       this->jnll_gmrf_dsem = GMRF(I_kk)(x_array);
       matrix<Type> z_k1(n_k, 1);
       for (size_t j = 0; j < this->n_j; j++) {
@@ -213,23 +240,28 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
         const Type y = this->y_tj.get_force_scalar(k);
 
         if (family == 0) {
+          // "fixed": observed value is treated as latent mean (no data density).
           mu_tj(t, j) = z_tj(t, j);
         } else if (family == 1) {
+          // Gaussian response on identity scale.
           mu_tj(t, j) = z_tj(t, j);
           if (!R_IsNA(asDouble(y))) {
             loglik_tj_dsem(t, j) = dnorm(y, mu_tj(t, j), sigma_j(j), true);
           }
         } else if (family == 2) {
+          // Bernoulli response on logit scale.
           mu_tj(t, j) = invlogit(z_tj(t, j));
           if (!R_IsNA(asDouble(y))) {
             loglik_tj_dsem(t, j) = dbinom(y, Type(1.0), mu_tj(t, j), true);
           }
         } else if (family == 3) {
+          // Poisson response on log scale.
           mu_tj(t, j) = exp(z_tj(t, j));
           if (!R_IsNA(asDouble(y))) {
             loglik_tj_dsem(t, j) = dpois(y, mu_tj(t, j), true);
           }
         } else if (family == 4) {
+          // Gamma response with log-linked mean and sigma-driven shape/scale.
           mu_tj(t, j) = exp(z_tj(t, j));
           if (!R_IsNA(asDouble(y))) {
             loglik_tj_dsem(t, j) = dgamma(y, pow(sigma_j(j), -2),

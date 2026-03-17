@@ -12,6 +12,13 @@
 
 /**
  * @brief Rcpp interface for DSEM likelihood.
+ *
+ * @details
+ * This interface owns R-exposed vectors/parameters and copies them into a
+ * templated C++ `DSEMLikelihood<Type>` module when FIMS builds the TMB model.
+ *
+ * As with other FIMS module interfaces, this lives in a header because the
+ * TMB-facing add/register methods are templated on `Type`.
  */
 class DSEMDistributionInterface : public DistributionsInterfaceBase {
  public:
@@ -67,6 +74,8 @@ class DSEMDistributionInterface : public DistributionsInterfaceBase {
   virtual double evaluate() {
     // This mirrors existing Rcpp distribution interfaces by creating a local
     // double-typed functor for interactive R-side evaluation.
+    // This evaluate path is for immediate R-side checks and uses doubles only.
+    // The optimization path uses add_to_fims_tmb_internal<Type>() below.
     fims_distributions::DSEMLikelihood<double> dsem;
     dsem.options.resize(this->options.size());
     for (size_t i = 0; i < this->options.size(); i++) dsem.options[i] = this->options[i];
@@ -144,6 +153,8 @@ class DSEMDistributionInterface : public DistributionsInterfaceBase {
     std::shared_ptr<fims_info::Information<Type>> info =
         fims_info::Information<Type>::GetInstance();
 
+    // Build the typed DSEM likelihood module that will be part of the FIMS
+    // objective function for this TMB type.
     std::shared_ptr<fims_distributions::DSEMLikelihood<Type>> distribution =
         std::make_shared<fims_distributions::DSEMLikelihood<Type>>();
     std::stringstream ss;
