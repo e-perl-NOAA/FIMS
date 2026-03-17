@@ -7,6 +7,7 @@
 \alias{CatchAtAge}
 \alias{DlnormDistribution}
 \alias{DmultinomDistribution}
+\alias{DSEMDistribution}
 \alias{DnormDistribution}
 \alias{DoubleLogisticSelectivity}
 \alias{EWAAGrowth}
@@ -38,6 +39,7 @@ docs.
 \item \href{https://noaa-fims.github.io/doxygen/classCatchAtAgeInterface.html}{CatchAtAge}
 \item \href{https://noaa-fims.github.io/doxygen/classDlnormDistributionsInterface.html}{DlnormDistribution}
 \item \href{https://noaa-fims.github.io/doxygen/classDmultinomDistributionsInterface.html}{DmultinomDistribution}
+\item \href{https://noaa-fims.github.io/doxygen/classDSEMDistributionInterface.html}{DSEMDistribution}
 \item \href{https://noaa-fims.github.io/doxygen/classDnormDistributionsInterface.html}{DnormDistribution}
 \item \href{https://noaa-fims.github.io/doxygen/classDoubleLogisticSelectivityInterface.html}{DoubleLogisticSelectivity}
 \item \href{https://noaa-fims.github.io/doxygen/classEWAAGrowthInterface.html}{EWAAGrowth}

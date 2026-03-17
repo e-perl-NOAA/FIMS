@@ -4,7 +4,7 @@
 \alias{initialize_fims}
 \title{Initialize C++ modules via Rcpp for a FIMS model}
 \usage{
-initialize_fims(parameters, data)
+initialize_fims(parameters, data, dsem = NULL)
 }
 \arguments{
 \item{parameters}{A tibble returned from \code{\link[=create_default_parameters]{create_default_parameters()}}. The
@@ -19,6 +19,10 @@ initialized for that fleet.}
 \code{\link[=FIMSFrame]{FIMSFrame()}}. Passing the data is required because initialization of the
 modules requires passing the data and information regarding the uncertainty
 of that data, i.e., input sample sizes for the multinomial distribution.}
+
+\item{dsem}{An optional list returned by \code{\link[=build_dsem_objects]{build_dsem_objects()}}. When
+supplied, a DSEM density module is initialized and added to the objective
+function before \code{CreateTMBModel()} is called.}
 }
 \value{
 A list is returned with two elements, \code{parameters} and \code{model}. The list can

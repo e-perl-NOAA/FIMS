@@ -16,10 +16,10 @@
 #' @return A named list with DSEM settings.
 #' @export
 build_DSEM <- function(
-    sem = NULL,
-    family = "normal",
-    all_vars = FALSE,
-    estimate_projection = FALSE
+  sem = NULL,
+  family = "normal",
+  all_vars = FALSE,
+  estimate_projection = FALSE
 ) {
   list(
     sem = sem,
@@ -80,10 +80,10 @@ build_DSEM <- function(
 #' # c("dsem_settings", "dsem_data", "tmb_inputs")
 #' @export
 build_dsem_objects <- function(
-    dsem_settings = NULL,
-    data = NULL,
-    env_data = NULL,
-    n_recdevs = 1L
+  dsem_settings = NULL,
+  data = NULL,
+  env_data = NULL,
+  n_recdevs = 1L
 ) {
   if (is.null(dsem_settings)) {
     dsem_settings <- build_DSEM()
