@@ -8,8 +8,6 @@
 #ifndef FIMS_DISTRIBUTIONS_DSEM_HPP
 #define FIMS_DISTRIBUTIONS_DSEM_HPP
 
-#include <Eigen/IterativeLinearSolvers>
-
 #include "density_components_base.hpp"
 
 namespace fims_distributions {
@@ -84,20 +82,9 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
     };
     auto solve_linear_system = [&](const Eigen::SparseMatrix<Type> &lhs_matrix,
                                    const matrix<Type> &rhs_matrix) {
-      Eigen::BiCGSTAB<Eigen::SparseMatrix<Type>> solver;
-      solver.compute(lhs_matrix);
-      if (solver.info() != Eigen::Success) {
-        FIMS_WARNING_LOG(
-            "DSEMLikelihood sparse solve decomposition failed; results may be "
-            "unreliable.");
-      }
-      matrix<Type> solution = solver.solve(rhs_matrix);
-      if (solver.info() != Eigen::Success) {
-        FIMS_WARNING_LOG(
-            "DSEMLikelihood sparse solve iteration failed for one or more RHS "
-            "columns; results may be unreliable.");
-      }
-      return solution;
+      matrix<Type> lhs_dense = sparse_to_dense(lhs_matrix);
+      matrix<Type> lhs_inverse = atomic::matinv(lhs_dense);
+      return lhs_inverse * rhs_matrix;
     };
 
     matrix<Type> loglik_tj_dsem(this->n_t, this->n_j);
@@ -145,8 +132,8 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
           solve_linear_system(IminusRho_kk, I_dense);
       matrix<Type> squared_invIminusRho_dense =
           invIminusRho_dense.cwiseProduct(invIminusRho_dense);
-      Eigen::ColPivHouseholderQR<matrix<Type>> invsq_solver(
-          squared_invIminusRho_dense);
+      matrix<Type> invsquared_invIminusRho_dense =
+          atomic::matinv(squared_invIminusRho_dense);
 
       if (CppAD::Integer(this->options[1]) == 1) {
         matrix<Type> ones_k1(n_k, 1);
@@ -154,7 +141,7 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
         Eigen::SparseMatrix<Type> squared_Gamma_kk =
             Gamma_kk.cwiseProduct(Gamma_kk);
         matrix<Type> sigma2_k1 = squared_Gamma_kk.transpose() * ones_k1;
-        matrix<Type> margvar_k1 = invsq_solver.solve(sigma2_k1);
+        matrix<Type> margvar_k1 = invsquared_invIminusRho_dense * sigma2_k1;
 
         Eigen::SparseMatrix<Type> invmargsd_kk(n_k, n_k);
         Eigen::SparseMatrix<Type> invsigma_kk(n_k, n_k);
@@ -170,7 +157,7 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
           targetvar_k1(k, 0) =
               Gamma_kk.coeffRef(k, k) * Gamma_kk.coeffRef(k, k);
         }
-        matrix<Type> margvar_k1 = invsq_solver.solve(targetvar_k1);
+        matrix<Type> margvar_k1 = invsquared_invIminusRho_dense * targetvar_k1;
         for (int k = 0; k < n_k; k++) {
           Gamma_kk.coeffRef(k, k) = pow(margvar_k1(k, 0), 0.5);
         }
@@ -194,9 +181,10 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
       }
     }
 
-    array<Type> xhat_tj(this->n_t, this->n_j);
-    array<Type> delta_tj(this->n_t, this->n_j);
-    array<Type> x_array(this->n_t, this->n_j);
+    array<Type> xhat_tj(static_cast<int>(this->n_t), static_cast<int>(this->n_j));
+    array<Type> delta_tj(static_cast<int>(this->n_t),
+                         static_cast<int>(this->n_j));
+    array<Type> x_array(static_cast<int>(this->n_t), static_cast<int>(this->n_j));
     for (size_t j = 0; j < this->n_j; j++) {
       for (size_t t = 0; t < this->n_t; t++) {
         const size_t k = this->k_index(t, j);
@@ -206,7 +194,7 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
       }
     }
 
-    array<Type> z_tj(this->n_t, this->n_j);
+    array<Type> z_tj(static_cast<int>(this->n_t), static_cast<int>(this->n_j));
     if (this->options.size() > 0 && CppAD::Integer(this->options[0]) == 0) {
       // Standard mode: x_tj is on the data scale and receives a sparse GMRF
       // prior with precision Q = (I-Rho)' V^-1 (I-Rho).
@@ -253,7 +241,7 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
       z_tj += xhat_tj + delta_tj;
     }
 
-    array<Type> mu_tj(this->n_t, this->n_j);
+    array<Type> mu_tj(static_cast<int>(this->n_t), static_cast<int>(this->n_j));
     for (size_t t = 0; t < this->n_t; t++) {
       for (size_t j = 0; j < this->n_j; j++) {
         const size_t k = this->k_index(t, j);
