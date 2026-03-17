@@ -62,6 +62,7 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
   inline size_t k_index(size_t t, size_t j) const { return j * n_t + t; }
 
   virtual const Type evaluate() {
+#ifdef TMB_MODEL
     using namespace density;
 
     if (this->n_t == 0 || this->n_j == 0) {
@@ -290,6 +291,9 @@ struct DSEMLikelihood : public DensityComponentBase<Type> {
     // FIMS density components return log-density. Here jnll_dsem is a positive
     // negative log-likelihood, so we pre-negate to return log-density.
     return -this->jnll_dsem;
+#else
+    return static_cast<Type>(0.0);
+#endif
   }
 };
 
