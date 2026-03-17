@@ -38,6 +38,13 @@ build_DSEM <- function(
 #' placeholder columns (`recdevs*`). When a default SEM is generated, equations
 #' are concatenated with `"; "` separators.
 #'
+#' For first-time users, this function does three jobs:
+#' 1. Builds a clean DSEM data matrix (`dsem_data`) aligned to the model years.
+#' 2. Builds a complete settings object (`dsem_settings`) with validated
+#'    `family` and SEM text.
+#' 3. Builds `tmb_inputs`, which are the low-level objects consumed by the
+#'    `DSEMDistribution` C++ module during fitting.
+#'
 #' @param dsem_settings A list returned by [build_DSEM()].
 #' @param data A `FIMSFrame` object used to determine model start and end years.
 #' @param env_data An optional data frame of environmental covariates. If
@@ -46,6 +53,31 @@ build_DSEM <- function(
 #' @param n_recdevs Number of `recdevs*` columns to prepend.
 #'
 #' @return A named list with `dsem_settings`, `dsem_data`, and `tmb_inputs`.
+#'
+#' @details
+#' The `tmb_inputs` element contains:
+#' - `options`: numeric controls for latent-state parameterization and scaling.
+#' - `RAM` / `RAMstart`: sparse structural-equation mapping and starting values.
+#' - `familycode_j`: integer family codes used by the C++ likelihood.
+#' - `y_tj`: observed data matrix for each year (`t`) and variable (`j`).
+#' - `parameters`: initial values for DSEM parameters and latent states.
+#'
+#' If the optional `dsem` package is installed, FIMS delegates RAM/TMB input
+#' construction to that package for consistency. Otherwise, FIMS uses an
+#' internal parser and mapper that supports the same default workflow.
+#'
+#' @examples
+#' dsem <- build_DSEM(family = "normal")
+#'
+#' dsem_obj <- build_dsem_objects(
+#'   dsem_settings = dsem,
+#'   data = FIMSFrame(data1),
+#'   env_data = tibble::tibble(Year = 2000:2010, Temp = rnorm(11)),
+#'   n_recdevs = 1
+#' )
+#'
+#' names(dsem_obj)
+#' # c("dsem_settings", "dsem_data", "tmb_inputs")
 #' @export
 build_dsem_objects <- function(
     dsem_settings = NULL,
@@ -202,6 +234,9 @@ build_dsem_objects <- function(
 
 #' @noRd
 .build_tmb_inputs_simple <- function(sem, dsem_data, family) {
+  # Internal fallback path used when {dsem} is not installed.
+  # Converts SEM text + data frame into the RAM representation expected by
+  # DSEMLikelihood in C++.
   terms <- .parse_sem_lines(sem)
   var_names <- colnames(dsem_data)
   n_t <- nrow(dsem_data)
@@ -276,6 +311,8 @@ build_dsem_objects <- function(
 
 #' @noRd
 .build_tmb_inputs_with_dsem <- function(sem, dsem_data, family) {
+  # Preferred path: use dsem package internals so RAM/parameter conventions
+  # match external DSEM behavior exactly.
   dsem_control <- dsem::dsem_control(
     use_REML = FALSE,
     run_model = FALSE,
@@ -310,6 +347,7 @@ initialize_dsem_distribution <- function(dsem) {
   dsem_tmb <- dsem$tmb_inputs
   module <- methods::new(DSEMDistribution)
 
+  # options/RAM/RAMstart define latent-state transition and covariance links.
   module$options$resize(length(dsem_tmb$options))
   purrr::walk(seq_along(dsem_tmb$options), \(i) module$options$set(i - 1, dsem_tmb$options[i]))
 
@@ -336,6 +374,7 @@ initialize_dsem_distribution <- function(dsem) {
   module$y_tj$set_all_estimable(FALSE)
   module$y_tj$set_all_random(FALSE)
 
+  # Helper that applies initial values and estimation mode to a ParameterVector.
   set_vec <- function(target, values, estimation_type = "fixed_effects") {
     target$resize(length(values))
     purrr::walk(seq_along(values), \(i) target[i]$value <- values[i])
@@ -351,6 +390,7 @@ initialize_dsem_distribution <- function(dsem) {
   if (is.null(delta0_j)) delta0_j <- numeric(0)
   set_vec(module$delta0_j, delta0_j, "fixed_effects")
 
+  # x_tj are latent states and are estimated as random effects.
   set_vec(module$x_tj, as.vector(dsem_tmb$parameters$x_tj), "random_effects")
 
   module

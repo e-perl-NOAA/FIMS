@@ -11,6 +11,8 @@ FIMS is an R package for fitting integrated statistical population-dynamics mode
 
 If you are new to FIMS, the best place to start is the <a href="https://noaa-fims.github.io/FIMS/articles/fims-demo.html" target="_blank">"Introducing FIMS"</a> vignette.
 
+If you are new to DSEM in FIMS, see [`DSEM_FIMS_FIRST_STEPS.md`](DSEM_FIMS_FIRST_STEPS.md) for a step-by-step walkthrough of the DSEM setup and fitting path.
+
 ## Installation
 
 A [precompiled version of the latest release](https://noaa-fisheries-integrated-toolbox.r-universe.dev/FIMS) is available from the instance of [R universe](https://noaa-fisheries-integrated-toolbox.r-universe.dev) hosted by NOAA Fisheries Integrated Toolbox. You can install the latest version from GitHub.

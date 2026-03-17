@@ -971,6 +971,8 @@ initialize_fims <- function(parameters, data, dsem = NULL) {
   )
 
   if (!is.null(dsem)) {
+    # Register DSEM density before model creation so its parameters and random
+    # effects are included in the TMB objective built by CreateTMBModel().
     initialize_dsem_distribution(dsem = dsem)
   }
 
