@@ -81,8 +81,11 @@ namespace
 
     info->SetupRandomEffects();
 
-    EXPECT_EQ(gmrf->precision_values, &precision_matrix);
+    EXPECT_EQ(gmrf->precision_matrix_flat, &precision_matrix);
     EXPECT_NO_THROW(gmrf->evaluate());
     EXPECT_EQ(gmrf->lpdf_vec.size(), recruitment->log_r.size());
+#ifndef TMB_MODEL
+    EXPECT_DOUBLE_EQ(gmrf->lpdf, -0.625);
+#endif
   }
 } 

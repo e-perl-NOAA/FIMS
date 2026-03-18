@@ -27,7 +27,7 @@ struct GMRF : public DensityComponentBase<Type> {
   /**
    * @brief Pointer to the flattened precision matrix (Q) in row-major order.
    */
-  fims::Vector<Type>* precision_values = NULL;
+  fims::Vector<Type>* precision_matrix_flat = NULL;
 
   /** @brief Constructor.
    */
@@ -56,18 +56,20 @@ struct GMRF : public DensityComponentBase<Type> {
       }
     }
 
-    if (this->precision_values == NULL) {
+    if (this->precision_matrix_flat == NULL) {
       throw std::invalid_argument(
-          "GMRF::precision_values must be linked before evaluate().");
+          "GMRF::precision_matrix_flat must be linked before evaluate().");
     }
 
-    const size_t q_size = this->precision_values->size();
+    const size_t q_size = this->precision_matrix_flat->size();
     if (q_size != n_x * n_x) {
       throw std::invalid_argument(
-          "GMRF::Vector index out of bounds. The precision matrix vector is of "
-          "size " +
+          "GMRF precision matrix dimension mismatch. The precision matrix "
+          "vector is of size " +
           fims::to_string(q_size) + " and expected " + fims::to_string(n_x) +
-          " x " + fims::to_string(n_x) + ".");
+          " x " + fims::to_string(n_x) +
+          ". Ensure the precision matrix matches the number of random "
+          "effects.");
     }
 
 #ifdef TMB_MODEL
@@ -78,7 +80,7 @@ struct GMRF : public DensityComponentBase<Type> {
           this->get_observed(i) - this->get_expected(i);
       for (size_t j = 0; j < n_x; ++j) {
         q(static_cast<int>(i), static_cast<int>(j)) =
-            (*(this->precision_values))[i * n_x + j];
+            (*(this->precision_matrix_flat))[i * n_x + j];
       }
     }
     this->lpdf = density::GMRF(q)(centered_values);
@@ -88,7 +90,8 @@ struct GMRF : public DensityComponentBase<Type> {
       for (size_t j = 0; j < n_x; ++j) {
         const Type centered_j = this->get_observed(j) - this->get_expected(j);
         this->lpdf -= static_cast<Type>(0.5) * centered_i *
-                      (*(this->precision_values))[i * n_x + j] * centered_j;
+                      (*(this->precision_matrix_flat))[i * n_x + j] *
+                      centered_j;
       }
     }
 #endif

@@ -331,11 +331,13 @@ class Information {
         } else {
           d->re_expected_values = &d->expected_values;
         }
-        std::shared_ptr<fims_distributions::GMRF<Type>> gmrf =
-            std::dynamic_pointer_cast<fims_distributions::GMRF<Type>>(d);
-        if (gmrf && d->key.size() > 2) {
-          vmit = this->variable_map.find(d->key[2]);
-          gmrf->precision_values = (*vmit).second;
+        if (d->key.size() > 2) {
+          std::shared_ptr<fims_distributions::GMRF<Type>> gmrf =
+              std::dynamic_pointer_cast<fims_distributions::GMRF<Type>>(d);
+          if (gmrf) {
+            vmit = this->variable_map.find(d->key[2]);
+            gmrf->precision_matrix_flat = (*vmit).second;
+          }
         }
         FIMS_INFO_LOG("Random effect size for distribution " +
                       fims::to_string(d->id) +
