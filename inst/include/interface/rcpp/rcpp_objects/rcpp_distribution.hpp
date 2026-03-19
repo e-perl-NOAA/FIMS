@@ -1365,7 +1365,10 @@ class GMRFDistributionsInterface : public DistributionsInterfaceBase {
         info->RegisterParameter(distribution->precision_matrix_values[i]);
       }
       if (this->precision_matrix[i].estimation_type_m.get() == "random_effects") {
-        FIMS_ERROR_LOG("precision matrix entries cannot be set to random effects");
+        FIMS_ERROR_LOG(
+            "Precision matrix entries must be fixed or estimated as fixed "
+            "effects, not random effects. Set estimation_type to "
+            "\"fixed_effects\" or \"constant\".");
       }
     }
     info->variable_map[this->precision_matrix.get_id()] =

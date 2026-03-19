@@ -113,10 +113,10 @@ check_distribution_validity <- function(args) {
       "i" = "Only {.code {names(sd)}} {cli::qty(length(sd))} {?is/are} present."
     )
   } else {
-    # GMRF uses this path to pass precision-matrix entries (Q), not standard
-    # deviations, so entries are not constrained to be strictly positive.
-    if (!all(sd[["value"]] > 0, na.rm = TRUE) &&
-      family[["family"]] != "gmrf"
+    # For GMRF, `sd$value` is used to pass flattened precision-matrix entries
+    # (Q), so positivity is not enforced here.
+    if (family[["family"]] != "gmrf" &&
+      !all(sd[["value"]] > 0, na.rm = TRUE)
     ) {
       abort_bullets <- c(
         abort_bullets,
@@ -430,7 +430,7 @@ initialize_process_distribution <- function(
     # create new Rcpp module
     new_module <- methods::new(GMRFDistribution)
 
-    # precision matrix (Q) is currently provided as a flattened vector
+    # precision matrix (Q) is provided as a flattened vector
     # through the standard deviation input path.
     new_module$precision_matrix$resize(length(sd[["value"]]))
     purrr::walk(
