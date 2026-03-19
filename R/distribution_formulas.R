@@ -12,7 +12,8 @@
 #' most information possible is the best way forward.
 #'
 #' @param args A named list of input arguments that must contain at least
-#'   `family` and `sd`. `data_type` is only needed for some upstream functions.
+#'   `family` and `sd`. For GMRF process distributions, `precision_matrix` is
+#'   also required. `data_type` is only needed for some upstream functions.
 #' @seealso
 #' This function is used in the following functions:
 #' * [initialize_data_distribution()]
@@ -25,8 +26,9 @@ check_distribution_validity <- function(args) {
   # Separate objects from args
   family <- args[["family"]]
   sd <- args[["sd"]]
-  # Optional argument data_type
+  # Optional arguments
   data_type <- args[["data_type"]]
+  precision_matrix <- args[["precision_matrix"]]
   check_present <- purrr::map_vec(list("family" = family, "sd" = sd), is.null)
 
   # Set up global rules
@@ -113,11 +115,7 @@ check_distribution_validity <- function(args) {
       "i" = "Only {.code {names(sd)}} {cli::qty(length(sd))} {?is/are} present."
     )
   } else {
-    # For GMRF, `sd$value` is used to pass flattened precision-matrix entries
-    # (Q), so positivity is not enforced here.
-    if (family[["family"]] != "gmrf" &&
-      !all(sd[["value"]] > 0, na.rm = TRUE)
-    ) {
+    if (!all(sd[["value"]] > 0, na.rm = TRUE)) {
       abort_bullets <- c(
         abort_bullets,
         "x" = "Values passed to {.var sd} are out of bounds.",
@@ -139,6 +137,33 @@ check_distribution_validity <- function(args) {
         "i" = "The length of {.var sd[['value']]} is {.code {sd_length}}.",
         "i" = "The length of {.var sd[['estimation_type']]} is
                {.code {est_length}}."
+      )
+    }
+  }
+
+  if (!is.null(family) &&
+    inherits(family, "family") &&
+    family[["family"]] == "gmrf"
+  ) {
+    if (is.null(precision_matrix)) {
+      abort_bullets <- c(
+        abort_bullets,
+        "x" = "The {.var precision_matrix} argument is required when using {.code family = gmrf()} for process distributions."
+      )
+    } else if (!all(c("value", "estimation_type") %in% names(precision_matrix))) {
+      abort_bullets <- c(
+        abort_bullets,
+        "x" = "{.var value} and {.var estimation_type} need to be present in {.var precision_matrix}.",
+        "i" = "Only {.code {names(precision_matrix)}} {cli::qty(length(precision_matrix))} {?is/are} present."
+      )
+    } else if (
+      length(precision_matrix[["estimation_type"]]) != 1 &&
+      length(precision_matrix[["value"]]) != length(precision_matrix[["estimation_type"]])
+    ) {
+      abort_bullets <- c(
+        abort_bullets,
+        "x" = "The sizes of {.var value} and {.var estimation_type} within {.var precision_matrix}
+               must match unless {.var estimation_type} is a single value."
       )
     }
   }
@@ -389,7 +414,11 @@ initialize_process_distribution <- function(
   )
 ) {
   # validity check on user input
-  args <- list(family = family, sd = sd)
+  args <- list(
+    family = family,
+    sd = sd,
+    precision_matrix = precision_matrix
+  )
   check_distribution_validity(args)
 
   if (!is.element(par, c("log_devs", "log_r"))) {
@@ -430,16 +459,25 @@ initialize_process_distribution <- function(
     # create new Rcpp module
     new_module <- methods::new(GMRFDistribution)
 
-    # precision matrix (Q) is provided as a flattened vector
-    # through the standard deviation input path.
-    new_module$precision_matrix$resize(length(sd[["value"]]))
+    n_dim <- length(module$field(par))
+    q_values <- precision_matrix[["value"]]
+    q_size <- length(q_values)
+    if (q_size != n_dim * n_dim) {
+      cli::cli_abort(c(
+        "x" = "The size of {.var precision_matrix[['value']]} does not match the required dimensions for GMRF.",
+        "i" = "{.var precision_matrix[['value']]} has size {.code {q_size}}.",
+        "i" = "The random effect vector for {.var {par}} has length {.code {n_dim}}, so {.var precision_matrix[['value']]} must have size {.code {n_dim * n_dim}}."
+      ))
+    }
+
+    new_module$precision_matrix$resize(length(q_values))
     purrr::walk(
-      seq_along(sd[["value"]]),
-      \(x) new_module[["precision_matrix"]][x][["value"]] <- sd[["value"]][x]
+      seq_along(q_values),
+      \(x) new_module[["precision_matrix"]][x][["value"]] <- q_values[x]
     )
     purrr::walk(
-      seq_along(sd[["estimation_type"]]),
-      \(x) new_module[["precision_matrix"]][x][["estimation_type"]]$set(sd[["estimation_type"]][x])
+      seq_along(precision_matrix[["estimation_type"]]),
+      \(x) new_module[["precision_matrix"]][x][["estimation_type"]]$set(precision_matrix[["estimation_type"]][x])
     )
   }
 

@@ -159,7 +159,7 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
     module = recruitment,
     par = "log_r",
     family = gmrf(),
-    sd = list(
+    precision_matrix = list(
       value = c(2, 0, 0, 3),
       estimation_type = rep("constant", 4)
     ),
@@ -168,6 +168,30 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
   expect_true(inherits(gmrf_distribution, "Rcpp_GMRFDistributionsInterface"))
   expect_equal(length(gmrf_distribution$precision_matrix), 4)
   clear()
+
+  expect_error(
+    initialize_process_distribution(
+      module = recruitment,
+      par = "log_r",
+      family = gmrf(),
+      is_random_effect = FALSE
+    ),
+    "precision_matrix"
+  )
+
+  expect_error(
+    initialize_process_distribution(
+      module = recruitment,
+      par = "log_r",
+      family = gmrf(),
+      precision_matrix = list(
+        value = c(1, 0, 0),
+        estimation_type = rep("constant", 3)
+      ),
+      is_random_effect = FALSE
+    ),
+    "must have size"
+  )
 
   #' @description Test that error is thrown when incorrect `family` specified for `initialize_process_distribution()`.
   expect_error(

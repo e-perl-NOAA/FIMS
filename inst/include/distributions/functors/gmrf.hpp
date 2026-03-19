@@ -13,6 +13,10 @@
 #include "density_components_base.hpp"
 #include "../../common/def.hpp"
 
+#ifdef TMB_MODEL
+#include <Eigen/Sparse>
+#endif
+
 namespace fims_distributions {
 /**
  * @copybrief gmrf.hpp
@@ -50,9 +54,8 @@ struct GMRF : public DensityComponentBase<Type> {
   virtual const Type evaluate() {
     size_t n_x = this->get_n_x();
     size_t n_expected = this->get_n_expected();
-    this->lpdf_vec.resize(n_x);
-    std::fill(this->lpdf_vec.begin(), this->lpdf_vec.end(),
-              static_cast<Type>(0));
+    this->lpdf_vec.resize(1);
+    this->lpdf_vec[0] = static_cast<Type>(0);
     this->lpdf = static_cast<Type>(0);
 
     if (n_x != n_expected) {
@@ -80,16 +83,20 @@ struct GMRF : public DensityComponentBase<Type> {
     }
 
 #ifdef TMB_MODEL
-    matrix<Type> q(n_x, n_x);
+    Eigen::SparseMatrix<Type> q(n_x, n_x);
+    std::vector<Eigen::Triplet<Type>> q_triplets;
+    q_triplets.reserve(q_size);
     vector<Type> centered_values(n_x);
     for (size_t i = 0; i < n_x; ++i) {
       centered_values(static_cast<int>(i)) =
           this->get_observed(i) - this->get_expected(i);
       for (size_t j = 0; j < n_x; ++j) {
-        q(static_cast<int>(i), static_cast<int>(j)) =
-            (*(this->precision_matrix_flat))[i * n_x + j];
+        q_triplets.emplace_back(
+            static_cast<int>(i), static_cast<int>(j),
+            (*(this->precision_matrix_flat))[i * n_x + j]);
       }
     }
+    q.setFromTriplets(q_triplets.begin(), q_triplets.end());
     this->lpdf = density::GMRF(q)(centered_values);
 #else
     for (size_t i = 0; i < n_x; ++i) {
@@ -102,9 +109,7 @@ struct GMRF : public DensityComponentBase<Type> {
       }
     }
 #endif
-    if (n_x > 0) {
-      this->lpdf_vec[0] = this->lpdf;
-    }
+    this->lpdf_vec[0] = this->lpdf;
     return this->lpdf;
   }
 };

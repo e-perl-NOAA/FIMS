@@ -83,9 +83,62 @@ namespace
 
     EXPECT_EQ(gmrf->precision_matrix_flat, &precision_matrix);
     EXPECT_NO_THROW(gmrf->evaluate());
-    EXPECT_EQ(gmrf->lpdf_vec.size(), recruitment->log_r.size());
+    EXPECT_EQ(gmrf->lpdf_vec.size(), 1);
 #ifndef TMB_MODEL
     EXPECT_DOUBLE_EQ(gmrf->lpdf, -0.625);
 #endif
+  }
+
+  TEST(SetupRandomEffects, GMRFPrecisionKeyMissingThrows)
+  {
+    std::shared_ptr<fims_info::Information<double> > info =
+      fims_info::Information<double>::GetInstance();
+
+    std::shared_ptr<fims_popdy::SRBevertonHolt<double> > recruitment =
+      std::make_shared<fims_popdy::SRBevertonHolt<double> >();
+    recruitment->log_r.resize(2);
+    recruitment->log_expected_recruitment.resize(2);
+
+    info->variable_map[201] = &(recruitment)->log_r;
+    info->variable_map[202] = &(recruitment)->log_expected_recruitment;
+
+    std::shared_ptr<fims_distributions::GMRF<double> > gmrf =
+      std::make_shared<fims_distributions::GMRF<double> >();
+    info->density_components[201] = gmrf;
+    gmrf->key.resize(3);
+    gmrf->key[0] = 201;
+    gmrf->key[1] = 202;
+    gmrf->key[2] = 203;  // missing from variable_map
+    gmrf->input_type = "random_effects";
+
+    EXPECT_THROW(info->SetupRandomEffects(), std::invalid_argument);
+  }
+
+  TEST(SetupRandomEffects, GMRFPrecisionEmptyVectorThrows)
+  {
+    std::shared_ptr<fims_info::Information<double> > info =
+      fims_info::Information<double>::GetInstance();
+
+    std::shared_ptr<fims_popdy::SRBevertonHolt<double> > recruitment =
+      std::make_shared<fims_popdy::SRBevertonHolt<double> >();
+    recruitment->log_r.resize(2);
+    recruitment->log_expected_recruitment.resize(2);
+
+    fims::Vector<double> precision_matrix;
+
+    info->variable_map[301] = &(recruitment)->log_r;
+    info->variable_map[302] = &(recruitment)->log_expected_recruitment;
+    info->variable_map[303] = &precision_matrix;
+
+    std::shared_ptr<fims_distributions::GMRF<double> > gmrf =
+      std::make_shared<fims_distributions::GMRF<double> >();
+    info->density_components[301] = gmrf;
+    gmrf->key.resize(3);
+    gmrf->key[0] = 301;
+    gmrf->key[1] = 302;
+    gmrf->key[2] = 303;
+    gmrf->input_type = "random_effects";
+
+    EXPECT_THROW(info->SetupRandomEffects(), std::invalid_argument);
   }
 } 

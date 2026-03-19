@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 #include "../distributions/distributions.hpp"
@@ -336,7 +337,20 @@ class Information {
               std::dynamic_pointer_cast<fims_distributions::GMRF<Type>>(d);
           if (gmrf) {
             vmit = this->variable_map.find(d->key[2]);
+            if (vmit == this->variable_map.end()) {
+              throw std::invalid_argument(
+                  "SetupRandomEffects: GMRF precision matrix key not found in "
+                  "variable_map for distribution " +
+                  std::to_string(d->id) + ".");
+            }
             gmrf->precision_matrix_flat = (*vmit).second;
+            if (gmrf->precision_matrix_flat == nullptr ||
+                gmrf->precision_matrix_flat->size() == 0) {
+              throw std::invalid_argument(
+                  "SetupRandomEffects: GMRF precision matrix pointer is null "
+                  "or empty for distribution " +
+                  std::to_string(d->id) + ".");
+            }
           }
         }
         FIMS_INFO_LOG("Random effect size for distribution " +
