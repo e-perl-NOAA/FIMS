@@ -154,6 +154,21 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
     "FIMS currently does not allow the family"
   )
 
+  # Test that `gmrf` can be specified as a process family and returns the Rcpp GMRF interface object.
+  gmrf_distribution <- initialize_process_distribution(
+    module = recruitment,
+    par = "log_r",
+    family = gmrf(),
+    sd = list(
+      value = c(2, 0, 0, 3),
+      estimation_type = rep("constant", 4)
+    ),
+    is_random_effect = FALSE
+  )
+  expect_true(inherits(gmrf_distribution, "Rcpp_GMRFDistributionsInterface"))
+  expect_equal(length(gmrf_distribution$precision_matrix), 4)
+  clear()
+
   #' @description Test that error is thrown when incorrect `family` specified for `initialize_process_distribution()`.
   expect_error(
     initialize_process_distribution(

@@ -25,13 +25,20 @@ namespace fims_distributions {
 template <typename Type>
 struct GMRF : public DensityComponentBase<Type> {
   /**
+   * @brief Internal storage for the flattened precision matrix.
+   */
+  fims::Vector<Type> precision_matrix_values;
+
+  /**
    * @brief Pointer to the flattened precision matrix (Q) in row-major order.
    */
   fims::Vector<Type>* precision_matrix_flat = NULL;
 
   /** @brief Constructor.
    */
-  GMRF() : DensityComponentBase<Type>() {}
+  GMRF() : DensityComponentBase<Type>() {
+    this->precision_matrix_flat = &(this->precision_matrix_values);
+  }
 
   /** @brief Destructor.
    */

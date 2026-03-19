@@ -35,7 +35,7 @@ check_distribution_validity <- function(args) {
   # are available
   data_type_names <- c("landings", "index", "agecomp", "lengthcomp")
   if (is.null(data_type)) {
-    available_distributions <- c("lognormal", "gaussian")
+    available_distributions <- c("lognormal", "gaussian", "gmrf")
   } else {
     available_distributions <- switch(
       EXPR = ifelse(grepl("comp", data_type), "composition", data_type),
@@ -113,7 +113,11 @@ check_distribution_validity <- function(args) {
       "i" = "Only {.code {names(sd)}} {cli::qty(length(sd))} {?is/are} present."
     )
   } else {
-    if (!all(sd[["value"]] > 0, na.rm = TRUE)) {
+    # GMRF uses this path to pass precision-matrix entries (Q), not standard
+    # deviations, so entries are not constrained to be strictly positive.
+    if (!all(sd[["value"]] > 0, na.rm = TRUE) &&
+      family[["family"]] != "gmrf"
+    ) {
       abort_bullets <- c(
         abort_bullets,
         "x" = "Values passed to {.var sd} are out of bounds.",
@@ -422,6 +426,23 @@ initialize_process_distribution <- function(
     }
   }
 
+  if (family[["family"]] == "gmrf") {
+    # create new Rcpp module
+    new_module <- methods::new(GMRFDistribution)
+
+    # precision matrix (Q) is currently provided as a flattened vector
+    # through the standard deviation input path.
+    new_module$precision_matrix$resize(length(sd[["value"]]))
+    purrr::walk(
+      seq_along(sd[["value"]]),
+      \(x) new_module[["precision_matrix"]][x][["value"]] <- sd[["value"]][x]
+    )
+    purrr::walk(
+      seq_along(sd[["estimation_type"]]),
+      \(x) new_module[["precision_matrix"]][x][["estimation_type"]]$set(sd[["estimation_type"]][x])
+    )
+  }
+
   if (family[["family"]] == "gaussian") {
     # create new Rcpp module
     new_module <- methods::new(DnormDistribution)
@@ -467,13 +488,14 @@ initialize_process_distribution <- function(
       module$field(par)$get_id()
     )
   } else {
-    new_module$set_distribution_links(
-      "random_effects",
-      c(
-        module$field(par)$get_id(),
-        module$field(expected)$get_id()
-      )
+    linked_ids <- c(
+      module$field(par)$get_id(),
+      module$field(expected)$get_id()
     )
+    if (family[["family"]] == "gmrf") {
+      linked_ids <- c(linked_ids, new_module$precision_matrix$get_id())
+    }
+    new_module$set_distribution_links("random_effects", linked_ids)
   }
 
   return(new_module)
@@ -541,6 +563,18 @@ lognormal <- function(link = "log") {
 multinomial <- function(link = "logit") {
   family_class <- c(
     list(family = "multinomial", link = link),
+    stats::make.link(link)
+  )
+  class(family_class) <- "family"
+  return(family_class)
+}
+
+#' @rdname lognormal
+#' @keywords distribution
+#' @export
+gmrf <- function(link = "identity") {
+  family_class <- c(
+    list(family = "gmrf", link = link),
     stats::make.link(link)
   )
   class(family_class) <- "family"
