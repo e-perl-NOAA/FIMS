@@ -135,7 +135,7 @@ test_that("`initialize_data_distribution()` works with correct inputs", {
     fishing_fleet_index_distribution2$log_sd[1]$value
   )
   #' @description Test that `initialize_data_distribution()` supports gmrf for index data.
-  expect_true(inherits(fishing_fleet_index_distribution_gmrf, "Rcpp_GMRFDistributionsInterface"))
+  expect_true(inherits(fishing_fleet_index_distribution_gmrf, "Rcpp_GMRFDistribution"))
   expect_equal(length(fishing_fleet_index_distribution_gmrf$precision_matrix), om_input$nyr * om_input$nyr)
 })
 
@@ -180,7 +180,7 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
     ),
     is_random_effect = FALSE
   )
-  expect_true(inherits(gmrf_distribution, "Rcpp_GMRFDistributionsInterface"))
+  expect_true(inherits(gmrf_distribution, "Rcpp_GMRFDistribution"))
   expect_equal(length(gmrf_distribution$precision_matrix), n_re * n_re)
 
   gmrf_distribution_random_effect <- initialize_process_distribution(
@@ -193,7 +193,7 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
     ),
     is_random_effect = TRUE
   )
-  expect_true(inherits(gmrf_distribution_random_effect, "Rcpp_GMRFDistributionsInterface"))
+  expect_true(inherits(gmrf_distribution_random_effect, "Rcpp_GMRFDistribution"))
   expect_equal(length(gmrf_distribution_random_effect$precision_matrix), n_re * n_re)
   clear()
 
