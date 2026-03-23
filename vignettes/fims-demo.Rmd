@@ -264,34 +264,43 @@ parameters_4_model <- default_parameters |>
   )
 ```
 
-### Example: using `gmrf()` for a recruitment process distribution
+### Example: using GMRF recruitment through `initialize_fims()`
 
 The default recruitment process distribution in this vignette uses a Gaussian
-distribution (`log_sd` values). If you want to use a GMRF process, provide a
-flattened precision matrix as the `precision_matrix` argument.
+distribution (`Dnorm` with `log_sd` values). To use GMRF in that same workflow,
+update the recruitment process rows in the parameter tibble, then call
+`initialize_fims()`.
 
 ```{r parameters-gmrf-example, eval=FALSE}
-# Create a recruitment module and size the random-effects vector.
-recruitment <- methods::new(BevertonHoltRecruitment)
 n_years <- get_n_years(data_4_model)
-recruitment[["log_r"]][["resize"]](n_years)
-
-# Build an identity precision matrix and flatten to a vector.
 precision_matrix_vector <- as.vector(diag(1, n_years))
 
-# Initialize the GMRF process distribution for log_r.
-gmrf_distribution <- initialize_process_distribution(
-  module = recruitment,
-  par = "log_r",
-  family = gmrf(),
-  precision_matrix = list(
+# Build replacement recruitment process rows that use GMRF on log_r.
+gmrf_process_parameters <- parameters_4_model |>
+  dplyr::filter(
+    module_name == "Recruitment",
+    distribution_type == "process"
+  ) |>
+  # Replicate the single recruitment process template row so each resulting row
+  # can store one entry of the flattened n_years x n_years precision matrix.
+  dplyr::slice(rep(1, length(precision_matrix_vector))) |>
+  dplyr::mutate(
+    distribution = "GMRF",
+    distribution_link = "log_r",
+    label = "precision_matrix",
     value = precision_matrix_vector,
-    # Keep precision matrix entries fixed in this example.
-    # (GMRF precision_matrix entries should be "constant" or "fixed_effects".)
-    # Use "fixed_effects" if you want to estimate precision-matrix entries.
-    estimation_type = rep("constant", length(precision_matrix_vector))
-  ),
-  is_random_effect = TRUE
+    estimation_type = "constant",
+    time = NA_integer_
+  )
+
+parameters_gmrf <- parameters_4_model |>
+  dplyr::filter(!(module_name == "Recruitment" & distribution_type == "process")) |>
+  dplyr::bind_rows(gmrf_process_parameters)
+
+# Initialize modules using the modified parameter table.
+gmrf_input <- initialize_fims(
+  parameters = parameters_gmrf,
+  data = data_4_model
 )
 ```
 
