@@ -264,6 +264,37 @@ parameters_4_model <- default_parameters |>
   )
 ```
 
+### Example: using `gmrf()` for a recruitment process distribution
+
+The default recruitment process distribution in this vignette uses a Gaussian
+distribution (`log_sd` values). If you want to use a GMRF process, provide a
+flattened precision matrix as the `precision_matrix` argument.
+
+```{r parameters-gmrf-example, eval=FALSE}
+# Create a recruitment module and size the random-effects vector.
+recruitment <- methods::new(BevertonHoltRecruitment)
+n_years <- get_n_years(data_4_model)
+recruitment[["log_r"]][["resize"]](n_years)
+
+# Build an identity precision matrix and flatten to a vector.
+precision_matrix_vector <- as.vector(diag(1, n_years))
+
+# Initialize the GMRF process distribution for log_r.
+gmrf_distribution <- initialize_process_distribution(
+  module = recruitment,
+  par = "log_r",
+  family = gmrf(),
+  precision_matrix = list(
+    value = precision_matrix_vector,
+    # Keep precision matrix entries fixed in this example.
+    # (GMRF precision_matrix entries should be "constant" or "fixed_effects".)
+    # Use "fixed_effects" if you want to estimate precision-matrix entries.
+    estimation_type = rep("constant", length(precision_matrix_vector))
+  ),
+  is_random_effect = TRUE
+)
+```
+
 ## Fit
 
 With data and parameters in place, we can now initialize modules using `initialize_fims()` and fit the model using `fit_fims()`.
