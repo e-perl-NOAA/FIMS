@@ -169,6 +169,19 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
   )
   expect_true(inherits(gmrf_distribution, "Rcpp_GMRFDistributionsInterface"))
   expect_equal(length(gmrf_distribution$precision_matrix), n_re * n_re)
+
+  gmrf_distribution_random_effect <- initialize_process_distribution(
+    module = recruitment,
+    par = "log_r",
+    family = gmrf(),
+    precision_matrix = list(
+      value = gmrf_q,
+      estimation_type = rep("constant", length(gmrf_q))
+    ),
+    is_random_effect = TRUE
+  )
+  expect_true(inherits(gmrf_distribution_random_effect, "Rcpp_GMRFDistributionsInterface"))
+  expect_equal(length(gmrf_distribution_random_effect$precision_matrix), n_re * n_re)
   clear()
 
   expect_error(
