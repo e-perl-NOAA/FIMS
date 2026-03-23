@@ -41,9 +41,9 @@ check_distribution_validity <- function(args) {
   } else {
     available_distributions <- switch(
       EXPR = ifelse(grepl("comp", data_type), "composition", data_type),
-      "landings" = c("lognormal", "gaussian"),
-      "index" = c("lognormal", "gaussian"),
-      "composition" = c("multinomial"),
+      "landings" = c("lognormal", "gaussian", "gmrf"),
+      "index" = c("lognormal", "gaussian", "gmrf"),
+      "composition" = c("multinomial", "gmrf"),
       "unavailable data type"
     )
   }
@@ -214,16 +214,16 @@ get_expected_name <- function(family, data_type) {
   link_string <- family[["link"]]
   expected_name <- dplyr::case_when(
     data_type == "landings" &&
-      grepl("lognormal|gaussian", family_string) &&
+      grepl("lognormal|gaussian|gmrf", family_string) &&
       link_string == "log" ~ "log_landings_expected",
     data_type == "landings" &&
-      grepl("lognormal|gaussian", family_string) &&
+      grepl("lognormal|gaussian|gmrf", family_string) &&
       link_string == "identity" ~ "landings_expected",
     data_type == "index" &&
-      grepl("lognormal|gaussian", family_string) &&
+      grepl("lognormal|gaussian|gmrf", family_string) &&
       link_string == "log" ~ "log_index_expected",
     data_type == "index" &&
-      grepl("lognormal|gaussian", family_string) &&
+      grepl("lognormal|gaussian|gmrf", family_string) &&
       link_string == "identity" ~ "index_expected",
     grepl("agecomp", data_type) ~ "agecomp_proportion",
     grepl("lengthcomp", data_type) ~ "lengthcomp_proportion",
@@ -315,6 +315,7 @@ initialize_data_distribution <- function(
     value = 1,
     estimation_type = "constant"
   ),
+  precision_matrix = NULL,
   # FIXME: Move this argument to second to match where par is in
   # initialize_process_distribution
   data_type = c("landings", "index", "agecomp", "lengthcomp")
@@ -328,6 +329,7 @@ initialize_data_distribution <- function(
   args <- list(
     family = family,
     sd = sd,
+    precision_matrix = precision_matrix,
     data_type = data_type,
     module = module
   )
@@ -377,6 +379,37 @@ initialize_data_distribution <- function(
   if (family[["family"]] == "multinomial") {
     # create new Rcpp module
     new_module <- methods::new(DmultinomDistribution)
+  }
+
+  if (family[["family"]] == "gmrf") {
+    # create new Rcpp module
+    new_module <- methods::new(GMRFDistribution)
+
+    n_dim <- switch(data_type,
+      landings = module$n_years$get(),
+      index = module$n_years$get(),
+      agecomp = module$n_ages$get(),
+      lengthcomp = module$n_lengths$get()
+    )
+    q_values <- precision_matrix[["value"]]
+    q_size <- length(q_values)
+    if (q_size != n_dim * n_dim) {
+      cli::cli_abort(c(
+        "x" = "The size of {.var precision_matrix[['value']]} does not match the required dimensions for GMRF.",
+        "i" = "{.var precision_matrix[['value']]} has size {.code {q_size}}.",
+        "i" = "The expected data vector for {.var {data_type}} has length {.code {n_dim}}, so {.var precision_matrix[['value']]} must have size {.code {n_dim * n_dim}}."
+      ))
+    }
+
+    new_module$precision_matrix$resize(length(q_values))
+    purrr::walk(
+      seq_along(q_values),
+      \(x) new_module[["precision_matrix"]][x][["value"]] <- q_values[x]
+    )
+    purrr::walk(
+      seq_along(precision_matrix[["estimation_type"]]),
+      \(x) new_module[["precision_matrix"]][x][["estimation_type"]]$set(precision_matrix[["estimation_type"]][x])
+    )
   }
 
   # setup link to observed data

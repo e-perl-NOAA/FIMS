@@ -170,6 +170,41 @@ test_that("`initialize_fims()` supports GMRF recruitment process distributions",
   clear()
 })
 
+test_that("`initialize_fims()` supports GMRF index data distributions", {
+  n_years <- get_n_years(data)
+  precision_matrix_vector <- as.vector(diag(1, n_years))
+
+  index_template <- default_parameters |>
+    dplyr::filter(
+      fleet_name == "fleet1",
+      distribution_type == "Data",
+      module_type == "Index"
+    ) |>
+    dplyr::slice(1)
+
+  gmrf_index_parameters <- index_template[rep(1, length(precision_matrix_vector)), ] |>
+    dplyr::mutate(
+      distribution = "GMRF",
+      label = "precision_matrix",
+      value = precision_matrix_vector,
+      estimation_type = "constant",
+      time = NA_integer_
+    )
+
+  parameters_gmrf_index <- default_parameters |>
+    dplyr::filter(!(fleet_name == "fleet1" & distribution_type == "Data" & module_type == "Index")) |>
+    dplyr::bind_rows(gmrf_index_parameters)
+
+  result <- initialize_fims(
+    parameters = parameters_gmrf_index,
+    data = data
+  )
+
+  expect_type(result, "list")
+  expect_named(result, c("parameters", "model"))
+  clear()
+})
+
 ## Error handling ----
 
 test_that("`initialize_fims()` returns correct error messages", {

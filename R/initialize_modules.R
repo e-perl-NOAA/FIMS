@@ -795,46 +795,180 @@ initialize_fims <- function(parameters, data) {
 
     if ("index" %in% fleet_types &&
       "Index" %in% data_distribution_names_for_fleet_i) {
+      index_distribution_input <- parameters |>
+        dplyr::filter(
+          fleet_name == fleet_names[i],
+          distribution_type == "Data",
+          module_type == "Index"
+        )
+      index_distribution <- index_distribution_input |>
+        dplyr::filter(!is.na(distribution)) |>
+        dplyr::pull(distribution) |>
+        unique()
+      if (length(index_distribution) != 1) {
+        cli::cli_abort(c(
+          "x" = "Fleet {.var {fleet_names[i]}} index data must map to exactly one distribution.",
+          "i" = "Found {.code {toString(index_distribution)}}."
+        ))
+      }
+
       fleet_index_distribution[[i]] <- initialize_data_distribution(
         module = fleet[[i]],
-        # TODO: need to update family and match options from the distribution
-        # column from the parameters tibble
-        family = lognormal(link = "log"),
-        sd = fleet_sd_input,
+        family = switch(index_distribution,
+          "Dlnorm" = lognormal(link = "log"),
+          "Dnorm" = gaussian(link = "log"),
+          "GMRF" = gmrf(link = "log"),
+          cli::cli_abort(c(
+            "x" = "Unsupported index distribution {.var {index_distribution}} for fleet {.var {fleet_names[i]}}.",
+            "i" = "Supported options include {.code Dlnorm}, {.code Dnorm}, and {.code GMRF}."
+          ))
+        ),
+        sd = if (index_distribution %in% c("Dlnorm", "Dnorm")) fleet_sd_input else list(value = 1, estimation_type = "constant"),
+        precision_matrix = if (index_distribution == "GMRF") {
+          parameters |>
+            dplyr::filter(
+              fleet_name == fleet_names[i],
+              distribution_type == "Data",
+              module_type == "Index",
+              label == "precision_matrix"
+            )
+        } else {
+          NULL
+        },
         data_type = "index"
       )
     }
 
     if ("landings" %in% fleet_types &&
       "Landings" %in% data_distribution_names_for_fleet_i) {
+      landings_distribution_input <- parameters |>
+        dplyr::filter(
+          fleet_name == fleet_names[i],
+          distribution_type == "Data",
+          module_type == "Landings"
+        )
+      landings_distribution <- landings_distribution_input |>
+        dplyr::filter(!is.na(distribution)) |>
+        dplyr::pull(distribution) |>
+        unique()
+      if (length(landings_distribution) != 1) {
+        cli::cli_abort(c(
+          "x" = "Fleet {.var {fleet_names[i]}} landings data must map to exactly one distribution.",
+          "i" = "Found {.code {toString(landings_distribution)}}."
+        ))
+      }
+
       fleet_landings_distribution[[i]] <- initialize_data_distribution(
         module = fleet[[i]],
-        # TODO: need to update family and match options from the distribution
-        # column from the parameters tibble
-        family = lognormal(link = "log"),
-        sd = fleet_sd_input,
+        family = switch(landings_distribution,
+          "Dlnorm" = lognormal(link = "log"),
+          "Dnorm" = gaussian(link = "log"),
+          "GMRF" = gmrf(link = "log"),
+          cli::cli_abort(c(
+            "x" = "Unsupported landings distribution {.var {landings_distribution}} for fleet {.var {fleet_names[i]}}.",
+            "i" = "Supported options include {.code Dlnorm}, {.code Dnorm}, and {.code GMRF}."
+          ))
+        ),
+        sd = if (landings_distribution %in% c("Dlnorm", "Dnorm")) fleet_sd_input else list(value = 1, estimation_type = "constant"),
+        precision_matrix = if (landings_distribution == "GMRF") {
+          parameters |>
+            dplyr::filter(
+              fleet_name == fleet_names[i],
+              distribution_type == "Data",
+              module_type == "Landings",
+              label == "precision_matrix"
+            )
+        } else {
+          NULL
+        },
         data_type = "landings"
       )
     }
 
     if ("age_comp" %in% fleet_types &&
       "AgeComp" %in% data_distribution_names_for_fleet_i) {
+      agecomp_distribution_input <- parameters |>
+        dplyr::filter(
+          fleet_name == fleet_names[i],
+          distribution_type == "Data",
+          module_type == "AgeComp"
+        )
+      agecomp_distribution <- agecomp_distribution_input |>
+        dplyr::filter(!is.na(distribution)) |>
+        dplyr::pull(distribution) |>
+        unique()
+      if (length(agecomp_distribution) != 1) {
+        cli::cli_abort(c(
+          "x" = "Fleet {.var {fleet_names[i]}} age composition data must map to exactly one distribution.",
+          "i" = "Found {.code {toString(agecomp_distribution)}}."
+        ))
+      }
+
       fleet_agecomp_distribution[[i]] <- initialize_data_distribution(
         module = fleet[[i]],
-        # TODO: need to update family and match options from the distribution
-        # column from the parameters tibble
-        family = multinomial(link = "logit"),
+        family = switch(agecomp_distribution,
+          "Dmultinom" = multinomial(link = "logit"),
+          "GMRF" = gmrf(link = "identity"),
+          cli::cli_abort(c(
+            "x" = "Unsupported age composition distribution {.var {agecomp_distribution}} for fleet {.var {fleet_names[i]}}.",
+            "i" = "Supported options include {.code Dmultinom} and {.code GMRF}."
+          ))
+        ),
+        precision_matrix = if (agecomp_distribution == "GMRF") {
+          parameters |>
+            dplyr::filter(
+              fleet_name == fleet_names[i],
+              distribution_type == "Data",
+              module_type == "AgeComp",
+              label == "precision_matrix"
+            )
+        } else {
+          NULL
+        },
         data_type = "agecomp"
       )
     }
 
     if ("length_comp" %in% fleet_types &&
       "LengthComp" %in% data_distribution_names_for_fleet_i) {
+      lengthcomp_distribution_input <- parameters |>
+        dplyr::filter(
+          fleet_name == fleet_names[i],
+          distribution_type == "Data",
+          module_type == "LengthComp"
+        )
+      lengthcomp_distribution <- lengthcomp_distribution_input |>
+        dplyr::filter(!is.na(distribution)) |>
+        dplyr::pull(distribution) |>
+        unique()
+      if (length(lengthcomp_distribution) != 1) {
+        cli::cli_abort(c(
+          "x" = "Fleet {.var {fleet_names[i]}} length composition data must map to exactly one distribution.",
+          "i" = "Found {.code {toString(lengthcomp_distribution)}}."
+        ))
+      }
+
       fleet_lengthcomp_distribution[[i]] <- initialize_data_distribution(
         module = fleet[[i]],
-        # TODO: need to update family and match options from the distribution
-        # column from the parameters tibble
-        family = multinomial(link = "logit"),
+        family = switch(lengthcomp_distribution,
+          "Dmultinom" = multinomial(link = "logit"),
+          "GMRF" = gmrf(link = "identity"),
+          cli::cli_abort(c(
+            "x" = "Unsupported length composition distribution {.var {lengthcomp_distribution}} for fleet {.var {fleet_names[i]}}.",
+            "i" = "Supported options include {.code Dmultinom} and {.code GMRF}."
+          ))
+        ),
+        precision_matrix = if (lengthcomp_distribution == "GMRF") {
+          parameters |>
+            dplyr::filter(
+              fleet_name == fleet_names[i],
+              distribution_type == "Data",
+              module_type == "LengthComp",
+              label == "precision_matrix"
+            )
+        } else {
+          NULL
+        },
         data_type = "lengthcomp"
       )
     }

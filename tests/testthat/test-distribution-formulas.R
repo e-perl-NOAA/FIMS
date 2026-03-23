@@ -91,6 +91,16 @@ fishing_fleet_index_distribution2 <- initialize_data_distribution(
   sd = list(value = fleet_sd[1], estimation_type = "fixed_effects"),
   data_type = "index"
 )
+gmrf_index_q <- as.vector(diag(1, om_input$nyr))
+fishing_fleet_index_distribution_gmrf <- initialize_data_distribution(
+  module = fishing_fleet,
+  family = gmrf(link = "log"),
+  precision_matrix = list(
+    value = gmrf_index_q,
+    estimation_type = rep("constant", length(gmrf_index_q))
+  ),
+  data_type = "index"
+)
 
 
 ## IO correctness ----
@@ -124,6 +134,9 @@ test_that("`initialize_data_distribution()` works with correct inputs", {
     log(fleet_sd[1]),
     fishing_fleet_index_distribution2$log_sd[1]$value
   )
+  #' @description Test that `initialize_data_distribution()` supports gmrf for index data.
+  expect_true(inherits(fishing_fleet_index_distribution_gmrf, "Rcpp_GMRFDistributionsInterface"))
+  expect_equal(length(fishing_fleet_index_distribution_gmrf$precision_matrix), om_input$nyr * om_input$nyr)
 })
 
 ## Edge handling ----
@@ -345,6 +358,19 @@ test_that("`initialize_data_distribution()` returns correct error messages", {
       data_type = "agecomp"
     ),
     "is missing from"
+  )
+  #' @description Test that error is thrown for incorrect gmrf precision-matrix length for index data.
+  expect_error(
+    initialize_data_distribution(
+      module = fishing_fleet,
+      family = gmrf(link = "log"),
+      precision_matrix = list(
+        value = gmrf_index_q[-1],
+        estimation_type = rep("constant", length(gmrf_index_q) - 1)
+      ),
+      data_type = "index"
+    ),
+    "must have size"
   )
   clear()
 })
