@@ -520,6 +520,8 @@ initialize_process_distribution <- function(
   }
 
   # setup links to parameter
+  # NOTE: `is_random_effect` is a process-level argument and does not replace
+  # parameter-level `estimation_type` settings for sd/precision_matrix values.
   if (is.null(expected)) {
     new_module$set_distribution_links(
       "random_effects",
