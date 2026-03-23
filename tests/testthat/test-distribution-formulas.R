@@ -155,18 +155,20 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
   )
 
   # Test that `gmrf` can be specified as a process family and returns the Rcpp GMRF interface object.
+  n_re <- length(recruitment$log_r)
+  gmrf_q <- as.vector(diag(1, n_re))
   gmrf_distribution <- initialize_process_distribution(
     module = recruitment,
     par = "log_r",
     family = gmrf(),
     precision_matrix = list(
-      value = c(2, 0, 0, 3),
-      estimation_type = rep("constant", 4)
+      value = gmrf_q,
+      estimation_type = rep("constant", length(gmrf_q))
     ),
     is_random_effect = FALSE
   )
   expect_true(inherits(gmrf_distribution, "Rcpp_GMRFDistributionsInterface"))
-  expect_equal(length(gmrf_distribution$precision_matrix), 4)
+  expect_equal(length(gmrf_distribution$precision_matrix), n_re * n_re)
   clear()
 
   expect_error(
@@ -185,8 +187,8 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
       par = "log_r",
       family = gmrf(),
       precision_matrix = list(
-        value = c(1, 0, 0),
-        estimation_type = rep("constant", 3)
+        value = gmrf_q[-1],
+        estimation_type = rep("constant", length(gmrf_q) - 1)
       ),
       is_random_effect = FALSE
     ),
