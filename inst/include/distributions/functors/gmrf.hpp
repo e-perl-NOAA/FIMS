@@ -25,6 +25,21 @@ namespace fims_distributions {
  * https://kaskr.github.io/adcomp/classdensity_1_1GMRF__t.html) when compiled
  * with TMB (`TMB_MODEL`). The precision matrix is stored as a flattened,
  * row-major vector and expected to be linked during model setup.
+ *
+ * In simple terms, this distribution says each random effect is compared to its
+ * expected value, then all of those differences are combined into one score.
+ * Large differences are penalized more, and the precision matrix (`Q`) controls
+ * how strong that penalty is and which random effects are related to each
+ * other.
+ *
+ * Mathematically, with centered values `d = x - mu`, the contribution used here
+ * is proportional to:
+ * `-0.5 * d' * Q * d`
+ *
+ * Where:
+ * - `x` is the random-effects vector,
+ * - `mu` is the expected-values vector,
+ * - `Q` is the precision matrix (inverse covariance).
  */
 template <typename Type>
 struct GMRF : public DensityComponentBase<Type> {
