@@ -1192,6 +1192,15 @@ class GMRFDistributionsInterface : public DistributionsInterfaceBase {
   virtual uint32_t get_id() { return this->id_m; }
 
   /**
+   * @brief Set the unique ID for the observed data object.
+   * @param observed_data_id Unique ID for the observed data object.
+   */
+  virtual bool set_observed_data(int observed_data_id) {
+    this->interface_observed_data_id_m.set(observed_data_id);
+    return true;
+  }
+
+  /**
    * @copydoc DistributionsInterfaceBase::set_distribution_links
    */
   virtual bool set_distribution_links(std::string input_type,

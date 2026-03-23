@@ -470,6 +470,8 @@ RCPP_MODULE(fims) {
       .constructor()
       .method("get_id", &GMRFDistributionsInterface::get_id)
       .method("evaluate", &GMRFDistributionsInterface::evaluate)
+      .method("set_observed_data",
+              &GMRFDistributionsInterface::set_observed_data)
       .method("set_distribution_links",
               &GMRFDistributionsInterface::set_distribution_links)
       .field("observed_values", &GMRFDistributionsInterface::observed_values)

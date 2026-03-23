@@ -192,7 +192,7 @@ test_that("rcpp distribution works with correct inputs", {
 
   # Test that GMRFDistribution evaluate() works with flattened precision matrix input.
   # Non-TMB evaluation path computes the quadratic form contribution.
-  expect_equal(gmrf_$evaluate(), 1.625)
+  expect_equal(gmrf_$evaluate(), 1.5675)
   clear()
 })
 

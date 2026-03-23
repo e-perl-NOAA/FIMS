@@ -34,7 +34,17 @@ initialize_module <- function(parameters, data, module_name, fleet_name = NA_cha
       dplyr::filter(fleet_name == !!fleet_name)
   }
 
-  module_class_name <- module_input |>
+  # Exclude distribution-spec rows when inferring module class names so we only
+  # inspect structural module rows (for example, Recruitment, Fleet, Index).
+  module_class_input <- module_input |>
+    dplyr::filter(is.na(distribution_type) | !distribution_type %in% c("Data", "process"))
+  # If a module happens to be represented only by distribution rows, fall back
+  # to the full input so class detection can still proceed.
+  if (nrow(module_class_input) == 0) {
+    module_class_input <- module_input
+  }
+
+  module_class_name <- module_class_input |>
     # Combine module_type and module_name into a single string
     dplyr::mutate(
       temp_name = paste0(
@@ -978,8 +988,14 @@ initialize_fims <- function(parameters, data) {
   # create new module in the recruitment class (specifically Beverton--Holt,
   # when there are other options, this would be where the option would be
   # chosen)
+  recruitment_input <- parameters |>
+    dplyr::filter(
+      module_name == "Recruitment",
+      is.na(distribution_type) | !distribution_type %in% c("Data", "process")
+    )
+
   recruitment <- initialize_recruitment(
-    parameters = parameters,
+    parameters = recruitment_input,
     data = data
   )
 
