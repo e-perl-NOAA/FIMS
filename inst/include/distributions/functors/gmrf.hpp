@@ -11,6 +11,7 @@
 #define GMRF_HPP
 
 #include "density_components_base.hpp"
+#include "precision_matrix_builder.hpp"
 #include "../../common/def.hpp"
 
 #ifdef TMB_MODEL
@@ -24,7 +25,8 @@ namespace fims_distributions {
  * @details This implementation uses [TMB's `density::GMRF()` utility](
  * https://kaskr.github.io/adcomp/classdensity_1_1GMRF__t.html) when compiled
  * with TMB (`TMB_MODEL`). The precision matrix is stored as a flattened,
- * row-major vector and expected to be linked during model setup.
+ * row-major vector and expected to be linked during model setup, or provided by
+ * a precision-matrix builder.
  *
  * In simple terms, this distribution says each random effect is compared to its
  * expected value, then all of those differences are combined into one score.
@@ -53,6 +55,17 @@ struct GMRF : public DensityComponentBase<Type> {
    */
   fims::Vector<Type>* precision_matrix_flat = NULL;
 
+  /**
+   * @brief Optional provider that builds a flattened precision matrix.
+   *
+   * @details This allows GMRF to consume a precision matrix assembled elsewhere
+   * (for example, by a DSEM precision-matrix builder) instead of assembling Q in
+   * this class. If both `precision_matrix_flat` and `precision_matrix_builder`
+   * are set, `precision_matrix_flat` is used directly.
+   */
+  std::shared_ptr<PrecisionMatrixBuilderBase<Type>> precision_matrix_builder =
+      nullptr;
+
   /** @brief Constructor.
    */
   GMRF() : DensityComponentBase<Type>() {
@@ -74,8 +87,17 @@ struct GMRF : public DensityComponentBase<Type> {
     this->lpdf = static_cast<Type>(0);
 
     if (this->precision_matrix_flat == NULL) {
-      throw std::invalid_argument(
-          "GMRF::precision_matrix_flat must be linked before evaluate().");
+      if (this->precision_matrix_builder != nullptr) {
+        // Build from external provider when no direct precision pointer is
+        // linked. This intentionally rebuilds per evaluate() call so upstream
+        // builder inputs can vary across calls.
+        this->precision_matrix_values =
+            this->precision_matrix_builder->BuildPrecisionMatrix();
+        this->precision_matrix_flat = &(this->precision_matrix_values);
+      } else {
+        throw std::invalid_argument(
+            "GMRF::precision_matrix_flat must be linked before evaluate().");
+      }
     }
 
     const size_t q_size = this->precision_matrix_flat->size();
