@@ -12,6 +12,11 @@
 #include "density_components_base.hpp"
 #include "../../common/def.hpp"
 
+#ifdef TMB_MODEL
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
+#endif
+
 namespace fims_distributions {
 
 /**
@@ -86,13 +91,17 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
           "DSEMPrecisionMatrixBuilder: RAM vectors must have equal lengths.");
     }
 
+#ifdef TMB_MODEL
+    Eigen::SparseMatrix<Type> rho_kk(static_cast<int>(n_k),
+                                     static_cast<int>(n_k));
+    Eigen::SparseMatrix<Type> gamma_kk(static_cast<int>(n_k),
+                                       static_cast<int>(n_k));
+    rho_kk.setZero();
+    gamma_kk.setZero();
+#else
     fims::Vector<Type> rho(n_k * n_k, static_cast<Type>(0));
     fims::Vector<Type> gamma(n_k * n_k, static_cast<Type>(0));
-    fims::Vector<Type> i_minus_rho(n_k * n_k, static_cast<Type>(0));
-
-    for (size_t i = 0; i < n_k; ++i) {
-      i_minus_rho[i * n_k + i] = static_cast<Type>(1);
-    }
+#endif
 
     for (size_t r = 0; r < n_rows; ++r) {
       const int from = this->ram_from[r] - 1;
@@ -114,12 +123,47 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
       }
 
       if (this->ram_type[r] == 1) {
+#ifdef TMB_MODEL
+        rho_kk.coeffRef(from, to) = value;
+#else
         rho[static_cast<size_t>(from) * n_k + static_cast<size_t>(to)] = value;
+#endif
       } else if (this->ram_type[r] == 2) {
+#ifdef TMB_MODEL
+        gamma_kk.coeffRef(from, to) = value;
+#else
         gamma[static_cast<size_t>(from) * n_k + static_cast<size_t>(to)] = value;
+#endif
       }
     }
 
+#ifdef TMB_MODEL
+    Eigen::SparseMatrix<Type> i_kk(static_cast<int>(n_k), static_cast<int>(n_k));
+    i_kk.setIdentity();
+    Eigen::SparseMatrix<Type> i_minus_rho_kk = i_kk - rho_kk;
+
+    Eigen::SparseMatrix<Type> v_kk = gamma_kk.transpose() * gamma_kk;
+    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> v_dense =
+        Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic>(v_kk);
+    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> v_inv_dense =
+        v_dense.inverse();
+    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> i_minus_rho_dense =
+        Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic>(i_minus_rho_kk);
+    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> q_dense =
+        i_minus_rho_dense.transpose() * v_inv_dense * i_minus_rho_dense;
+
+    fims::Vector<Type> q(n_k * n_k, static_cast<Type>(0));
+    for (size_t i = 0; i < n_k; ++i) {
+      for (size_t j = 0; j < n_k; ++j) {
+        q[i * n_k + j] = q_dense(static_cast<int>(i), static_cast<int>(j));
+      }
+    }
+    return q;
+#else
+    fims::Vector<Type> i_minus_rho(n_k * n_k, static_cast<Type>(0));
+    for (size_t i = 0; i < n_k; ++i) {
+      i_minus_rho[i * n_k + i] = static_cast<Type>(1);
+    }
     for (size_t i = 0; i < n_k; ++i) {
       for (size_t j = 0; j < n_k; ++j) {
         i_minus_rho[i * n_k + j] -= rho[i * n_k + j];
@@ -141,6 +185,7 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
     fims::Vector<Type> temp = this->DenseMatMul(v_inv, i_minus_rho, n_k);
     fims::Vector<Type> q = this->DenseMatMul(this->Transpose(i_minus_rho, n_k), temp, n_k);
     return q;
+#endif
   }
 
  private:
