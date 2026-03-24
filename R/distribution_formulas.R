@@ -26,9 +26,7 @@ check_distribution_validity <- function(args) {
   # Separate objects from args
   family <- args[["family"]]
   sd <- args[["sd"]]
-  # Optional arguments
   data_type <- args[["data_type"]]
-  precision_matrix <- args[["precision_matrix"]]
   check_present <- purrr::map_vec(list("family" = family, "sd" = sd), is.null)
 
   # Set up global rules
@@ -37,13 +35,13 @@ check_distribution_validity <- function(args) {
   # are available
   data_type_names <- c("landings", "index", "agecomp", "lengthcomp")
   if (is.null(data_type)) {
-    available_distributions <- c("lognormal", "gaussian", "gmrf")
+    available_distributions <- c("lognormal", "gaussian")
   } else {
     available_distributions <- switch(
       EXPR = ifelse(grepl("comp", data_type), "composition", data_type),
-      "landings" = c("lognormal", "gaussian", "gmrf"),
-      "index" = c("lognormal", "gaussian", "gmrf"),
-      "composition" = c("multinomial", "gmrf"),
+      "landings" = c("lognormal", "gaussian"),
+      "index" = c("lognormal", "gaussian"),
+      "composition" = c("multinomial"),
       "unavailable data type"
     )
   }
@@ -141,33 +139,6 @@ check_distribution_validity <- function(args) {
     }
   }
 
-  if (!is.null(family) &&
-    inherits(family, "family") &&
-    family[["family"]] == "gmrf"
-  ) {
-    if (is.null(precision_matrix)) {
-      abort_bullets <- c(
-        abort_bullets,
-        "x" = "The {.var precision_matrix} argument is required when using {.code family = gmrf()} for process distributions."
-      )
-    } else if (!all(c("value", "estimation_type") %in% names(precision_matrix))) {
-      abort_bullets <- c(
-        abort_bullets,
-        "x" = "{.var value} and {.var estimation_type} need to be present in {.var precision_matrix}.",
-        "i" = "Only {.code {names(precision_matrix)}} {cli::qty(length(precision_matrix))} {?is/are} present."
-      )
-    } else if (
-      length(precision_matrix[["estimation_type"]]) != 1 &&
-      length(precision_matrix[["value"]]) != length(precision_matrix[["estimation_type"]])
-    ) {
-      abort_bullets <- c(
-        abort_bullets,
-        "x" = "The sizes of {.var value} and {.var estimation_type} within {.var precision_matrix}
-               must match unless {.var estimation_type} is a single value."
-      )
-    }
-  }
-
   # Check dimensions for data distributions: sd must be either length 1 (scalar)
   # or match data length when data_type is landings or index
   if (!is.null(data_type) && !is.null(args[["module"]])) {
@@ -214,16 +185,16 @@ get_expected_name <- function(family, data_type) {
   link_string <- family[["link"]]
   expected_name <- dplyr::case_when(
     data_type == "landings" &&
-      grepl("lognormal|gaussian|gmrf", family_string) &&
+      grepl("lognormal|gaussian", family_string) &&
       link_string == "log" ~ "log_landings_expected",
     data_type == "landings" &&
-      grepl("lognormal|gaussian|gmrf", family_string) &&
+      grepl("lognormal|gaussian", family_string) &&
       link_string == "identity" ~ "landings_expected",
     data_type == "index" &&
-      grepl("lognormal|gaussian|gmrf", family_string) &&
+      grepl("lognormal|gaussian", family_string) &&
       link_string == "log" ~ "log_index_expected",
     data_type == "index" &&
-      grepl("lognormal|gaussian|gmrf", family_string) &&
+      grepl("lognormal|gaussian", family_string) &&
       link_string == "identity" ~ "index_expected",
     grepl("agecomp", data_type) ~ "agecomp_proportion",
     grepl("lengthcomp", data_type) ~ "lengthcomp_proportion",
@@ -315,7 +286,6 @@ initialize_data_distribution <- function(
     value = 1,
     estimation_type = "constant"
   ),
-  precision_matrix = NULL,
   # FIXME: Move this argument to second to match where par is in
   # initialize_process_distribution
   data_type = c("landings", "index", "agecomp", "lengthcomp")
@@ -329,7 +299,6 @@ initialize_data_distribution <- function(
   args <- list(
     family = family,
     sd = sd,
-    precision_matrix = precision_matrix,
     data_type = data_type,
     module = module
   )
@@ -381,37 +350,6 @@ initialize_data_distribution <- function(
     new_module <- methods::new(DmultinomDistribution)
   }
 
-  if (family[["family"]] == "gmrf") {
-    # create new Rcpp module
-    new_module <- methods::new(GMRFDistribution)
-
-    n_dim <- switch(data_type,
-      landings = module$n_years$get(),
-      index = module$n_years$get(),
-      agecomp = module$n_ages$get(),
-      lengthcomp = module$n_lengths$get()
-    )
-    q_values <- precision_matrix[["value"]]
-    q_size <- length(q_values)
-    if (q_size != n_dim * n_dim) {
-      cli::cli_abort(c(
-        "x" = "The size of {.var precision_matrix[['value']]} does not match the required dimensions for GMRF.",
-        "i" = "{.var precision_matrix[['value']]} has size {.code {q_size}}.",
-        "i" = "The expected data vector for {.var {data_type}} has length {.code {n_dim}}, so {.var precision_matrix[['value']]} must have size {.code {n_dim * n_dim}}."
-      ))
-    }
-
-    new_module$precision_matrix$resize(length(q_values))
-    purrr::walk(
-      seq_along(q_values),
-      \(x) new_module[["precision_matrix"]][x][["value"]] <- q_values[x]
-    )
-    purrr::walk(
-      seq_along(precision_matrix[["estimation_type"]]),
-      \(x) new_module[["precision_matrix"]][x][["estimation_type"]]$set(precision_matrix[["estimation_type"]][x])
-    )
-  }
-
   # setup link to observed data
   if (data_type == "landings") {
     new_module$set_observed_data(module$GetObservedLandingsDataID())
@@ -447,11 +385,7 @@ initialize_process_distribution <- function(
   )
 ) {
   # validity check on user input
-  args <- list(
-    family = family,
-    sd = sd,
-    precision_matrix = precision_matrix
-  )
+  args <- list(family = family, sd = sd)
   check_distribution_validity(args)
 
   if (!is.element(par, c("log_devs", "log_r"))) {
@@ -486,32 +420,6 @@ initialize_process_distribution <- function(
         new_module$log_sd[i]$estimation_type$set(sd[["estimation_type"]][i])
       }
     }
-  }
-
-  if (family[["family"]] == "gmrf") {
-    # create new Rcpp module
-    new_module <- methods::new(GMRFDistribution)
-
-    n_dim <- length(module$field(par))
-    q_values <- precision_matrix[["value"]]
-    q_size <- length(q_values)
-    if (q_size != n_dim * n_dim) {
-      cli::cli_abort(c(
-        "x" = "The size of {.var precision_matrix[['value']]} does not match the required dimensions for GMRF.",
-        "i" = "{.var precision_matrix[['value']]} has size {.code {q_size}}.",
-        "i" = "The random effect vector for {.var {par}} has length {.code {n_dim}}, so {.var precision_matrix[['value']]} must have size {.code {n_dim * n_dim}}."
-      ))
-    }
-
-    new_module$precision_matrix$resize(length(q_values))
-    purrr::walk(
-      seq_along(q_values),
-      \(x) new_module[["precision_matrix"]][x][["value"]] <- q_values[x]
-    )
-    purrr::walk(
-      seq_along(precision_matrix[["estimation_type"]]),
-      \(x) new_module[["precision_matrix"]][x][["estimation_type"]]$set(precision_matrix[["estimation_type"]][x])
-    )
   }
 
   if (family[["family"]] == "gaussian") {
@@ -553,8 +461,6 @@ initialize_process_distribution <- function(
   }
 
   # setup links to parameter
-  # NOTE: `is_random_effect` is a process-level argument and does not replace
-  # parameter-level `estimation_type` settings for sd/precision_matrix values.
   if (is.null(expected)) {
     new_module$set_distribution_links(
       "random_effects",
@@ -565,10 +471,6 @@ initialize_process_distribution <- function(
       module$field(par)$get_id(),
       module$field(expected)$get_id()
     )
-    if (family[["family"]] == "gmrf") {
-      linked_ids <- c(linked_ids, new_module$precision_matrix$get_id())
-    }
-    new_module$set_distribution_links("random_effects", linked_ids)
   }
 
   return(new_module)
@@ -636,18 +538,6 @@ lognormal <- function(link = "log") {
 multinomial <- function(link = "logit") {
   family_class <- c(
     list(family = "multinomial", link = link),
-    stats::make.link(link)
-  )
-  class(family_class) <- "family"
-  return(family_class)
-}
-
-#' @rdname lognormal
-#' @keywords distribution
-#' @export
-gmrf <- function(link = "identity") {
-  family_class <- c(
-    list(family = "gmrf", link = link),
     stats::make.link(link)
   )
   class(family_class) <- "family"

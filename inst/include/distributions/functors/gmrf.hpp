@@ -73,14 +73,6 @@ struct GMRF : public DensityComponentBase<Type> {
     this->lpdf_vec[0] = static_cast<Type>(0);
     this->lpdf = static_cast<Type>(0);
 
-    if (n_x != n_expected) {
-      if (n_expected == 1) {
-        n_expected = n_x;
-      } else if (n_x > n_expected) {
-        n_x = n_expected;
-      }
-    }
-
     if (this->precision_matrix_flat == NULL) {
       throw std::invalid_argument(
           "GMRF::precision_matrix_flat must be linked before evaluate().");

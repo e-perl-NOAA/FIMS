@@ -91,16 +91,6 @@ fishing_fleet_index_distribution2 <- initialize_data_distribution(
   sd = list(value = fleet_sd[1], estimation_type = "fixed_effects"),
   data_type = "index"
 )
-gmrf_index_q <- as.vector(diag(1, om_input$nyr))
-fishing_fleet_index_distribution_gmrf <- initialize_data_distribution(
-  module = fishing_fleet,
-  family = gmrf(link = "log"),
-  precision_matrix = list(
-    value = gmrf_index_q,
-    estimation_type = rep("constant", length(gmrf_index_q))
-  ),
-  data_type = "index"
-)
 
 
 ## IO correctness ----
@@ -134,9 +124,6 @@ test_that("`initialize_data_distribution()` works with correct inputs", {
     log(fleet_sd[1]),
     fishing_fleet_index_distribution2$log_sd[1]$value
   )
-  #' @description Test that `initialize_data_distribution()` supports gmrf for index data.
-  expect_true(inherits(fishing_fleet_index_distribution_gmrf, "Rcpp_GMRFDistribution"))
-  expect_equal(length(fishing_fleet_index_distribution_gmrf$precision_matrix), om_input$nyr * om_input$nyr)
 })
 
 ## Edge handling ----
@@ -165,60 +152,6 @@ test_that("`initialize_process_distribution()` returns correct error messages", 
       sd = list(value = om_input$logR_sd, estimation_type = "constant")
     ),
     "FIMS currently does not allow the family"
-  )
-
-  # Test that `gmrf` can be specified as a process family and returns the Rcpp GMRF interface object.
-  n_re <- length(recruitment$log_r)
-  gmrf_q <- as.vector(diag(1, n_re))
-  gmrf_distribution <- initialize_process_distribution(
-    module = recruitment,
-    par = "log_r",
-    family = gmrf(),
-    precision_matrix = list(
-      value = gmrf_q,
-      estimation_type = rep("constant", length(gmrf_q))
-    ),
-    is_random_effect = FALSE
-  )
-  expect_true(inherits(gmrf_distribution, "Rcpp_GMRFDistribution"))
-  expect_equal(length(gmrf_distribution$precision_matrix), n_re * n_re)
-
-  gmrf_distribution_random_effect <- initialize_process_distribution(
-    module = recruitment,
-    par = "log_r",
-    family = gmrf(),
-    precision_matrix = list(
-      value = gmrf_q,
-      estimation_type = rep("constant", length(gmrf_q))
-    ),
-    is_random_effect = TRUE
-  )
-  expect_true(inherits(gmrf_distribution_random_effect, "Rcpp_GMRFDistribution"))
-  expect_equal(length(gmrf_distribution_random_effect$precision_matrix), n_re * n_re)
-  clear()
-
-  expect_error(
-    initialize_process_distribution(
-      module = recruitment,
-      par = "log_r",
-      family = gmrf(),
-      is_random_effect = FALSE
-    ),
-    "precision_matrix"
-  )
-
-  expect_error(
-    initialize_process_distribution(
-      module = recruitment,
-      par = "log_r",
-      family = gmrf(),
-      precision_matrix = list(
-        value = gmrf_q[-1],
-        estimation_type = rep("constant", length(gmrf_q) - 1)
-      ),
-      is_random_effect = FALSE
-    ),
-    "must have size"
   )
 
   #' @description Test that error is thrown when incorrect `family` specified for `initialize_process_distribution()`.
@@ -358,19 +291,6 @@ test_that("`initialize_data_distribution()` returns correct error messages", {
       data_type = "agecomp"
     ),
     "is missing from"
-  )
-  #' @description Test that error is thrown for incorrect gmrf precision-matrix length for index data.
-  expect_error(
-    initialize_data_distribution(
-      module = fishing_fleet,
-      family = gmrf(link = "log"),
-      precision_matrix = list(
-        value = gmrf_index_q[-1],
-        estimation_type = rep("constant", length(gmrf_index_q) - 1)
-      ),
-      data_type = "index"
-    ),
-    "must have size"
   )
   clear()
 })

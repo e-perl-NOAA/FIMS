@@ -263,47 +263,6 @@ parameters_4_model <- default_parameters |>
     by = c("label", "age")
   )
 ```
-
-### Example: using GMRF recruitment through `initialize_fims()`
-
-The default recruitment process distribution in this vignette uses a Gaussian
-distribution (`Dnorm` with `log_sd` values). To use GMRF in that same workflow,
-update the recruitment process rows in the parameter tibble, then call
-`initialize_fims()`.
-
-```{r parameters-gmrf-example, eval=FALSE}
-n_years <- get_n_years(data_4_model)
-precision_matrix_vector <- as.vector(diag(1, n_years))
-
-# Build replacement recruitment process rows that use GMRF on log_r.
-gmrf_process_parameters <- parameters_4_model |>
-  dplyr::filter(
-    module_name == "Recruitment",
-    distribution_type == "process"
-  ) |>
-  # Replicate the single recruitment process template row so each resulting row
-  # can store one entry of the flattened n_years x n_years precision matrix.
-  dplyr::slice(rep(1, length(precision_matrix_vector))) |>
-  dplyr::mutate(
-    distribution = "GMRF",
-    distribution_link = "log_r",
-    label = "precision_matrix",
-    value = precision_matrix_vector,
-    estimation_type = "constant",
-    time = NA_integer_
-  )
-
-parameters_gmrf <- parameters_4_model |>
-  dplyr::filter(!(module_name == "Recruitment" & distribution_type == "process")) |>
-  dplyr::bind_rows(gmrf_process_parameters)
-
-# Initialize modules using the modified parameter table.
-gmrf_input <- initialize_fims(
-  parameters = parameters_gmrf,
-  data = data_4_model
-)
-```
-
 ## Fit
 
 With data and parameters in place, we can now initialize modules using `initialize_fims()` and fit the model using `fit_fims()`.
