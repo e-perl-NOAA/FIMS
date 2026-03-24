@@ -809,7 +809,7 @@ initialize_fims <- function(parameters, data) {
       "Landings" %in% data_distribution_names_for_fleet_i) {
       fleet_landings_distribution[[i]] <- initialize_data_distribution(
         module = fleet[[i]],
-         # TODO: need to update family and match options from the distribution
+        # TODO: need to update family and match options from the distribution
         # column from the parameters tibble
         family = lognormal(link = "log"),
         sd = fleet_sd_input,
@@ -844,9 +844,6 @@ initialize_fims <- function(parameters, data) {
   # create new module in the recruitment class (specifically Beverton--Holt,
   # when there are other options, this would be where the option would be
   # chosen)
-  recruitment_input <- parameters |>
-    dplyr::filter(module_name == "Recruitment")
-
   recruitment <- initialize_recruitment(
     parameters = parameters,
     data = data

@@ -12,8 +12,7 @@
 #' most information possible is the best way forward.
 #'
 #' @param args A named list of input arguments that must contain at least
-#'   `family` and `sd`. For GMRF process distributions, `precision_matrix` is
-#'   also required. `data_type` is only needed for some upstream functions.
+#'   `family` and `sd`. `data_type` is only needed for some upstream functions.
 #' @seealso
 #' This function is used in the following functions:
 #' * [initialize_data_distribution()]
@@ -26,6 +25,7 @@ check_distribution_validity <- function(args) {
   # Separate objects from args
   family <- args[["family"]]
   sd <- args[["sd"]]
+  # Optional argument data_type
   data_type <- args[["data_type"]]
   check_present <- purrr::map_vec(list("family" = family, "sd" = sd), is.null)
 
@@ -467,9 +467,12 @@ initialize_process_distribution <- function(
       module$field(par)$get_id()
     )
   } else {
-    linked_ids <- c(
-      module$field(par)$get_id(),
-      module$field(expected)$get_id()
+    new_module$set_distribution_links(
+      "random_effects",
+      c(
+        module$field(par)$get_id(),
+        module$field(expected)$get_id()
+      )
     )
   }
 
