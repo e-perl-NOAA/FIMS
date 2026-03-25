@@ -353,11 +353,10 @@ class Information {
               std::dynamic_pointer_cast<fims_distributions::GMRF<Type>>(d);
 
           if (gmrf) {
-            if (d->key.size() < 10) {
+            if (d->key.size() < 3) {
               throw std::invalid_argument(
-                  "SetupRandomEffects: GMRF requires 10 keys (0..9) to build a "
-                  "DSEMPrecisionMatrixBuilder for distribution " +
-                  std::to_string(d->id) + ".");
+                  "SetupRandomEffects: GMRF requires key[2] for precision matrix "
+                  "linkage for distribution " + std::to_string(d->id) + ".");
             }
 
             auto get_vec = [&](size_t key_index, const char* what) -> fims::Vector<Type>* {
@@ -377,65 +376,13 @@ class Information {
               return (*it2).second;
             };
 
-            // n_time and n_variables are stored as scalars in fims::Vector<Type> (index 0).
-            fims::Vector<Type>* n_time_v = get_vec(2, "n_time");
-            fims::Vector<Type>* n_vars_v = get_vec(3, "n_variables");
-            if (n_time_v->size() < 1 || n_vars_v->size() < 1) {
+            fims::Vector<Type>* precision_matrix = get_vec(2, "precision_matrix");
+            if (precision_matrix->size() == 0) {
               throw std::invalid_argument(
-                  "SetupRandomEffects: GMRF n_time/n_variables vectors must have size >= 1 "
-                  "for distribution " + std::to_string(d->id) + ".");
+                  "SetupRandomEffects: GMRF precision matrix vector is empty for "
+                  "distribution " + std::to_string(d->id) + ".");
             }
-
-            const size_t n_time = static_cast<size_t>((*n_time_v)[0]);
-            const size_t n_variables = static_cast<size_t>((*n_vars_v)[0]);
-
-            // Pull the RAM and beta vectors (stored as Type vectors in variable_map).
-            // Note: variable_map is fims::Vector<Type>* (Type), but builder expects some int vectors.
-            // We cast elementwise below.
-            fims::Vector<Type>* ram_type_v = get_vec(4, "ram_type");
-            fims::Vector<Type>* ram_from_v = get_vec(5, "ram_from");
-            fims::Vector<Type>* ram_to_v = get_vec(6, "ram_to");
-            fims::Vector<Type>* ram_beta_index_v = get_vec(7, "ram_beta_index");
-            fims::Vector<Type>* ram_start_v = get_vec(8, "ram_start");
-            fims::Vector<Type>* beta_z_v = get_vec(9, "beta_z");
-
-            // Build the builder
-            std::shared_ptr<fims_distributions::DSEMPrecisionMatrixBuilder<Type>> builder =
-                std::make_shared<fims_distributions::DSEMPrecisionMatrixBuilder<Type>>();
-
-            builder->n_time = n_time;
-            builder->n_variables = n_variables;
-
-            // Copy/cast RAM vectors into the builder's expected types
-            const size_t n_rows = ram_type_v->size();
-            if (ram_from_v->size() != n_rows || ram_to_v->size() != n_rows ||
-                ram_beta_index_v->size() != n_rows || ram_start_v->size() != n_rows) {
-              throw std::invalid_argument(
-                  "SetupRandomEffects: GMRF RAM vectors must have equal lengths for distribution " +
-                  std::to_string(d->id) + ".");
-            }
-
-            builder->ram_type.resize(n_rows);
-            builder->ram_from.resize(n_rows);
-            builder->ram_to.resize(n_rows);
-            builder->ram_beta_index.resize(n_rows);
-            builder->ram_start.resize(n_rows);
-
-            for (size_t r = 0; r < n_rows; ++r) {
-              builder->ram_type[r] = static_cast<int>((*ram_type_v)[r]);
-              builder->ram_from[r] = static_cast<int>((*ram_from_v)[r]);
-              builder->ram_to[r] = static_cast<int>((*ram_to_v)[r]);
-              builder->ram_beta_index[r] = static_cast<int>((*ram_beta_index_v)[r]);
-              builder->ram_start[r] = (*ram_start_v)[r];
-            }
-
-            builder->beta_z.resize(beta_z_v->size());
-            for (size_t i = 0; i < beta_z_v->size(); ++i) {
-              builder->beta_z[i] = (*beta_z_v)[i];
-            }
-
-            // Assign builder into the functor (required by gmrf.hpp evaluate()).
-            gmrf->precision_matrix_builder = builder;
+            gmrf->precision_matrix_flat = precision_matrix;
           }
         }
         FIMS_INFO_LOG("Random effect size for distribution " +
