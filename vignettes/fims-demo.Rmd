@@ -263,6 +263,7 @@ parameters_4_model <- default_parameters |>
     by = c("label", "age")
   )
 ```
+
 ## Fit
 
 With data and parameters in place, we can now initialize modules using `initialize_fims()` and fit the model using `fit_fims()`.
