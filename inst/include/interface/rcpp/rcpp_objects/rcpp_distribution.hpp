@@ -1138,29 +1138,29 @@ class DmultinomDistributionsInterface : public DistributionsInterfaceBase {
 /**
  * @brief The Rcpp interface for GMRF to instantiate from R:
  * gmrf_ <- methods::new(GMRFDistribution).
+ *
+ * @details
+ * Option A (DSEM/GMRF): The sparse precision matrix builder is wired in
+ * fims_info::Information<Type>::SetupRandomEffects() by reading IDs from
+ * distribution->key and looking them up in info->variable_map.
+ *
+ * Therefore this interface only needs to:
+ *  - store key_m (set_distribution_links)
+ *  - create the TMB-side fims_distributions::GMRF<Type> object
+ *  - copy observed/expected values (optional placeholders)
  */
 class GMRFDistributionsInterface : public DistributionsInterfaceBase {
  public:
-  /**
-   * @brief Observed values.
-   */
+  /** @brief Observed values (often length-1 placeholder for random effects). */
   ParameterVector observed_values;
-  /**
-   * @brief Expected values.
-   */
+
+  /** @brief Expected values (often length-1 placeholder for random effects). */
   ParameterVector expected_values;
-  /**
-   * @brief Flattened precision matrix values in row-major order.
-   */
-  ParameterVector precision_matrix;
-  /**
-   * @brief Vector that records individual log probability contributions.
-   */
+
+  /** @brief Vector that records individual log probability contributions. */
   RealVector lpdf_vec;
 
-  /**
-   * @brief The constructor.
-   */
+  /** @brief Constructor. */
   GMRFDistributionsInterface() : DistributionsInterfaceBase() {
     DistributionsInterfaceBase::live_objects[this->id_m] =
         std::make_shared<GMRFDistributionsInterface>(*this);
@@ -1168,41 +1168,22 @@ class GMRFDistributionsInterface : public DistributionsInterfaceBase {
         DistributionsInterfaceBase::live_objects[this->id_m]);
   }
 
-  /**
-   * @brief Copy constructor.
-   *
-   * @param other
-   */
+  /** @brief Copy constructor. */
   GMRFDistributionsInterface(const GMRFDistributionsInterface &other)
       : DistributionsInterfaceBase(other),
         observed_values(other.observed_values),
         expected_values(other.expected_values),
-        precision_matrix(other.precision_matrix),
         lpdf_vec(other.lpdf_vec) {}
 
-  /**
-   * @brief The destructor.
-   */
   virtual ~GMRFDistributionsInterface() {}
 
-  /**
-   * @brief Gets the ID of the interface base object.
-   * @return The ID.
-   */
   virtual uint32_t get_id() { return this->id_m; }
 
-  /**
-   * @brief Set the unique ID for the observed data object.
-   * @param observed_data_id Unique ID for the observed data object.
-   */
   virtual bool set_observed_data(int observed_data_id) {
     this->interface_observed_data_id_m.set(observed_data_id);
     return true;
   }
 
-  /**
-   * @copydoc DistributionsInterfaceBase::set_distribution_links
-   */
   virtual bool set_distribution_links(std::string input_type,
                                       Rcpp::IntegerVector ids) {
     this->input_type_m.set(input_type);
@@ -1214,74 +1195,62 @@ class GMRFDistributionsInterface : public DistributionsInterfaceBase {
   }
 
   /**
-   * @brief Evaluate GMRF log density.
-   * @return The natural log of the probability density.
+   * @brief Evaluate GMRF in pure-R (double) context.
+   *
+   * @details
+   * The DSEM sparse precision builder uses TMB utilities and is intended to be
+   * evaluated inside the TMB model. In the R-only (double) context we do not
+   * have the builder wiring, so we return 0 (alternatively: throw).
    */
-  virtual double evaluate() {
-    fims_distributions::GMRF<double> gmrf;
-    gmrf.observed_values.resize(this->observed_values.size());
-    gmrf.expected_values.resize(this->expected_values.size());
-    gmrf.precision_matrix_values.resize(this->precision_matrix.size());
-    for (size_t i = 0; i < this->observed_values.size(); i++) {
-      gmrf.observed_values[i] = this->observed_values[i].initial_value_m;
-    }
-    for (size_t i = 0; i < this->expected_values.size(); i++) {
-      gmrf.expected_values[i] = this->expected_values[i].initial_value_m;
-    }
-    for (size_t i = 0; i < this->precision_matrix.size(); i++) {
-      gmrf.precision_matrix_values[i] = this->precision_matrix[i].initial_value_m;
-    }
-    return gmrf.evaluate();
-  }
+  virtual double evaluate() { return 0.0; }
 
-  /**
-   * @brief Extracts derived quantities from `Information` to the Rcpp object.
-   */
   virtual void finalize() {
     if (this->finalized) {
       FIMS_WARNING_LOG("GMRFDistribution " + fims::to_string(this->id_m) +
                        " has been finalized already.");
     }
-
     this->finalized = true;
 
     std::shared_ptr<fims_info::Information<double>> info =
         fims_info::Information<double>::GetInstance();
 
-    fims_info::Information<double>::density_components_iterator it;
-    it = info->density_components.find(this->id_m);
+    fims_info::Information<double>::density_components_iterator it =
+        info->density_components.find(this->id_m);
+
     if (it == info->density_components.end()) {
       FIMS_WARNING_LOG("GMRFDistribution " + fims::to_string(this->id_m) +
                        " not found in Information.");
       return;
-    } else {
-      std::shared_ptr<fims_distributions::GMRF<double>> gmrf =
-          std::dynamic_pointer_cast<fims_distributions::GMRF<double>>(
-              it->second);
+    }
 
-      this->lpdf_value = gmrf->lpdf;
-      size_t n_x = gmrf->get_n_x();
-      this->lpdf_vec = RealVector(n_x);
+    std::shared_ptr<fims_distributions::GMRF<double>> gmrf =
+        std::dynamic_pointer_cast<fims_distributions::GMRF<double>>(it->second);
 
-      if (this->expected_values.size() == 1) {
-        this->expected_values.resize(n_x);
-      }
-      if (this->observed_values.size() == 1) {
-        this->observed_values.resize(n_x);
-      }
+    if (!gmrf) {
+      FIMS_WARNING_LOG("GMRFDistribution " + fims::to_string(this->id_m) +
+                       " found in Information but could not be cast to GMRF.");
+      return;
+    }
 
-      for (size_t i = 0; i < this->lpdf_vec.size(); i++) {
-        this->lpdf_vec[i] = gmrf->lpdf_vec[i];
-        this->expected_values[i].final_value_m = gmrf->get_expected(i);
-        this->observed_values[i].final_value_m = gmrf->get_observed(i);
-      }
+    this->lpdf_value = gmrf->lpdf;
+
+    size_t n_x = gmrf->get_n_x();
+    this->lpdf_vec = RealVector(n_x);
+
+    if (this->expected_values.size() == 1) {
+      this->expected_values.resize(n_x);
+    }
+    if (this->observed_values.size() == 1) {
+      this->observed_values.resize(n_x);
+    }
+
+    for (size_t i = 0; i < n_x; i++) {
+      this->lpdf_vec[i] = gmrf->lpdf_vec[i];
+      this->expected_values[i].final_value_m = gmrf->get_expected(i);
+      this->observed_values[i].final_value_m = gmrf->get_observed(i);
     }
   }
 
-  /**
-   * @brief Converts the data to json representation for the output.
-   * @return Json string for the GMRF distribution.
-   */
   virtual std::string to_json() {
     std::stringstream ss;
 
@@ -1328,6 +1297,7 @@ class GMRFDistributionsInterface : public DistributionsInterfaceBase {
                 .final_value_m
          << "]\n";
     }
+
     ss << " }}\n";
     return ss.str();
   }
@@ -1344,11 +1314,15 @@ class GMRFDistributionsInterface : public DistributionsInterfaceBase {
     distribution->id = this->id_m;
     distribution->observed_data_id_m = interface_observed_data_id_m;
     distribution->input_type = this->input_type_m;
+
+    // Pass the key vector through; SetupRandomEffects will interpret it.
     distribution->key.resize(this->key_m->size());
     for (size_t i = 0; i < this->key_m->size(); i++) {
       distribution->key[i] = this->key_m->at(i);
     }
 
+    // Optional placeholders (often length 1). The actual random effects vector
+    // and expected values are linked via Information::SetupRandomEffects().
     distribution->observed_values.resize(this->observed_values.size());
     for (size_t i = 0; i < this->observed_values.size(); i++) {
       distribution->observed_values[i] =
@@ -1361,37 +1335,17 @@ class GMRFDistributionsInterface : public DistributionsInterfaceBase {
           this->expected_values[i].initial_value_m;
     }
 
-    distribution->precision_matrix_values.resize(this->precision_matrix.size());
-    std::stringstream ss;
-    for (size_t i = 0; i < this->precision_matrix.size(); i++) {
-      distribution->precision_matrix_values[i] =
-          this->precision_matrix[i].initial_value_m;
-      if (this->precision_matrix[i].estimation_type_m.get() == "fixed_effects") {
-        ss.str("");
-        ss << "gmrf." << this->id_m << ".precision_matrix."
-           << this->precision_matrix[i].id_m;
-        info->RegisterParameterName(ss.str());
-        info->RegisterParameter(distribution->precision_matrix_values[i]);
-      }
-      if (this->precision_matrix[i].estimation_type_m.get() == "random_effects") {
-        throw std::invalid_argument(
-            "Precision matrix entries must be fixed or estimated as fixed "
-            "effects, not random effects. Set estimation_type to "
-            "\"fixed_effects\" or \"constant\".");
-      }
-    }
-    info->variable_map[this->precision_matrix.get_id()] =
-        &(distribution->precision_matrix_values);
-
+    // NOTE:
+    // We do NOT create or register the DSEM/RAM vectors here.
+    // key[2..9] must refer to vectors that are already present in
+    // info->variable_map (created by other interface objects).
     info->density_components[distribution->id] = distribution;
-
     return true;
   }
 
   virtual bool add_to_fims_tmb() {
     this->add_to_fims_tmb_internal<TMB_FIMS_REAL_TYPE>();
     this->add_to_fims_tmb_internal<TMBAD_FIMS_TYPE>();
-
     return true;
   }
 #endif
