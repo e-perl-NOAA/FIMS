@@ -44,4 +44,4 @@ namespace
     EXPECT_EQ(recruitment->log_r[0], 4.3);
     EXPECT_EQ(recruitment->log_expected_recruitment[0], 5.6);
   }
-} 
+}
