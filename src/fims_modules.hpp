@@ -475,7 +475,8 @@ RCPP_MODULE(fims) {
       .method("set_distribution_links",
               &GMRFDistributionsInterface::set_distribution_links)
       .field("observed_values", &GMRFDistributionsInterface::observed_values)
-      .field("expected_values", &GMRFDistributionsInterface::expected_values);
+      .field("expected_values", &GMRFDistributionsInterface::expected_values)
+      .field("precision_matrix", &GMRFDistributionsInterface::precision_matrix);
 
   Rcpp::class_<CatchAtAgeInterface>(
       "CatchAtAge",

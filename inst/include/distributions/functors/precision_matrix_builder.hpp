@@ -1,7 +1,7 @@
 /**
  * @file precision_matrix_builder.hpp
  * @brief Declares helpers that assemble precision matrices for multivariate
- * random-effects models.
+ * random-effects models (TMB-only, sparse-Q interface).
  * @copyright This file is part of the NOAA, National Marine Fisheries Service
  * Fisheries Integrated Modeling System project. See LICENSE in the source
  * folder for reuse information.
@@ -11,73 +11,60 @@
 
 #include "density_components_base.hpp"
 #include "../../common/def.hpp"
-
-#ifdef TMB_MODEL
-#include <Eigen/Dense>
 #include <Eigen/Sparse>
-#endif
+#include <TMB.hpp>  // tmbutils::invertSparseMatrix, tmbutils::asSparseMatrix
 
 namespace fims_distributions {
 
 /**
- * @brief Base class for objects that assemble a flattened precision matrix.
+ * @brief Base class for objects that assemble a sparse precision matrix Q.
  *
- * @tparam Type Numeric type (double or TMB type).
+ * @tparam Type Numeric type (TMB type).
  */
 template <typename Type>
 struct PrecisionMatrixBuilderBase {
-  /** @brief Destructor. */
   virtual ~PrecisionMatrixBuilderBase() {}
 
   /**
-   * @brief Assemble and return a flattened row-major precision matrix.
+   * @brief Assemble and return the precision matrix Q as an Eigen sparse matrix.
+   *
+   * @details Intended for direct use with TMB's density::GMRF(Q).
    */
-  virtual fims::Vector<Type> BuildPrecisionMatrix() const = 0;
+  virtual Eigen::SparseMatrix<Type> BuildPrecisionMatrixSparse() const = 0;
 };
 
 /**
  * @brief DSEM precision-matrix builder based on a RAM specification.
  *
- * @details This class only assembles the precision matrix (`Q`) and does not
- * evaluate a GMRF log density. That allows GMRF to consume a precomputed
- * precision matrix from DSEM (or other future builders).
+ * @details
+ * Assembles:
+ *   Q = (I - Rho)' * V^{-1} * (I - Rho)
+ * with:
+ *   V = Gamma' * Gamma
+ *
+ * This follows the sparse-building pattern used in Rceattle's DSEM implementation:
+ * - Build Rho and Gamma as sparse
+ * - Compute V as sparse
+ * - Invert V using tmbutils::invertSparseMatrix (dense result)
+ * - Convert dense inverse back to sparse via tmbutils::asSparseMatrix
+ * - Assemble Q sparsely
  */
 template <typename Type>
 struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
-  /** @brief Number of time steps (`n_t`). */
   size_t n_time = 0;
-  /** @brief Number of variables (`n_j`). */
   size_t n_variables = 0;
 
-  /**
-   * @brief RAM path type for each row.
-   * 1 = rho path, 2 = gamma path.
-   */
   fims::Vector<int> ram_type;
-  /** @brief RAM source index (1-based in RAM input). */
   fims::Vector<int> ram_from;
-  /** @brief RAM destination index (1-based in RAM input). */
   fims::Vector<int> ram_to;
-  /**
-   * @brief RAM beta index for estimated parameters.
-   * If >= 1, uses `beta_z[ram_beta_index - 1]`; otherwise uses `ram_start`.
-   */
   fims::Vector<int> ram_beta_index;
-  /** @brief RAM fixed/start values. */
   fims::Vector<Type> ram_start;
-  /** @brief Estimated RAM coefficients. */
   fims::Vector<Type> beta_z;
 
-  /** @brief Constructor. */
   DSEMPrecisionMatrixBuilder() : PrecisionMatrixBuilderBase<Type>() {}
-
-  /** @brief Destructor. */
   virtual ~DSEMPrecisionMatrixBuilder() {}
 
-  /**
-   * @brief Assemble `Q = (I-Rho)' * V^{-1} * (I-Rho)` with `V = Gamma' * Gamma`.
-   */
-  virtual fims::Vector<Type> BuildPrecisionMatrix() const {
+  virtual Eigen::SparseMatrix<Type> BuildPrecisionMatrixSparse() const override {
     const size_t n_k = this->n_time * this->n_variables;
     if (n_k == 0) {
       throw std::invalid_argument(
@@ -86,22 +73,18 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
 
     const size_t n_rows = this->ram_type.size();
     if (this->ram_from.size() != n_rows || this->ram_to.size() != n_rows ||
-        this->ram_beta_index.size() != n_rows || this->ram_start.size() != n_rows) {
+        this->ram_beta_index.size() != n_rows ||
+        this->ram_start.size() != n_rows) {
       throw std::invalid_argument(
           "DSEMPrecisionMatrixBuilder: RAM vectors must have equal lengths.");
     }
 
-#ifdef TMB_MODEL
-    Eigen::SparseMatrix<Type> rho_kk(static_cast<int>(n_k),
-                                     static_cast<int>(n_k));
-    Eigen::SparseMatrix<Type> gamma_kk(static_cast<int>(n_k),
-                                       static_cast<int>(n_k));
-    rho_kk.setZero();
-    gamma_kk.setZero();
-#else
-    fims::Vector<Type> rho(n_k * n_k, static_cast<Type>(0));
-    fims::Vector<Type> gamma(n_k * n_k, static_cast<Type>(0));
-#endif
+    Eigen::SparseMatrix<Type> Rho_kk(static_cast<int>(n_k), static_cast<int>(n_k));
+    Eigen::SparseMatrix<Type> Gamma_kk(static_cast<int>(n_k), static_cast<int>(n_k));
+    Eigen::SparseMatrix<Type> I_kk(static_cast<int>(n_k), static_cast<int>(n_k));
+    Rho_kk.setZero();
+    Gamma_kk.setZero();
+    I_kk.setIdentity();
 
     for (size_t r = 0; r < n_rows; ++r) {
       const int from = this->ram_from[r] - 1;
@@ -123,159 +106,25 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
       }
 
       if (this->ram_type[r] == 1) {
-#ifdef TMB_MODEL
-        rho_kk.coeffRef(from, to) = value;
-#else
-        rho[static_cast<size_t>(from) * n_k + static_cast<size_t>(to)] = value;
-#endif
+        Rho_kk.coeffRef(from, to) = value;
       } else if (this->ram_type[r] == 2) {
-#ifdef TMB_MODEL
-        gamma_kk.coeffRef(from, to) = value;
-#else
-        gamma[static_cast<size_t>(from) * n_k + static_cast<size_t>(to)] = value;
-#endif
+        Gamma_kk.coeffRef(from, to) = value;
       }
     }
 
-#ifdef TMB_MODEL
-    Eigen::SparseMatrix<Type> i_kk(static_cast<int>(n_k), static_cast<int>(n_k));
-    i_kk.setIdentity();
-    Eigen::SparseMatrix<Type> i_minus_rho_kk = i_kk - rho_kk;
+    Eigen::SparseMatrix<Type> IminusRho_kk = I_kk - Rho_kk;
+    Eigen::SparseMatrix<Type> V_kk = Gamma_kk.transpose() * Gamma_kk;
 
-    Eigen::SparseMatrix<Type> v_kk = gamma_kk.transpose() * gamma_kk;
-    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> v_dense =
-        Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic>(v_kk);
-    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> v_inv_dense =
-        v_dense.inverse();
-    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> i_minus_rho_dense =
-        Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic>(i_minus_rho_kk);
-    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> q_dense =
-        i_minus_rho_dense.transpose() * v_inv_dense * i_minus_rho_dense;
+    // invertSparseMatrix returns dense matrix<Type>
+    matrix<Type> Vinv_dense = tmbutils::invertSparseMatrix(V_kk);
 
-    fims::Vector<Type> q(n_k * n_k, static_cast<Type>(0));
-    for (size_t i = 0; i < n_k; ++i) {
-      for (size_t j = 0; j < n_k; ++j) {
-        q[i * n_k + j] = q_dense(static_cast<int>(i), static_cast<int>(j));
-      }
-    }
-    return q;
-#else
-    fims::Vector<Type> i_minus_rho(n_k * n_k, static_cast<Type>(0));
-    for (size_t i = 0; i < n_k; ++i) {
-      i_minus_rho[i * n_k + i] = static_cast<Type>(1);
-    }
-    for (size_t i = 0; i < n_k; ++i) {
-      for (size_t j = 0; j < n_k; ++j) {
-        i_minus_rho[i * n_k + j] -= rho[i * n_k + j];
-      }
-    }
+    // Convert dense inverse back to sparse using structural-zero detection
+    Eigen::SparseMatrix<Type> Vinv_sparse = tmbutils::asSparseMatrix(Vinv_dense);
 
-    fims::Vector<Type> gamma_t_gamma(n_k * n_k, static_cast<Type>(0));
-    for (size_t i = 0; i < n_k; ++i) {
-      for (size_t j = 0; j < n_k; ++j) {
-        Type value = static_cast<Type>(0);
-        for (size_t k = 0; k < n_k; ++k) {
-          value += gamma[k * n_k + i] * gamma[k * n_k + j];
-        }
-        gamma_t_gamma[i * n_k + j] = value;
-      }
-    }
+    Eigen::SparseMatrix<Type> Q_kk =
+        IminusRho_kk.transpose() * Vinv_sparse * IminusRho_kk;
 
-    fims::Vector<Type> v_inv = this->InvertDense(gamma_t_gamma, n_k);
-    fims::Vector<Type> temp = this->DenseMatMul(v_inv, i_minus_rho, n_k);
-    fims::Vector<Type> q = this->DenseMatMul(this->Transpose(i_minus_rho, n_k), temp, n_k);
-    return q;
-#endif
-  }
-
- private:
-  /**
-   * @brief Dense matrix multiplication for row-major square matrices.
-   */
-  fims::Vector<Type> DenseMatMul(const fims::Vector<Type>& a,
-                                 const fims::Vector<Type>& b,
-                                 const size_t n) const {
-    fims::Vector<Type> out(n * n, static_cast<Type>(0));
-    for (size_t i = 0; i < n; ++i) {
-      for (size_t j = 0; j < n; ++j) {
-        Type value = static_cast<Type>(0);
-        for (size_t k = 0; k < n; ++k) {
-          value += a[i * n + k] * b[k * n + j];
-        }
-        out[i * n + j] = value;
-      }
-    }
-    return out;
-  }
-
-  /**
-   * @brief Dense matrix transpose for row-major square matrices.
-   */
-  fims::Vector<Type> Transpose(const fims::Vector<Type>& a, const size_t n) const {
-    fims::Vector<Type> out(n * n, static_cast<Type>(0));
-    for (size_t i = 0; i < n; ++i) {
-      for (size_t j = 0; j < n; ++j) {
-        out[j * n + i] = a[i * n + j];
-      }
-    }
-    return out;
-  }
-
-  /**
-   * @brief Invert dense row-major square matrix with Gauss-Jordan elimination.
-   */
-  fims::Vector<Type> InvertDense(const fims::Vector<Type>& a, const size_t n) const {
-    fims::Vector<Type> aug(n * 2 * n, static_cast<Type>(0));
-
-    for (size_t i = 0; i < n; ++i) {
-      for (size_t j = 0; j < n; ++j) {
-        aug[i * (2 * n) + j] = a[i * n + j];
-      }
-      aug[i * (2 * n) + (n + i)] = static_cast<Type>(1);
-    }
-
-    for (size_t col = 0; col < n; ++col) {
-      size_t pivot = col;
-      Type max_abs = fims_math::abs(aug[pivot * (2 * n) + col]);
-      for (size_t row = col + 1; row < n; ++row) {
-        const Type cand = fims_math::abs(aug[row * (2 * n) + col]);
-        if (cand > max_abs) {
-          max_abs = cand;
-          pivot = row;
-        }
-      }
-      if (max_abs == static_cast<Type>(0)) {
-        throw std::invalid_argument(
-            "DSEMPrecisionMatrixBuilder: matrix inversion failed (singular matrix).");
-      }
-
-      if (pivot != col) {
-        for (size_t j = 0; j < 2 * n; ++j) {
-          std::swap(aug[col * (2 * n) + j], aug[pivot * (2 * n) + j]);
-        }
-      }
-
-      const Type pivot_val = aug[col * (2 * n) + col];
-      for (size_t j = 0; j < 2 * n; ++j) {
-        aug[col * (2 * n) + j] /= pivot_val;
-      }
-
-      for (size_t row = 0; row < n; ++row) {
-        if (row == col) continue;
-        const Type factor = aug[row * (2 * n) + col];
-        for (size_t j = 0; j < 2 * n; ++j) {
-          aug[row * (2 * n) + j] -= factor * aug[col * (2 * n) + j];
-        }
-      }
-    }
-
-    fims::Vector<Type> inv(n * n, static_cast<Type>(0));
-    for (size_t i = 0; i < n; ++i) {
-      for (size_t j = 0; j < n; ++j) {
-        inv[i * n + j] = aug[i * (2 * n) + (n + j)];
-      }
-    }
-    return inv;
+    return Q_kk;
   }
 };
 
