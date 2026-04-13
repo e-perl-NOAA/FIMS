@@ -14,7 +14,6 @@
 
 #ifdef TMB_MODEL
 #include <Eigen/Sparse>
-#include <Eigen/Dense>
 #else
 // Forward declaration keeps non-TMB builds from requiring Eigen/TMB headers
 // while still allowing this template interface to compile.
@@ -86,19 +85,6 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
   DSEMPrecisionMatrixBuilder() : PrecisionMatrixBuilderBase<Type>() {}
   virtual ~DSEMPrecisionMatrixBuilder() {}
 
-#ifdef TMB_MODEL
-  static Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> InvertSparseMatrix(
-      const Eigen::SparseMatrix<Type>& sparse_matrix) {
-    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> dense_matrix(sparse_matrix);
-    return dense_matrix.inverse();
-  }
-
-  static Eigen::SparseMatrix<Type> AsSparseMatrix(
-      const Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic>& dense_matrix) {
-    return dense_matrix.sparseView();
-  }
-#endif
-
   virtual Eigen::SparseMatrix<Type> BuildPrecisionMatrixSparse() const override {
 #ifndef TMB_MODEL
     throw std::invalid_argument(
@@ -151,8 +137,8 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
     Eigen::SparseMatrix<Type> V_kk = Gamma_kk.transpose() * Gamma_kk;
 
     Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> Vinv_dense =
-        InvertSparseMatrix(V_kk);
-    Eigen::SparseMatrix<Type> Vinv_sparse = AsSparseMatrix(Vinv_dense);
+        fims_math::invertSparseMatrix(V_kk);
+    Eigen::SparseMatrix<Type> Vinv_sparse = fims_math::asSparseMatrix(Vinv_dense);
 
     Eigen::SparseMatrix<Type> Q_kk =
         IminusRho_kk.transpose() * Vinv_sparse * IminusRho_kk;

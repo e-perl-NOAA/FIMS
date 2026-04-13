@@ -11,11 +11,17 @@
 // note: this is modeling platform specific, must be controlled by
 // preprocessing macros
 #include <cmath>
+#include <limits>
 #include <random>
 #include <sstream>
 
 #include "../interface/interface.hpp"
 #include "fims_vector.hpp"
+
+#ifdef TMB_MODEL
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
+#endif
 
 namespace fims_math {
 #ifdef STD_LIB
@@ -183,6 +189,65 @@ inline const Type lgamma(const Type &x) {
   // use std::lgamma for double type, look for TMB version of lgamma if AD type
   using std::lgamma;
   return lgamma(x);
+}
+
+/**
+ * @brief Checks if a matrix value should be treated as a structural zero.
+ */
+template <typename Type>
+inline bool isStructuralZero(
+    const Type &value,
+    const Type &tolerance =
+        static_cast<Type>(std::numeric_limits<double>::epsilon())) {
+  using std::abs;
+  return abs(value) <= tolerance;
+}
+
+/**
+ * @brief Backward-compatible alias for misspelled helper name.
+ */
+template <typename Type>
+inline bool isStructualZero(
+    const Type &value,
+    const Type &tolerance =
+        static_cast<Type>(std::numeric_limits<double>::epsilon())) {
+  return isStructuralZero(value, tolerance);
+}
+
+/**
+ * @brief Converts sparse matrix to dense, then returns dense inverse.
+ */
+template <typename Type>
+inline Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> invertSparseMatrix(
+    const Eigen::SparseMatrix<Type> &sparse_matrix) {
+  Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> dense_matrix(
+      sparse_matrix);
+  return dense_matrix.inverse();
+}
+
+/**
+ * @brief Converts dense matrix to sparse matrix using structural-zero detection.
+ */
+template <typename Type>
+inline Eigen::SparseMatrix<Type> asSparseMatrix(
+    const Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> &dense_matrix,
+    const Type &tolerance =
+        static_cast<Type>(std::numeric_limits<double>::epsilon())) {
+  Eigen::SparseMatrix<Type> sparse_matrix(dense_matrix.rows(),
+                                          dense_matrix.cols());
+  std::vector<Eigen::Triplet<Type>> triplets;
+  triplets.reserve(static_cast<size_t>(dense_matrix.rows()) *
+                   static_cast<size_t>(dense_matrix.cols()));
+  for (int row = 0; row < dense_matrix.rows(); ++row) {
+    for (int col = 0; col < dense_matrix.cols(); ++col) {
+      const Type value = dense_matrix(row, col);
+      if (!isStructualZero(value, tolerance)) {
+        triplets.emplace_back(row, col, value);
+      }
+    }
+  }
+  sparse_matrix.setFromTriplets(triplets.begin(), triplets.end());
+  return sparse_matrix;
 }
 
 #endif
