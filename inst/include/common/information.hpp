@@ -415,18 +415,15 @@ class Information {
                   std::to_string(d->id) + ".");
             }
 
-            builder->ram_type.resize(n_rows);
-            builder->ram_from.resize(n_rows);
-            builder->ram_to.resize(n_rows);
-            builder->ram_beta_index.resize(n_rows);
-            builder->ram_start.resize(n_rows);
+            builder->paths.resize(n_rows);
 
             for (size_t r = 0; r < n_rows; ++r) {
-              builder->ram_type[r] = static_cast<int>((*ram_type_v)[r]);
-              builder->ram_from[r] = static_cast<int>((*ram_from_v)[r]);
-              builder->ram_to[r] = static_cast<int>((*ram_to_v)[r]);
-              builder->ram_beta_index[r] = static_cast<int>((*ram_beta_index_v)[r]);
-              builder->ram_start[r] = (*ram_start_v)[r];
+              builder->paths[r].type = static_cast<int>((*ram_type_v)[r]);
+              builder->paths[r].from = static_cast<int>((*ram_from_v)[r]);
+              builder->paths[r].to = static_cast<int>((*ram_to_v)[r]);
+              builder->paths[r].beta_index =
+                  static_cast<int>((*ram_beta_index_v)[r]);
+              builder->paths[r].start = (*ram_start_v)[r];
             }
 
             builder->beta_z.resize(beta_z_v->size());

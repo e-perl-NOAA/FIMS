@@ -11,8 +11,18 @@
 
 #include "density_components_base.hpp"
 #include "../../common/def.hpp"
+
+#ifdef TMB_MODEL
 #include <Eigen/Sparse>
-#include <TMB.hpp>  // tmbutils::invertSparseMatrix, tmbutils::asSparseMatrix
+#include <Eigen/Dense>
+#else
+// Forward declaration keeps non-TMB builds from requiring Eigen/TMB headers
+// while still allowing this template interface to compile.
+namespace Eigen {
+template <typename Scalar, int Options = 0, typename StorageIndex = int>
+class SparseMatrix;
+}  // namespace Eigen
+#endif
 
 namespace fims_distributions {
 
@@ -45,39 +55,64 @@ struct PrecisionMatrixBuilderBase {
  * This follows the sparse-building pattern used in Rceattle's DSEM implementation:
  * - Build Rho and Gamma as sparse
  * - Compute V as sparse
- * - Invert V using tmbutils::invertSparseMatrix (dense result)
- * - Convert dense inverse back to sparse via tmbutils::asSparseMatrix
+ * - Invert V via a dense inverse helper
+ * - Convert dense inverse back to sparse
  * - Assemble Q sparsely
  */
 template <typename Type>
 struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
+  /**
+   * @brief One RAM path entry used to assemble Rho/Gamma.
+   * @details
+   * type: 1 = Rho path, 2 = Gamma path
+   * from/to: 1-based indices into the expanded state vector
+   * beta_index: 1-based index into beta_z; 0 means use start
+   * start: default/fixed value when beta_index == 0
+   */
+  struct RAMPath {
+    int type = 0;
+    int from = 0;
+    int to = 0;
+    int beta_index = 0;
+    Type start = Type(0);
+  };
+
   size_t n_time = 0;
   size_t n_variables = 0;
 
-  fims::Vector<int> ram_type;
-  fims::Vector<int> ram_from;
-  fims::Vector<int> ram_to;
-  fims::Vector<int> ram_beta_index;
-  fims::Vector<Type> ram_start;
+  std::vector<RAMPath> paths;
   fims::Vector<Type> beta_z;
 
   DSEMPrecisionMatrixBuilder() : PrecisionMatrixBuilderBase<Type>() {}
   virtual ~DSEMPrecisionMatrixBuilder() {}
 
+#ifdef TMB_MODEL
+  static Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> InvertSparseMatrix(
+      const Eigen::SparseMatrix<Type>& sparse_matrix) {
+    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> dense_matrix(sparse_matrix);
+    return dense_matrix.inverse();
+  }
+
+  static Eigen::SparseMatrix<Type> AsSparseMatrix(
+      const Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic>& dense_matrix) {
+    return dense_matrix.sparseView();
+  }
+#endif
+
   virtual Eigen::SparseMatrix<Type> BuildPrecisionMatrixSparse() const override {
+#ifndef TMB_MODEL
+    throw std::invalid_argument(
+        "DSEMPrecisionMatrixBuilder::BuildPrecisionMatrixSparse() requires "
+        "compilation with TMB_MODEL defined. Ensure TMB_MODEL is enabled or "
+        "use a non-TMB precision-matrix builder.");
+#else
     const size_t n_k = this->n_time * this->n_variables;
     if (n_k == 0) {
       throw std::invalid_argument(
           "DSEMPrecisionMatrixBuilder: n_time and n_variables must both be > 0.");
     }
 
-    const size_t n_rows = this->ram_type.size();
-    if (this->ram_from.size() != n_rows || this->ram_to.size() != n_rows ||
-        this->ram_beta_index.size() != n_rows ||
-        this->ram_start.size() != n_rows) {
-      throw std::invalid_argument(
-          "DSEMPrecisionMatrixBuilder: RAM vectors must have equal lengths.");
-    }
+    const size_t n_rows = this->paths.size();
 
     Eigen::SparseMatrix<Type> Rho_kk(static_cast<int>(n_k), static_cast<int>(n_k));
     Eigen::SparseMatrix<Type> Gamma_kk(static_cast<int>(n_k), static_cast<int>(n_k));
@@ -87,17 +122,17 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
     I_kk.setIdentity();
 
     for (size_t r = 0; r < n_rows; ++r) {
-      const int from = this->ram_from[r] - 1;
-      const int to = this->ram_to[r] - 1;
+      const int from = this->paths[r].from - 1;
+      const int to = this->paths[r].to - 1;
       if (from < 0 || to < 0 || static_cast<size_t>(from) >= n_k ||
           static_cast<size_t>(to) >= n_k) {
         throw std::invalid_argument(
             "DSEMPrecisionMatrixBuilder: RAM indices are out of bounds.");
       }
 
-      Type value = this->ram_start[r];
-      if (this->ram_beta_index[r] >= 1) {
-        const size_t beta_idx = static_cast<size_t>(this->ram_beta_index[r] - 1);
+      Type value = this->paths[r].start;
+      if (this->paths[r].beta_index >= 1) {
+        const size_t beta_idx = static_cast<size_t>(this->paths[r].beta_index - 1);
         if (beta_idx >= this->beta_z.size()) {
           throw std::invalid_argument(
               "DSEMPrecisionMatrixBuilder: ram_beta_index points past beta_z.");
@@ -105,9 +140,9 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
         value = this->beta_z[beta_idx];
       }
 
-      if (this->ram_type[r] == 1) {
+      if (this->paths[r].type == 1) {
         Rho_kk.coeffRef(from, to) = value;
-      } else if (this->ram_type[r] == 2) {
+      } else if (this->paths[r].type == 2) {
         Gamma_kk.coeffRef(from, to) = value;
       }
     }
@@ -115,16 +150,15 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
     Eigen::SparseMatrix<Type> IminusRho_kk = I_kk - Rho_kk;
     Eigen::SparseMatrix<Type> V_kk = Gamma_kk.transpose() * Gamma_kk;
 
-    // invertSparseMatrix returns dense matrix<Type>
-    matrix<Type> Vinv_dense = tmbutils::invertSparseMatrix(V_kk);
-
-    // Convert dense inverse back to sparse using structural-zero detection
-    Eigen::SparseMatrix<Type> Vinv_sparse = tmbutils::asSparseMatrix(Vinv_dense);
+    Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> Vinv_dense =
+        InvertSparseMatrix(V_kk);
+    Eigen::SparseMatrix<Type> Vinv_sparse = AsSparseMatrix(Vinv_dense);
 
     Eigen::SparseMatrix<Type> Q_kk =
         IminusRho_kk.transpose() * Vinv_sparse * IminusRho_kk;
 
     return Q_kk;
+#endif
   }
 };
 

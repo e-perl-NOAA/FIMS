@@ -13,7 +13,6 @@
 #include "density_components_base.hpp"
 #include "precision_matrix_builder.hpp"
 #include "../../common/def.hpp"
-#include <Eigen/Sparse>
 
 namespace fims_distributions {
 
