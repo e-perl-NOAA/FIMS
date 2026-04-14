@@ -313,15 +313,6 @@ void clear() {
   DistributionsInterfaceBase::id_g = 1;
   DistributionsInterfaceBase::live_objects.clear();
 
-  DnormDistributionsInterface::id_g = 1;
-  DnormDistributionsInterface::live_objects.clear();
-
-  DlnormDistributionsInterface::id_g = 1;
-  DlnormDistributionsInterface::live_objects.clear();
-
-  DmultinomDistributionsInterface::id_g = 1;
-  DmultinomDistributionsInterface::live_objects.clear();
-
   FisheryModelInterfaceBase::id_g = 1;
   FisheryModelInterfaceBase::live_objects.clear();
 

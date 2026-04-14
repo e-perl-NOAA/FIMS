@@ -155,6 +155,7 @@ DoubleLogisticSelectivity
 DoubleLogisticSelectivityInterface
 DoxygenLayout
 DragonFly
+Eigen
 ELT
 ENDIF
 EOF
@@ -223,6 +224,12 @@ GetType
 GetUserNameA
 Getter
 GlobalEnv
+GMRF
+GMRFDistribution
+GMRFDistributionsInterface
+GMRFPrecisionEmptyVectorThrows
+GMRFPrecisionKeyMissingThrows
+GMRFPrecisionLinksFromVariableMap
 GoogleTest
 GraphQL
 GrowthBase
@@ -468,6 +475,7 @@ SharedString
 ShowPopulation
 SkipWhitespace
 SortIncludes
+SparseMatrix
 SrBevertonHoltEvaluate
 Stroustrup
 Subpopulation
@@ -572,12 +580,14 @@ clangFormatVersion
 classAgeCompDataInterface
 classBevertonHoltRecruitmentInterface
 classCatchAtAgeInterface
+classdensity
 classDlnormDistributionsInterface
 classDmultinomDistributionsInterface
 classDnormDistributionsInterface
 classDoubleLogisticSelectivityInterface
 classEWAAGrowthInterface
 classFleetInterface
+classGMRFDistributionsInterface
 classIndexDataInterface
 classLandingsDataInterface
 classLengthCompDataInterface
@@ -765,6 +775,7 @@ githubusercontent
 gitignore
 glm
 globalVariables
+gmrf
 googleapis
 googlebenchmark
 googletest
@@ -1095,6 +1106,7 @@ selex
 sep
 setClass
 setClassUnion
+setFromTriplets
 setGeneric
 setMethod
 setNames

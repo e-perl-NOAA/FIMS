@@ -459,8 +459,24 @@ RCPP_MODULE(fims) {
       .field("observed_values",
              &DmultinomDistributionsInterface::observed_values)
       .field("expected_values",
-             &DmultinomDistributionsInterface::expected_values)
+              &DmultinomDistributionsInterface::expected_values)
       .field("dims", &DmultinomDistributionsInterface::dims);
+
+  Rcpp::class_<GMRFDistributionsInterface>(
+      "GMRFDistribution",
+      "See "
+      "https://noaa-fims.github.io/FIMS/doxygen/"
+      "classGMRFDistributionsInterface.html.")
+      .constructor()
+      .method("get_id", &GMRFDistributionsInterface::get_id)
+      .method("evaluate", &GMRFDistributionsInterface::evaluate)
+      .method("set_observed_data",
+              &GMRFDistributionsInterface::set_observed_data)
+      .method("set_distribution_links",
+              &GMRFDistributionsInterface::set_distribution_links)
+      .field("observed_values", &GMRFDistributionsInterface::observed_values)
+      .field("expected_values", &GMRFDistributionsInterface::expected_values)
+      .field("precision_matrix", &GMRFDistributionsInterface::precision_matrix);
 
   Rcpp::class_<CatchAtAgeInterface>(
       "CatchAtAge",

@@ -1135,4 +1135,220 @@ class DmultinomDistributionsInterface : public DistributionsInterfaceBase {
 #endif
 };
 
+/**
+ * @brief The Rcpp interface for GMRF to instantiate from R:
+ * gmrf_ <- methods::new(GMRFDistribution).
+ *
+ * @details
+ * Option A (DSEM/GMRF): The sparse precision matrix builder is wired in
+ * fims_info::Information<Type>::SetupRandomEffects() by reading IDs from
+ * distribution->key and looking them up in info->variable_map.
+ *
+ * Therefore this interface only needs to:
+ *  - store key_m (set_distribution_links)
+ *  - create the TMB-side fims_distributions::GMRF<Type> object
+ *  - copy observed/expected values (optional placeholders)
+ */
+class GMRFDistributionsInterface : public DistributionsInterfaceBase {
+ public:
+  /** @brief Observed values (often length-1 placeholder for random effects). */
+  ParameterVector observed_values;
+
+  /** @brief Expected values (often length-1 placeholder for random effects). */
+  ParameterVector expected_values;
+
+  /** @brief Vector that records individual log probability contributions. */
+  RealVector lpdf_vec;
+
+  /** @brief Constructor. */
+  GMRFDistributionsInterface() : DistributionsInterfaceBase() {
+    DistributionsInterfaceBase::live_objects[this->id_m] =
+        std::make_shared<GMRFDistributionsInterface>(*this);
+    FIMSRcppInterfaceBase::fims_interface_objects.push_back(
+        DistributionsInterfaceBase::live_objects[this->id_m]);
+  }
+
+  /** @brief Copy constructor. */
+  GMRFDistributionsInterface(const GMRFDistributionsInterface &other)
+      : DistributionsInterfaceBase(other),
+        observed_values(other.observed_values),
+        expected_values(other.expected_values),
+        lpdf_vec(other.lpdf_vec) {}
+
+  virtual ~GMRFDistributionsInterface() {}
+
+  virtual uint32_t get_id() { return this->id_m; }
+
+  virtual bool set_observed_data(int observed_data_id) {
+    this->interface_observed_data_id_m.set(observed_data_id);
+    return true;
+  }
+
+  virtual bool set_distribution_links(std::string input_type,
+                                      Rcpp::IntegerVector ids) {
+    this->input_type_m.set(input_type);
+    this->key_m->resize(ids.size());
+    for (R_xlen_t i = 0; i < ids.size(); i++) {
+      this->key_m->at(i) = ids[i];
+    }
+    return true;
+  }
+
+  /**
+   * @brief Evaluate GMRF in pure-R (double) context.
+   *
+   * @details
+   * The DSEM sparse precision builder uses TMB utilities and is intended to be
+   * evaluated inside the TMB model. In the R-only (double) context we do not
+   * have the builder wiring, so we return 0 (alternatively: throw).
+   */
+  virtual double evaluate() { return 0.0; }
+
+  virtual void finalize() {
+    if (this->finalized) {
+      FIMS_WARNING_LOG("GMRFDistribution " + fims::to_string(this->id_m) +
+                       " has been finalized already.");
+    }
+    this->finalized = true;
+
+    std::shared_ptr<fims_info::Information<double>> info =
+        fims_info::Information<double>::GetInstance();
+
+    fims_info::Information<double>::density_components_iterator it =
+        info->density_components.find(this->id_m);
+
+    if (it == info->density_components.end()) {
+      FIMS_WARNING_LOG("GMRFDistribution " + fims::to_string(this->id_m) +
+                       " not found in Information.");
+      return;
+    }
+
+    std::shared_ptr<fims_distributions::GMRF<double>> gmrf =
+        std::dynamic_pointer_cast<fims_distributions::GMRF<double>>(it->second);
+
+    if (!gmrf) {
+      FIMS_WARNING_LOG("GMRFDistribution " + fims::to_string(this->id_m) +
+                       " found in Information but could not be cast to GMRF.");
+      return;
+    }
+
+    this->lpdf_value = gmrf->lpdf;
+
+    size_t n_x = gmrf->get_n_x();
+    this->lpdf_vec = RealVector(n_x);
+
+    if (this->expected_values.size() == 1) {
+      this->expected_values.resize(n_x);
+    }
+    if (this->observed_values.size() == 1) {
+      this->observed_values.resize(n_x);
+    }
+
+    for (size_t i = 0; i < n_x; i++) {
+      this->lpdf_vec[i] = gmrf->lpdf_vec[i];
+      this->expected_values[i].final_value_m = gmrf->get_expected(i);
+      this->observed_values[i].final_value_m = gmrf->get_observed(i);
+    }
+  }
+
+  virtual std::string to_json() {
+    std::stringstream ss;
+
+    ss << "{\n";
+    ss << " \"module_name\": \"density\",\n";
+    ss << " \"module_id\": " << this->id_m << ",\n";
+    ss << " \"module_type\": \"gmrf\",\n";
+    ss << " \"input_type\" : \"" << this->input_type_m << "\",\n";
+    ss << " \"density_component\": {\n";
+    ss << "  \"lpdf_value\": " << this->lpdf_value << ",\n";
+    ss << "  \"value\":[";
+    if (this->lpdf_vec.size() == 0) {
+      ss << "],\n";
+    } else {
+      for (size_t i = 0; i < this->lpdf_vec.size() - 1; i++) {
+        ss << this->value_to_string(this->lpdf_vec[i]) << ", ";
+      }
+      ss << this->value_to_string(this->lpdf_vec[this->lpdf_vec.size() - 1]);
+      ss << "],\n";
+    }
+
+    ss << "  \"expected_values\":[";
+    if (this->expected_values.size() == 0) {
+      ss << "],\n";
+    } else {
+      for (size_t i = 0; i < this->expected_values.size() - 1; i++) {
+        ss << this->value_to_string(this->expected_values[i].final_value_m)
+           << ", ";
+      }
+      ss << this->value_to_string(
+          this->expected_values[this->expected_values.size() - 1]
+              .final_value_m);
+      ss << "],\n";
+    }
+
+    ss << "  \"observed_values\":[";
+    if (this->observed_values.size() == 0) {
+      ss << "]\n";
+    } else {
+      for (size_t i = 0; i < this->observed_values.size() - 1; i++) {
+        ss << this->observed_values[i].final_value_m << ", ";
+      }
+      ss << this->observed_values[this->observed_values.size() - 1]
+                .final_value_m
+         << "]\n";
+    }
+
+    ss << " }}\n";
+    return ss.str();
+  }
+
+#ifdef TMB_MODEL
+  template <typename Type>
+  bool add_to_fims_tmb_internal() {
+    std::shared_ptr<fims_info::Information<Type>> info =
+        fims_info::Information<Type>::GetInstance();
+
+    std::shared_ptr<fims_distributions::GMRF<Type>> distribution =
+        std::make_shared<fims_distributions::GMRF<Type>>();
+
+    distribution->id = this->id_m;
+    distribution->observed_data_id_m = interface_observed_data_id_m;
+    distribution->input_type = this->input_type_m;
+
+    // Pass the key vector through; SetupRandomEffects will interpret it.
+    distribution->key.resize(this->key_m->size());
+    for (size_t i = 0; i < this->key_m->size(); i++) {
+      distribution->key[i] = this->key_m->at(i);
+    }
+
+    // Optional placeholders (often length 1). The actual random effects vector
+    // and expected values are linked via Information::SetupRandomEffects().
+    distribution->observed_values.resize(this->observed_values.size());
+    for (size_t i = 0; i < this->observed_values.size(); i++) {
+      distribution->observed_values[i] =
+          this->observed_values[i].initial_value_m;
+    }
+
+    distribution->expected_values.resize(this->expected_values.size());
+    for (size_t i = 0; i < this->expected_values.size(); i++) {
+      distribution->expected_values[i] =
+          this->expected_values[i].initial_value_m;
+    }
+
+    // NOTE:
+    // We do NOT create or register the DSEM/RAM vectors here.
+    // key[2..9] must refer to vectors that are already present in
+    // info->variable_map (created by other interface objects).
+    info->density_components[distribution->id] = distribution;
+    return true;
+  }
+
+  virtual bool add_to_fims_tmb() {
+    this->add_to_fims_tmb_internal<TMB_FIMS_REAL_TYPE>();
+    this->add_to_fims_tmb_internal<TMBAD_FIMS_TYPE>();
+    return true;
+  }
+#endif
+};
+
 #endif
