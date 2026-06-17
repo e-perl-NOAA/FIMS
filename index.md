@@ -1,7 +1,7 @@
 # Overview
 
 [![FIMS status
-badge](https://noaa-fims.r-universe.dev/badges/FIMS)](https://noaa-fims.r-universe.dev/FIMS)
+badge](https://noaa-fisheries-integrated-toolbox.r-universe.dev/badges/FIMS)](https://noaa-fisheries-integrated-toolbox.r-universe.dev/FIMS)
 [![R-CMD-check
 badge](https://github.com/NOAA-FIMS/FIMS/actions/workflows/call-r-cmd-check.yml/badge.svg?branch=main)](https://github.com/NOAA-FIMS/FIMS/actions/workflows/call-r-cmd-check.yml)
 [![Codecov test

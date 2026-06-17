@@ -12,7 +12,7 @@ and how to prepare your data for use in a FIMS model using the
 function.
 
 The [FIMS
-cheatsheet](https://github.com/NOAA-FIMS/FIMS/blob/dev/pkgdown/assets/fims-cheatsheet.pdf)
+cheatsheet](https://github.com/NOAA-FIMS/FIMS/tree/main/pkgdown/assets/fims-cheatsheet.pdf)
 includes a quick summary of the input data format.
 
 The help page for the

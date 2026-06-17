@@ -104,6 +104,9 @@ Primary functions used when developing FIMS package.
   : Setup and run the google test suite
 - [`setup_gtest()`](https://NOAA-FIMS.github.io/FIMS/reference/setup_gtest.md)
   : Set up your local environment to run the google tests locally
+- [`use_google_benchmark_template()`](https://NOAA-FIMS.github.io/FIMS/reference/use_google_benchmark_template.md)
+  : Create tests/google_benchmark/benchmark\_\*.cpp and register it in
+  CMakeLists.txt
 - [`use_gtest_template()`](https://NOAA-FIMS.github.io/FIMS/reference/use_gtest_template.md)
   : Create tests/gtest/test\_\*.cpp test file and register it in
   CMakeLists.txt
