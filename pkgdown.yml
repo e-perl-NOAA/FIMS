@@ -1,10 +1,11 @@
 pandoc: 3.8.3
-pkgdown: 2.2.0
+pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   adding-new-module: adding-new-module.html
   fims-demo-projections: fims-demo-projections.html
   fims-demo: fims-demo.html
+  fims-diagnostics: fims-diagnostics.html
   fims-input-data: fims-input-data.html
   fims-logging: fims-logging.html
   fims-path-maturity: fims-path-maturity.html
@@ -12,7 +13,7 @@ articles:
   RD-re-sparsity: RD-re-sparsity.html
   training-intro-cpp: training-intro-cpp.html
   training-intro-rcpp: training-intro-rcpp.html
-last_built: 2026-06-17T19:54Z
+last_built: 2026-07-27T13:14Z
 urls:
   reference: https://NOAA-FIMS.github.io/FIMS/reference
   article: https://NOAA-FIMS.github.io/FIMS/articles

@@ -23,6 +23,7 @@ var annotated_dup =
       [ "Model", "classfims__model_1_1Model.html", "classfims__model_1_1Model" ]
     ] ],
     [ "fims_model_object", null, [
+      [ "FIMSMemoryTracker", "structfims__model__object_1_1FIMSMemoryTracker.html", "structfims__model__object_1_1FIMSMemoryTracker" ],
       [ "FIMSObject", "structfims__model__object_1_1FIMSObject.html", "structfims__model__object_1_1FIMSObject" ]
     ] ],
     [ "fims_popdy", "namespacefims__popdy.html", [
@@ -67,8 +68,6 @@ var annotated_dup =
     [ "LogisticSelectivityInterface", "classLogisticSelectivityInterface.html", "classLogisticSelectivityInterface" ],
     [ "LogRRecruitmentInterface", "classLogRRecruitmentInterface.html", "classLogRRecruitmentInterface" ],
     [ "MaturityInterfaceBase", "classMaturityInterfaceBase.html", "classMaturityInterfaceBase" ],
-    [ "Parameter", "classParameter.html", "classParameter" ],
-    [ "ParameterVector", "classParameterVector.html", "classParameterVector" ],
     [ "PopulationInterface", "classPopulationInterface.html", "classPopulationInterface" ],
     [ "PopulationInterfaceBase", "classPopulationInterfaceBase.html", "classPopulationInterfaceBase" ],
     [ "RealVector", "classRealVector.html", "classRealVector" ],
@@ -77,5 +76,7 @@ var annotated_dup =
     [ "SharedBoolean", "classSharedBoolean.html", "classSharedBoolean" ],
     [ "SharedInt", "classSharedInt.html", "classSharedInt" ],
     [ "SharedReal", "classSharedReal.html", "classSharedReal" ],
-    [ "SharedString", "classSharedString.html", "classSharedString" ]
+    [ "SharedString", "classSharedString.html", "classSharedString" ],
+    [ "Variable", "classVariable.html", "classVariable" ],
+    [ "VariableVector", "classVariableVector.html", "classVariableVector" ]
 ];

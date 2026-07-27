@@ -53,6 +53,7 @@
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-diagnostics.html">Running a diagnostics on a FIMS model</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Developer</h6></li>
     <li><a class="dropdown-item" href="../articles/adding-new-module.html">Adding a New C++ Module</a></li>
@@ -75,13 +76,6 @@
     <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
   </ul>
 </li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-reports" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">reports</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-reports">
-<li><a class="external-link dropdown-item" href="https://app.codecov.io/gh/NOAA-FIMS/FIMS" target="_blank">coverage (codecov)</a></li>
-    <li><a class="external-link dropdown-item" href="https://noaa-fims.github.io/FIMS/testdown/index.html">testdown</a></li>
-  </ul>
-</li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><a class="external-link nav-link" href="https://noaa-fims.github.io/">fims website</a></li>
@@ -102,8 +96,6 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Intro to Rcpp</h1>
-                        <h4 data-toc-skip class="author">Christine
-Stawitz</h4>
             
       
       <small class="dont-index">Source: <a href="https://github.com/noaa-fims/fims/blob/main/vignettes/training-intro-rcpp.Rmd" class="external-link"><code>vignettes/training-intro-rcpp.Rmd</code></a></small>
@@ -194,7 +186,7 @@ C++ code in <code><a href="https://rdrr.io/pkg/Rcpp/man/cppFunction.html" class=
 <span><span class="co"># after compiling, add works like a regular R function</span></span>
 <span><span class="va">add</span></span></code></pre></div>
 <pre><code><span><span class="co">## function (x, y, z) </span></span>
-<span><span class="co">## .Call(&lt;pointer: 0x7f791725d410&gt;, x, y, z)</span></span></code></pre>
+<span><span class="co">## .Call(&lt;pointer: 0x7f0397a6a3f0&gt;, x, y, z)</span></span></code></pre>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">add</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## [1] 6</span></span></code></pre>
@@ -299,9 +291,9 @@ compiled <code>meanC</code> function against the R function
 <span>  <span class="fu">meanC</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## Unit: microseconds</span></span>
-<span><span class="co">##      expr     min       lq     mean  median       uq       max neval</span></span>
-<span><span class="co">##   mean(x) 418.663 432.5390 438.2210 436.486 442.8225   537.364   100</span></span>
-<span><span class="co">##  meanC(x) 371.935 372.5515 481.7755 373.353 382.9755 10874.475   100</span></span></code></pre>
+<span><span class="co">##      expr     min       lq     mean   median      uq      max neval</span></span>
+<span><span class="co">##   mean(x) 364.561 376.9250 381.4851 379.7690 385.207  440.854   100</span></span>
+<span><span class="co">##  meanC(x)  82.182  82.3775 166.3184  83.0135  83.519 8288.791   100</span></span></code></pre>
 </details>
 </div>
 <div class="section level3">
@@ -579,7 +571,7 @@ functions.</p>
 </h3>
 <p>Within FIMS, we first use <code>RCPP_EXPOSED_CLASS()</code> to expose
 all of our new type classes, e.g.,
-<code>RCPP_EXPOSED_CLASS(Parameter)</code> in <a href="https://github.com/NOAA-FIMS/FIMS/blob/main/src/fims_modules.hpp" class="external-link"><code>src/fims_modules.hpp</code></a>.
+<code>RCPP_EXPOSED_CLASS(Variable)</code> in <a href="https://github.com/NOAA-FIMS/FIMS/blob/main/src/fims_modules.hpp" class="external-link"><code>src/fims_modules.hpp</code></a>.
 Once all of the type classes are exposed, we then use a single instance
 of <code>RCPP_MODULE</code> to expose the C++ to R in that same
 file.</p>
@@ -596,7 +588,7 @@ file.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

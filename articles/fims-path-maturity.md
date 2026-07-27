@@ -52,11 +52,15 @@ default_parameters <- create_default_configurations(fims_frame) |>
   FIMS:::create_default_maturity(data = fims_frame)
 
 show(default_parameters)
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> Also defined by 'tibble'
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> Also defined by 'tibble'
 #> # A tibble: 2 × 12
-#>   model_family module_name module_type label fleet_name   age length  time value
-#>   <chr>        <chr>       <chr>       <chr> <chr>      <dbl>  <dbl> <int> <dbl>
-#> 1 NA           Maturity    Logistic    infl… NA            NA     NA    NA     2
-#> 2 NA           Maturity    Logistic    slope NA            NA     NA    NA     1
+#>   model_family module_name module_type label      fleet   age length  time value
+#>   <chr>        <chr>       <chr>       <chr>      <chr> <dbl>  <dbl> <int> <dbl>
+#> 1 NA           Maturity    Logistic    inflectio… NA       NA     NA    NA     2
+#> 2 NA           Maturity    Logistic    slope      NA       NA     NA    NA     1
 #> # ℹ 3 more variables: estimation_type <chr>, distribution_type <chr>,
 #> #   distribution <chr>
 
@@ -74,10 +78,10 @@ parameters <- default_parameters |>
 
 show(parameters)
 #> # A tibble: 2 × 12
-#>   model_family module_name module_type label fleet_name   age length  time value
-#>   <chr>        <chr>       <chr>       <chr> <chr>      <dbl>  <dbl> <int> <dbl>
-#> 1 catch_at_age Maturity    Logistic    infl… NA            NA     NA    NA  2.25
-#> 2 catch_at_age Maturity    Logistic    slope NA            NA     NA    NA  3   
+#>   model_family module_name module_type label      fleet   age length  time value
+#>   <chr>        <chr>       <chr>       <chr>      <chr> <dbl>  <dbl> <int> <dbl>
+#> 1 catch_at_age Maturity    Logistic    inflectio… NA       NA     NA    NA  2.25
+#> 2 catch_at_age Maturity    Logistic    slope      NA       NA     NA    NA  3   
 #> # ℹ 3 more variables: estimation_type <chr>, distribution_type <chr>,
 #> #   distribution <chr>
 
@@ -219,11 +223,11 @@ class LogisticMaturityInterface : public MaturityInterfaceBase {
    * @brief The value of the dependent variable at which the response reaches
    * 0.5.
    */
-  Parameter inflection_point;
+  VariableVector inflection_point;
   /**
    * @brief The width of the curve at the inflection_point.
    */
-  Parameter slope;
+  VariableVector slope;
   ...
 }
 ```
@@ -232,13 +236,12 @@ class LogisticMaturityInterface : public MaturityInterfaceBase {
 LogisticMaturityInterface.](figures/fims-path-maturity-1.png)
 
 All Rcpp interface classes from FIMS define parameters (e.g.,
-`inflection_point`, `slope`) using the `ParameterVector` class defined
-in
+`inflection_point`, `slope`) using the `VariableVector` class defined in
 [rcpp_interface_base.hpp](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/interface/rcpp/rcpp_objects/rcpp_interface_base.hpp)
 in the directory
 [inst/include/interface/rcpp/rcpp_objects](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/interface/rcpp/rcpp_objects).
-ParameterVectors allow parameters to vary with time. Whereas, the
-Parameter class is only used for time-invariant parameters. The fields
+VariableVectors allow parameters to vary with time. Whereas, the
+Variable class is only used for time-invariant parameters. The fields
 for these classes that are accessible from R are defined in the
 [rcpp_interface.hpp](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/interface/rcpp/rcpp_interface.hpp)
 file in the directory
@@ -246,20 +249,22 @@ file in the directory
 For example,
 
 ``` cpp
- Rcpp::class_<Parameter>("Parameter")
-  .constructor()
-  .constructor<double>()
-  .constructor<Parameter>()
-  .field("value", &Parameter::value)
-  .field("min", &Parameter::min)
-  .field("max", &Parameter::max)
-  .field("estimation_type", &Parameter::estimation_type);
+Rcpp::class_<Variable>(
+    "Variable",
+    "See https://noaa-fims.github.io/FIMS/doxygen/classVariable.html.")
+    .constructor()
+    .constructor<double>()
+    .constructor<Variable>()
+    .field("value", &Variable::initial_value_m)
+    .field("estimated_value", &Variable::final_value_m)
+    .field("id", &Variable::id_m)
+    .field("estimation_type", &Variable::estimation_type_m);
 ```
 
 Each field (i.e., parameter) from `maturity` (i.e., the maturity module
-we defined in R) will therefore inherit the five fields defined in the
-Parameter class: `value`, `min`, `max`, `estimation_type`. That is, two
-parameter fields and 10 fields within those parameters.
+we defined in R) will therefore inherit the four fields defined in the
+Variable class: `value`, `estimated_value`, `id`, `estimation_type`.
+That is, two parameter fields and 8 fields within those parameters.
 
 ## `fims` namespace
 
@@ -305,13 +310,13 @@ namespace fims {
 #ifdef TMB_MODEL
 /**
  * @brief fims::ModelTraits class that contains the DataVector
- * and ParameterVector types.
+ * and VariableVector types.
  */
 template <typename Type>
 struct fims::ModelTraits {
   typedef typename tmbutils::vector<Type> DataVector;       /**< A vector
         of the data that is differentiable (Type is the TMB/TMBad scalar). */
-  typedef typename tmbutils::vector<Type> ParameterVector;  /**< A vector
+  typedef typename tmbutils::vector<Type> VariableVector;  /**< A vector
         of the parameters that is differentiable. */
   typedef typename tmbutils::vector<Type>
       EigenVector; /**< A vector as defined in the Eigen namespace in TMB */

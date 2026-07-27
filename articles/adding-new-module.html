@@ -53,6 +53,7 @@
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-diagnostics.html">Running a diagnostics on a FIMS model</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Developer</h6></li>
     <li><a class="dropdown-item" href="../articles/adding-new-module.html">Adding a New C++ Module</a></li>
@@ -73,13 +74,6 @@
     <li><a class="external-link dropdown-item" href="https://github.com/NOAA-FIMS/FIMS/releases/latest">Latest release</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
-  </ul>
-</li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-reports" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">reports</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-reports">
-<li><a class="external-link dropdown-item" href="https://app.codecov.io/gh/NOAA-FIMS/FIMS" target="_blank">coverage (codecov)</a></li>
-    <li><a class="external-link dropdown-item" href="https://noaa-fims.github.io/FIMS/testdown/index.html">testdown</a></li>
   </ul>
 </li>
       </ul>
@@ -236,7 +230,7 @@ guide</a>:</p>
 <code>LogisticSelectivity</code>)</li>
 <li>
 <strong>Variables</strong>: snake_case (e.g.,
-<code>fleet_name</code>, <code>module_input</code>)</li>
+<code>module_name</code>, <code>module_input</code>)</li>
 </ul>
 </div>
 <div class="section level3">
@@ -485,7 +479,7 @@ model setup, and the object lifecycle used by FIMS.</p>
 they serve different purposes:</p>
 <ul>
 <li>
-<strong><code>Parameter</code></strong> in
+<strong><code>Variable</code></strong> in
 <code>inst/include/interface/rcpp/rcpp_objects/rcpp_interface_base.hpp</code>
 stores metadata for a single estimable quantity, including:
 <ul>
@@ -496,8 +490,8 @@ stores metadata for a single estimable quantity, including:
 </ul>
 </li>
 <li>
-<strong><code>ParameterVector</code></strong> is the Rcpp-facing
-container that holds <code>Parameter</code> objects and is exposed to
+<strong><code>VariableVector</code></strong> is the Rcpp-facing
+container that holds <code>Variable</code> objects and is exposed to
 R.</li>
 <li>
 <strong><code>fims::Vector&lt;Type&gt;</code></strong> is the
@@ -505,7 +499,7 @@ templated C++ computation container used inside the functor
 implementation.</li>
 </ul>
 <p>This distinction matters because the interface class receives
-<code>ParameterVector</code> fields from R, then copies only the values
+<code>VariableVector</code> fields from R, then copies only the values
 into <code>fims::Vector&lt;Type&gt;</code> objects inside
 <code>add_to_fims_tmb_internal()</code>.</p>
 <p>A simple R example from the current selectivity tests looks like
@@ -549,8 +543,8 @@ this:</p>
 <span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a></span>
 <span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a><span class="kw">class</span> LogisticSelectivityInterface <span class="op">:</span> <span class="kw">public</span> SelectivityInterfaceBase <span class="op">{</span></span>
 <span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a> <span class="kw">public</span><span class="op">:</span></span>
-<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>  ParameterVector inflection_point<span class="op">;</span></span>
-<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>  ParameterVector slope<span class="op">;</span></span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>  VariableVector inflection_point<span class="op">;</span></span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>  VariableVector slope<span class="op">;</span></span>
 <span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a></span>
 <span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>  LogisticSelectivityInterface<span class="op">()</span> <span class="op">:</span> SelectivityInterfaceBase<span class="op">()</span> <span class="op">{</span></span>
 <span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a>    SelectivityInterfaceBase<span class="op">::</span>live_objects<span class="op">[</span><span class="kw">this</span><span class="op">-&gt;</span>id<span class="op">]</span> <span class="op">=</span></span>
@@ -579,7 +573,7 @@ this:</p>
 and the common interface contract.</li>
 <li>
 <strong>Concrete interface class</strong>: exposes module-specific
-<code>ParameterVector</code> fields to R.</li>
+<code>VariableVector</code> fields to R.</li>
 <li>
 <strong>Constructor registration</strong>: the object must be stored
 in both <code>live_objects</code> and
@@ -601,7 +595,7 @@ run.</li>
 </h4>
 <p>The most important integration work happens in
 <code>add_to_fims_tmb_internal()</code>. This is the function that
-copies values out of the R-facing <code>ParameterVector</code> objects,
+copies values out of the R-facing <code>VariableVector</code> objects,
 registers estimable parameters, and stores the C++ object in the
 <code>Information</code> singleton.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="kw">template</span> <span class="op">&lt;</span><span class="kw">typename</span> Type<span class="op">&gt;</span></span>
@@ -650,7 +644,7 @@ registers estimable parameters, and stores the C++ object in the
 <strong>Information singleton lookup</strong>: gives the interface
 access to the shared TMB state for the current type.</li>
 <li>
-<strong>Value copy from <code>ParameterVector</code> to
+<strong>Value copy from <code>VariableVector</code> to
 <code>fims::Vector&lt;Type&gt;</code></strong>: moves user-provided
 parameter values into the computation object.</li>
 <li>
@@ -809,7 +803,7 @@ by combining <code>module_type</code> and <code>module_name</code>:</p>
 <li>filling <code>RealVector</code> fields such as <code>ages</code> or
 <code>weights</code>, or</li>
 <li>calling <code>set_param_vector()</code> for
-<code>ParameterVector</code> fields.</li>
+<code>VariableVector</code> fields.</li>
 </ul>
 <p>That means a new module type typically needs:</p>
 <ul>
@@ -988,7 +982,7 @@ documented workflow.</p>
 </h3>
 <p>Keep the current distinction clear:</p>
 <ul>
-<li>use <strong><code>ParameterVector</code></strong> in the Rcpp
+<li>use <strong><code>VariableVector</code></strong> in the Rcpp
 interface layer,</li>
 <li>use <strong><code>fims::Vector&lt;Type&gt;</code></strong> in the
 C++ implementation layer.</li>
@@ -1188,7 +1182,7 @@ Please open an issue or discussion on the <a href="https://github.com/NOAA-FIMS/
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

@@ -27,6 +27,7 @@
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-diagnostics.html">Running a diagnostics on a FIMS model</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Developer</h6></li>
     <li><a class="dropdown-item" href="../articles/adding-new-module.html">Adding a New C++ Module</a></li>
@@ -45,11 +46,6 @@
     <li><a class="external-link dropdown-item" href="https://github.com/NOAA-FIMS/FIMS/releases/latest">Latest release</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
-  </ul></li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-reports" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">reports</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-reports"><li><a class="external-link dropdown-item" href="https://app.codecov.io/gh/NOAA-FIMS/FIMS" target="_blank">coverage (codecov)</a></li>
-    <li><a class="external-link dropdown-item" href="https://noaa-fims.github.io/FIMS/testdown/index.html">testdown</a></li>
   </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://noaa-fims.github.io/">fims website</a></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/noaa-fims/fims/" aria-label="GitHub repository for FIMS"><span class="fa fa-brands fa-github fa-lg"></span></a></li>
@@ -177,7 +173,7 @@
 
         <dt>
 
-          <code><a href="get_FIMSFit.html">get_input()</a></code> <code><a href="get_FIMSFit.html">get_report()</a></code> <code><a href="get_FIMSFit.html">get_obj()</a></code> <code><a href="get_FIMSFit.html">get_opt()</a></code> <code><a href="get_FIMSFit.html">get_max_gradient()</a></code> <code><a href="get_FIMSFit.html">get_sdreport()</a></code> <code><a href="get_FIMSFit.html">get_estimates()</a></code> <code><a href="get_FIMSFit.html">get_number_of_parameters()</a></code> <code><a href="get_FIMSFit.html">get_timing()</a></code> <code><a href="get_FIMSFit.html">get_version()</a></code> <code><a href="get_FIMSFit.html">get_model_output()</a></code>
+          <code><a href="get_FIMSFit.html">get_input()</a></code> <code><a href="get_FIMSFit.html">get_report()</a></code> <code><a href="get_FIMSFit.html">get_obj()</a></code> <code><a href="get_FIMSFit.html">get_opt()</a></code> <code><a href="get_FIMSFit.html">get_max_gradient()</a></code> <code><a href="get_FIMSFit.html">get_gradient()</a></code> <code><a href="get_FIMSFit.html">get_sdreport()</a></code> <code><a href="get_FIMSFit.html">get_estimates()</a></code> <code><a href="get_FIMSFit.html">get_number_of_parameters()</a></code> <code><a href="get_FIMSFit.html">get_timing()</a></code> <code><a href="get_FIMSFit.html">get_version()</a></code> <code><a href="get_FIMSFit.html">get_model_output()</a></code>
 
         </dt>
         <dd>Get a slot in a FIMSFit object</dd>
@@ -195,6 +191,57 @@
 
         </dt>
         <dd>Should FIMS be verbose?</dd>
+      </dl></div><div class="section level2">
+      <h2 id="diagnostics">Diagnostics<a class="anchor" aria-label="anchor" href="#diagnostics"></a></h2>
+
+      <div class="section-desc"><p>Primary functions used when diagnosing a FIMS model.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="calculate_mohns_rho.html">calculate_mohns_rho()</a></code>
+
+        </dt>
+        <dd>Calculate Mohn's rho for retrospective analysis</dd>
+
+        <dt>
+
+          <code><a href="plot_likelihood.html">plot_likelihood()</a></code>
+
+        </dt>
+        <dd>Plot Likelihood Profile</dd>
+
+        <dt>
+
+          <code><a href="run_fims_likelihood.html">run_fims_likelihood()</a></code>
+
+        </dt>
+        <dd>Run Likelihood Profile</dd>
+
+        <dt>
+
+          <code><a href="run_fims_retrospective.html">run_fims_retrospective()</a></code>
+
+        </dt>
+        <dd>Run Retrospective Analysis</dd>
+
+        <dt>
+
+          <code><a href="run_modified_data_fims.html">run_modified_data_fims()</a></code>
+
+        </dt>
+        <dd>Modify data for a FIMS Model</dd>
+
+        <dt>
+
+          <code><a href="run_modified_pars_fims.html">run_modified_pars_fims()</a></code>
+
+        </dt>
+        <dd>Modify Parameters of a FIMS Model</dd>
       </dl></div><div class="section level2">
       <h2 id="package-development">Package development<a class="anchor" aria-label="anchor" href="#package-development"></a></h2>
 
@@ -293,7 +340,7 @@
 
       <dl><dt>
 
-          <code><a href="Cpp_classes.html">Cpp_classes</a></code> <code><a href="Cpp_classes.html">AgeComp</a></code> <code><a href="Cpp_classes.html">BevertonHoltRecruitment</a></code> <code><a href="Cpp_classes.html">CatchAtAge</a></code> <code><a href="Cpp_classes.html">DlnormDistribution</a></code> <code><a href="Cpp_classes.html">DmultinomDistribution</a></code> <code><a href="Cpp_classes.html">DnormDistribution</a></code> <code><a href="Cpp_classes.html">DoubleLogisticSelectivity</a></code> <code><a href="Cpp_classes.html">EWAAGrowth</a></code> <code><a href="Cpp_classes.html">Fleet</a></code> <code><a href="Cpp_classes.html">Index</a></code> <code><a href="Cpp_classes.html">Landings</a></code> <code><a href="Cpp_classes.html">LengthComp</a></code> <code><a href="Cpp_classes.html">LogDevsRecruitmentProcess</a></code> <code><a href="Cpp_classes.html">LogRRecruitmentProcess</a></code> <code><a href="Cpp_classes.html">LogisticMaturity</a></code> <code><a href="Cpp_classes.html">LogisticSelectivity</a></code> <code><a href="Cpp_classes.html">Parameter</a></code> <code><a href="Cpp_classes.html">ParameterVector</a></code> <code><a href="Cpp_classes.html">Population</a></code> <code><a href="Cpp_classes.html">RealVector</a></code> <code><a href="Cpp_classes.html">SharedInt</a></code> <code><a href="Cpp_classes.html">SharedReal</a></code> <code><a href="Cpp_classes.html">SharedString</a></code>
+          <code><a href="Cpp_classes.html">Cpp_classes</a></code> <code><a href="Cpp_classes.html">AgeComp</a></code> <code><a href="Cpp_classes.html">BevertonHoltRecruitment</a></code> <code><a href="Cpp_classes.html">CatchAtAge</a></code> <code><a href="Cpp_classes.html">DlnormDistribution</a></code> <code><a href="Cpp_classes.html">DmultinomDistribution</a></code> <code><a href="Cpp_classes.html">DnormDistribution</a></code> <code><a href="Cpp_classes.html">DoubleLogisticSelectivity</a></code> <code><a href="Cpp_classes.html">EWAAGrowth</a></code> <code><a href="Cpp_classes.html">Fleet</a></code> <code><a href="Cpp_classes.html">Index</a></code> <code><a href="Cpp_classes.html">Landings</a></code> <code><a href="Cpp_classes.html">LengthComp</a></code> <code><a href="Cpp_classes.html">LogDevsRecruitmentProcess</a></code> <code><a href="Cpp_classes.html">LogRRecruitmentProcess</a></code> <code><a href="Cpp_classes.html">LogisticMaturity</a></code> <code><a href="Cpp_classes.html">LogisticSelectivity</a></code> <code><a href="Cpp_classes.html">Variable</a></code> <code><a href="Cpp_classes.html">VariableVector</a></code> <code><a href="Cpp_classes.html">Population</a></code> <code><a href="Cpp_classes.html">RealVector</a></code> <code><a href="Cpp_classes.html">SharedInt</a></code> <code><a href="Cpp_classes.html">SharedReal</a></code> <code><a href="Cpp_classes.html">SharedString</a></code>
 
         </dt>
         <dd>C++ Classes Exported via Rcpp</dd>
@@ -304,6 +351,50 @@
 
         </dt>
         <dd>C++ Functions Exported via Rcpp</dd>
+      </dl></div><div class="section level2">
+      <h2 id="model-tidying-and-fit-evaluation">Model Tidying and Fit Evaluation<a class="anchor" aria-label="anchor" href="#model-tidying-and-fit-evaluation"></a></h2>
+
+      <div class="section-desc"><p>Functions used to extract, tidy, and evaluate model fit results.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="augment.FIMSFit.html">augment(<i>&lt;FIMSFit&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Augment a FIMSFit object for use with yardstick</dd>
+
+        <dt>
+
+          <code><a href="get_fit_metrics.html">get_fit_metrics()</a></code>
+
+        </dt>
+        <dd>Compute yardstick metrics for a fitted FIMS model</dd>
+
+        <dt>
+
+          <code><a href="get_fit_stream.html">get_fit_stream()</a></code>
+
+        </dt>
+        <dd>Extract a single data stream from a FIMSFit augmented tibble</dd>
+
+        <dt>
+
+          <code><a href="glance.FIMSFit.html">glance(<i>&lt;FIMSFit&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Glance at a FIMSFit object - one-row model summary</dd>
+
+        <dt>
+
+          <code><a href="tidy.FIMSFit.html">tidy(<i>&lt;FIMSFit&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Tidy a FIMSFit object into a parameter-level tibble</dd>
       </dl></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
@@ -314,7 +405,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

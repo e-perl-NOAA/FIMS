@@ -21,6 +21,9 @@ If you are new to FIMS, the best place to start is the [“Introducing
 FIMS”](https://noaa-fims.github.io/FIMS/articles/fims-demo.html)
 vignette.
 
+[![Ask
+DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/NOAA-FIMS/FIMS)
+
 ## Installation
 
 A [precompiled version of the latest
@@ -127,27 +130,6 @@ Discussion](https://github.com/orgs/NOAA-FIMS/discussions/801).
 More information can be found on the [NOAA-FIMS
 website](https://noaa-fims.github.io), particularly on [our
 blog](https://noaa-fims.github.io/blog/).
-
-------------------------------------------------------------------------
-
-## Contributors
-
-All contributions to this project are gratefully acknowledged using the
-[`allcontributors` package](https://github.com/ropensci/allcontributors)
-following the [allcontributors](https://allcontributors.org)
-specification. Contributions of any kind are welcome!
-
-### Code
-
-[TABLE]
-
-### Issue Authors
-
-[TABLE]
-
-### Issue Contributors
-
-[TABLE]
 
 ## NOAA Disclaimer
 
@@ -259,6 +241,7 @@ Primary functions used when setting up or running a FIMS model.
   [`get_obj()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_opt()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_max_gradient()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
+  [`get_gradient()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_sdreport()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_estimates()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_number_of_parameters()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
@@ -272,6 +255,23 @@ Primary functions used when setting up or running a FIMS model.
 
 - [`is_fims_verbose()`](https://NOAA-FIMS.github.io/FIMS/reference/is_fims_verbose.md)
   : Should FIMS be verbose?
+
+## Diagnostics
+
+Primary functions used when diagnosing a FIMS model.
+
+- [`calculate_mohns_rho()`](https://NOAA-FIMS.github.io/FIMS/reference/calculate_mohns_rho.md)
+  : Calculate Mohn's rho for retrospective analysis
+- [`plot_likelihood()`](https://NOAA-FIMS.github.io/FIMS/reference/plot_likelihood.md)
+  : Plot Likelihood Profile
+- [`run_fims_likelihood()`](https://NOAA-FIMS.github.io/FIMS/reference/run_fims_likelihood.md)
+  : Run Likelihood Profile
+- [`run_fims_retrospective()`](https://NOAA-FIMS.github.io/FIMS/reference/run_fims_retrospective.md)
+  : Run Retrospective Analysis
+- [`run_modified_data_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/run_modified_data_fims.md)
+  : Modify data for a FIMS Model
+- [`run_modified_pars_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/run_modified_pars_fims.md)
+  : Modify Parameters of a FIMS Model
 
 ## Package development
 
@@ -323,8 +323,8 @@ Links to the relevant doxygen documentation for the C++ code.
   [`LogRRecruitmentProcess`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`LogisticMaturity`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`LogisticSelectivity`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
-  [`Parameter`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
-  [`ParameterVector`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
+  [`Variable`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
+  [`VariableVector`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`Population`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`RealVector`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`SharedInt`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
@@ -351,6 +351,21 @@ Links to the relevant doxygen documentation for the C++ code.
   [`CreateTMBModel`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_functions.md)
   : C++ Functions Exported via Rcpp
 
+## Model Tidying and Fit Evaluation
+
+Functions used to extract, tidy, and evaluate model fit results.
+
+- [`augment(`*`<FIMSFit>`*`)`](https://NOAA-FIMS.github.io/FIMS/reference/augment.FIMSFit.md)
+  : Augment a FIMSFit object for use with yardstick
+- [`get_fit_metrics()`](https://NOAA-FIMS.github.io/FIMS/reference/get_fit_metrics.md)
+  : Compute yardstick metrics for a fitted FIMS model
+- [`get_fit_stream()`](https://NOAA-FIMS.github.io/FIMS/reference/get_fit_stream.md)
+  : Extract a single data stream from a FIMSFit augmented tibble
+- [`glance(`*`<FIMSFit>`*`)`](https://NOAA-FIMS.github.io/FIMS/reference/glance.FIMSFit.md)
+  : Glance at a FIMSFit object - one-row model summary
+- [`tidy(`*`<FIMSFit>`*`)`](https://NOAA-FIMS.github.io/FIMS/reference/tidy.FIMSFit.md)
+  : Tidy a FIMSFit object into a parameter-level tibble
+
 # Articles
 
 ### All vignettes
@@ -361,6 +376,8 @@ Links to the relevant doxygen documentation for the C++ code.
   FIMS](https://NOAA-FIMS.github.io/FIMS/articles/fims-demo-projections.md):
 - [Introducing the Fisheries Integrated Modeling System
   (FIMS)](https://NOAA-FIMS.github.io/FIMS/articles/fims-demo.md):
+- [Running diagnostics on a FIMS
+  model](https://NOAA-FIMS.github.io/FIMS/articles/fims-diagnostics.md):
 - [Introducing FIMS input
   data](https://NOAA-FIMS.github.io/FIMS/articles/fims-input-data.md):
 - [Introducing the FIMS Logging

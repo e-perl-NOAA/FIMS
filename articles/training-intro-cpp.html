@@ -53,6 +53,7 @@
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-diagnostics.html">Running a diagnostics on a FIMS model</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Developer</h6></li>
     <li><a class="dropdown-item" href="../articles/adding-new-module.html">Adding a New C++ Module</a></li>
@@ -75,13 +76,6 @@
     <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
   </ul>
 </li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-reports" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">reports</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-reports">
-<li><a class="external-link dropdown-item" href="https://app.codecov.io/gh/NOAA-FIMS/FIMS" target="_blank">coverage (codecov)</a></li>
-    <li><a class="external-link dropdown-item" href="https://noaa-fims.github.io/FIMS/testdown/index.html">testdown</a></li>
-  </ul>
-</li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><a class="external-link nav-link" href="https://noaa-fims.github.io/">fims website</a></li>
@@ -102,8 +96,6 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Intro to C++</h1>
-                        <h4 data-toc-skip class="author">Andrea
-Havron</h4>
             
       
       <small class="dont-index">Source: <a href="https://github.com/noaa-fims/fims/blob/main/vignettes/training-intro-cpp.Rmd" class="external-link"><code>vignettes/training-intro-cpp.Rmd</code></a></small>
@@ -306,10 +298,10 @@ vector will be compound integer if the vector is composed of integers,
 compound double if the vector is composed of doubles, and so on. The
 type of all elements in the vector must be the same and must be declared
 when the vector is created, e.g., <code>std::vector&lt;int&gt;</code>.
-For example, in FIMS we have a vector of parameter names that we declare
+For example, in FIMS we have a vector of variable names that we declare
 as a vector of strings, e.g.,
-<code>std::vector&lt;std::string&gt; parameter_names</code> in <a href="https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/common/information.hpp" class="external-link"><code>information.hpp</code></a>.</p>
-<p><code>std::vector</code> has a number of member functions (see the <a href="training-intro-rcpp.html#rcpp-methods">rcpp methods section in the
+<code>std::vector&lt;std::string&gt; variable_names</code> in <a href="https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/common/information.hpp" class="external-link"><code>information.hpp</code></a>.
+<code>std::vector</code> has a number of member functions (see the <a href="training-intro-rcpp.html#rcpp-methods">rcpp methods section in the
 Rcpp vignette</a>) that can be used to operate on a vector. Below are a
 few member functions of <code>std::vector</code> that are commonly used
 or used within the FIMS code, e.g., we use <code>resize</code> quite
@@ -820,8 +812,8 @@ will explore later.</p>
 <span></span>
 <span><span class="fu">pointer</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## x is equal to the address of y</span></span>
-<span><span class="co">## x is: 0x7ffe4d4b72f4</span></span>
-<span><span class="co">## The address of y is: 0x7ffe4d4b72f4</span></span>
+<span><span class="co">## x is: 0x7ffe7c7c2e64</span></span>
+<span><span class="co">## The address of y is: 0x7ffe7c7c2e64</span></span>
 <span><span class="co">## *x returns the value of y: 3.1459</span></span></code></pre>
 <pre><code><span><span class="co">## [1] 0</span></span></code></pre>
 </details>
@@ -860,8 +852,8 @@ e.g., <code>&amp;y</code>.</p>
 <span><span class="fu">reference</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## x is: 3</span></span>
 <span><span class="co">## y is: 3</span></span>
-<span><span class="co">## The memory address of x is: 0x7ffe4d4b72f4</span></span>
-<span><span class="co">## The memory address of y is: 0x7ffe4d4b72f4</span></span></code></pre>
+<span><span class="co">## The memory address of x is: 0x7ffe7c7c2e64</span></span>
+<span><span class="co">## The memory address of y is: 0x7ffe7c7c2e64</span></span></code></pre>
 <pre><code><span><span class="co">## [1] 0</span></span></code></pre>
 </details>
 </div>
@@ -925,9 +917,9 @@ following example?</p>
 <span></span>
 <span><span class="fu">reassign_pointer</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## c now equals the address of b</span></span>
-<span><span class="co">## &amp;a = 0x7ffe4d4b72f0</span></span>
-<span><span class="co">## &amp;b = 0x7ffe4d4b72f4</span></span>
-<span><span class="co">## c = 0x7ffe4d4b72f4</span></span>
+<span><span class="co">## &amp;a = 0x7ffe7c7c2e60</span></span>
+<span><span class="co">## &amp;b = 0x7ffe7c7c2e64</span></span>
+<span><span class="co">## c = 0x7ffe7c7c2e64</span></span>
 <span><span class="co">## a = 100</span></span>
 <span><span class="co">## b = 10</span></span>
 <span><span class="co">## *c = 10</span></span></code></pre>
@@ -1040,9 +1032,9 @@ automatically deleted.</p>
 <span><span class="fu">shared_pointer</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## ptr1: 42</span></span>
 <span><span class="co">## ptr2: 24</span></span>
-<span><span class="co">## ptr1 = 0x55da6b946110</span></span>
-<span><span class="co">## ptr2 = 0x55da6e054220</span></span>
-<span><span class="co">## ptr3 = 0x55da6b946110</span></span></code></pre>
+<span><span class="co">## ptr1 = 0x55e54496d760</span></span>
+<span><span class="co">## ptr2 = 0x55e53f8d5dd0</span></span>
+<span><span class="co">## ptr3 = 0x55e54496d760</span></span></code></pre>
 <pre><code><span><span class="co">## [1] 0</span></span></code></pre>
 </details>
 </div>
@@ -1058,7 +1050,7 @@ automatically deleted.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>
