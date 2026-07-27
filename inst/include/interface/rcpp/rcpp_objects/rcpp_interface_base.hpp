@@ -53,6 +53,18 @@ class Variable {
   SharedString estimation_type_m = SharedString("constant");
 
   /**
+   * @brief The constructor for initializing a variable from a SEXP (R object).
+   */
+  Variable(SEXP value) {
+    if (Rf_isNumeric(value)) {
+      initial_value_m = Rcpp::as<double>(value);
+    } else {
+      throw std::invalid_argument("Not compatible with requested type: [type=character; target=double].");
+    }
+    id_m = Variable::id_g++;
+  }
+
+  /**
    * @brief The constructor for initializing a variable.
    */
   Variable(double value, std::string estimation_type)

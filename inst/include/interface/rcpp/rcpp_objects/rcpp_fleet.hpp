@@ -294,39 +294,54 @@ class FleetInterface : public FleetInterfaceBase {
    * @brief Set the unique ID for the observed age-composition data object.
    * @param observed_agecomp_data_id Unique ID for the observed data object.
    */
-  void SetObservedAgeCompDataID(int observed_agecomp_data_id) {
-    interface_observed_agecomp_data_id_m.set(observed_agecomp_data_id);
+  void SetObservedAgeCompDataID(SEXP observed_agecomp_data_id) {
+    if (!Rf_isNumeric(observed_agecomp_data_id)) {
+      throw std::invalid_argument("Not compatible with requested type: [type=character; target=integer].");
+    }
+    interface_observed_agecomp_data_id_m.set(Rcpp::as<int>(observed_agecomp_data_id));
   }
 
   /**
    * @brief Set the unique ID for the observed length-composition data object.
    * @param observed_lengthcomp_data_id Unique ID for the observed data object.
    */
-  void SetObservedLengthCompDataID(int observed_lengthcomp_data_id) {
-    interface_observed_lengthcomp_data_id_m.set(observed_lengthcomp_data_id);
+  void SetObservedLengthCompDataID(SEXP observed_lengthcomp_data_id) {
+    if (!Rf_isNumeric(observed_lengthcomp_data_id)) {
+      throw std::invalid_argument("Not compatible with requested type: [type=character; target=integer].");
+    }
+    interface_observed_lengthcomp_data_id_m.set(Rcpp::as<int>(observed_lengthcomp_data_id));
   }
 
   /**
    * @brief Set the unique ID for the observed index data object.
    * @param observed_index_data_id Unique ID for the observed data object.
    */
-  void SetObservedIndexDataID(int observed_index_data_id) {
-    interface_observed_index_data_id_m.set(observed_index_data_id);
+  void SetObservedIndexDataID(SEXP observed_index_data_id) {
+    if (!Rf_isNumeric(observed_index_data_id)) {
+      throw std::invalid_argument("Not compatible with requested type: [type=character; target=integer].");
+    }
+    interface_observed_index_data_id_m.set(Rcpp::as<int>(observed_index_data_id));
   }
 
   /**
    * @brief Set the unique ID for the observed landings data object.
    * @param observed_landings_data_id Unique ID for the observed data object.
    */
-  void SetObservedLandingsDataID(int observed_landings_data_id) {
-    interface_observed_landings_data_id_m.set(observed_landings_data_id);
+  void SetObservedLandingsDataID(SEXP observed_landings_data_id) {
+    if (!Rf_isNumeric(observed_landings_data_id)) {
+      throw std::invalid_argument("Not compatible with requested type: [type=character; target=integer].");
+    }
+    interface_observed_landings_data_id_m.set(Rcpp::as<int>(observed_landings_data_id));
   }
   /**
    * @brief Set the unique ID for the selectivity object.
    * @param selectivity_id Unique ID for the observed object.
    */
-  void SetSelectivityID(int selectivity_id) {
-    interface_selectivity_id_m.set(selectivity_id);
+  void SetSelectivityID(SEXP selectivity_id) {
+    if (!Rf_isNumeric(selectivity_id)) {
+      throw std::invalid_argument("Not compatible with requested type: [type=character; target=integer].");
+    }
+    interface_selectivity_id_m.set(Rcpp::as<int>(selectivity_id));
   }
 
   /**
