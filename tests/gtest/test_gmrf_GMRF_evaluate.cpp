@@ -3,17 +3,17 @@
 // Necessary tests include input and output (IO) correctness, edge-case
 // handling, and built-in errors and warnings.
 
+// Define TMB_MODEL for tests that require TMB/Eigen functionality
+#ifndef TMB_MODEL
+#define TMB_MODEL
+#endif
+
 #include "gtest/gtest.h"
 #include "distributions/functors/gmrf.hpp"
 #include "distributions/functors/precision_builders.hpp"
 #include "common/fims_vector.hpp"
 #include <Eigen/Sparse>
 #include <cmath>  // For std::log, std::sqrt, M_PI
-
-// Define TMB_MODEL for tests that require TMB/Eigen functionality
-#ifndef TMB_MODEL
-#define TMB_MODEL
-#endif
 #include "TMB.hpp"  // To get density::GMRF
 
 namespace {

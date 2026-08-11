@@ -19,16 +19,21 @@
 #ifndef FIMS_DISTRIBUTIONS_PRECISION_BUILDERS_HPP
 #define FIMS_DISTRIBUTIONS_PRECISION_BUILDERS_HPP
 
-// Only include Eigen's sparse math if compiling for TMB.
-// This prevents errors when running basic C++ unit tests.
 #ifdef TMB_MODEL
+#include <Eigen/Core>
 #include <Eigen/Sparse>
 #else
-// Forward declaration allows this template to compile without TMB/Eigen headers
 namespace Eigen {
-    template <typename Scalar, int Options = 0, typename StorageIndex = int>
-    class SparseMatrix;
-}
+enum { Dynamic = -1 };
+
+template <typename Scalar, int RowsAtCompileTime, int ColsAtCompileTime,
+          int Options = 0, int MaxRowsAtCompileTime = RowsAtCompileTime,
+          int MaxColsAtCompileTime = ColsAtCompileTime>
+class Matrix;
+
+template <typename Scalar, int Options = 0, typename StorageIndex = int>
+class SparseMatrix;
+}  // namespace Eigen
 #endif
 
 namespace fims_distributions {
@@ -69,10 +74,15 @@ struct PrecisionMatrixBuilderBase {
     
      //TO DO: Follow up on what n_k is to better explain what this function below is doing
 
+#ifdef TMB_MODEL
     virtual Eigen::Matrix<Type, Eigen::Dynamic, 1> GetMeanOffset(
         size_t n_k) const {
         return Eigen::Matrix<Type, Eigen::Dynamic, 1>::Zero(n_k);
     }
+#else
+    virtual Eigen::Matrix<Type, Eigen::Dynamic, 1> GetMeanOffset(
+        size_t n_k) const;
+#endif
 };
 
 }  // namespace fims_distributions
@@ -83,6 +93,7 @@ struct PrecisionMatrixBuilderBase {
 
 namespace fims_distributions {
 
+#ifdef TMB_MODEL
 /**
  * @details This class handles the math for "arrow-and-lag" models (the RAM). DSEM is 
  * implemented here based on the [DSEM package](https://github.com/James-Thorson-NOAA/dsem) 
@@ -135,35 +146,33 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
      * If all variances are contained within their own specific years, we can use 
      * a much faster shortcut (`BuildQ_BlockInversion`).
      */
+#ifdef TMB_MODEL
     virtual Eigen::SparseMatrix<Type> BuildPrecisionMatrixSparse() const override {
-        #ifndef TMB_MODEL
-            throw std::invalid_argument(
-                "DSEMPrecisionMatrixBuilder: BuildPrecisionMatrixSparse() requires "
-                "compilation with TMB_MODEL defined.");
-        #else
-            bool has_cross_year_cor = false;
-            // Pre-scan paths to determine the optimal inversion strategy
-            for (size_t r = 0; r < this->paths.size(); ++r) {
-                if (this->paths[r].type == 2) {
-                    size_t path_t_from = (this->paths[r].from - 1) / this->n_variables;
-                    size_t path_t_to = (this->paths[r].to - 1) / this->n_variables;
+        bool has_cross_year_cor = false;
+        // Pre-scan paths to determine the optimal inversion strategy
+        for (size_t r = 0; r < this->paths.size(); ++r) {
+            if (this->paths[r].type == 2) {
+                size_t path_t_from = (this->paths[r].from - 1) / this->n_variables;
+                size_t path_t_to = (this->paths[r].to - 1) / this->n_variables;
 
-                    if (path_t_from != path_t_to) {
-                        has_cross_year_cor = true;
-                        break;  // Stop scanning as soon as we find one
-                    }
+                if (path_t_from != path_t_to) {
+                    has_cross_year_cor = true;
+                    break;  // Stop scanning as soon as we find one
                 }
             }
+        }
 
-            if (has_cross_year_cor) {
-                // Fallback: Slower, but mathematically robust for complex time linkages
-                return BuildQ_FullInversion();
-            } else {
-                // Fast Path: Highly optimized block-diagonal inversion
-                return BuildQ_BlockInversion();
-            }
-        #endif
+        if (has_cross_year_cor) {
+            // Fallback: Slower, but mathematically robust for complex time linkages
+            return BuildQ_FullInversion();
+        } else {
+            // Fast Path: Highly optimized block-diagonal inversion
+            return BuildQ_BlockInversion();
+        }
     }
+#else
+    virtual Eigen::SparseMatrix<Type> BuildPrecisionMatrixSparse() const override;
+#endif
 
     /**
      * @brief Calculates the mean offset across all variables and time steps.
@@ -177,94 +186,90 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
      */
     virtual Eigen::Matrix<Type, Eigen::Dynamic, 1> GetMeanOffset(
         size_t n_k) const override {
-        #ifndef TMB_MODEL
+        if (this->delta0_j.size() == 0) {
             return Eigen::Matrix<Type, Eigen::Dynamic, 1>::Zero(n_k);
-        #else
-            if (this->delta0_j.size() == 0) {
-                return Eigen::Matrix<Type, Eigen::Dynamic, 1>::Zero(n_k);
-            }
+        }
 
-            // Initialize the offset matrix (n_time x n_variables)
-            Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> delta_tj(
-                this->n_time, this->n_variables);
-            delta_tj.setZero();
+        // Initialize the offset matrix (n_time x n_variables)
+        Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> delta_tj(
+            this->n_time, this->n_variables);
+        delta_tj.setZero();
 
-            // Loop forward through time
-            for (size_t t = 0; t < this->n_time; ++t) {
-                // 1. Gather incoming effects from previous time steps
-                Eigen::Matrix<Type, Eigen::Dynamic, 1> incoming_delta =
-                    Eigen::Matrix<Type, Eigen::Dynamic, 1>::Zero(this->n_variables);
+        // Loop forward through time
+        for (size_t t = 0; t < this->n_time; ++t) {
+            // 1. Gather incoming effects from previous time steps
+            Eigen::Matrix<Type, Eigen::Dynamic, 1> incoming_delta =
+                Eigen::Matrix<Type, Eigen::Dynamic, 1>::Zero(this->n_variables);
 
-                // At t=0, the "incoming" effect is just the user-provided initial
-                // condition
-                if (t == 0) {
-                    if (this->delta0_j.size() != this->n_variables) {
-                        throw std::invalid_argument(
-                            "DSEMPrecisionMatrixBuilder: delta0_j size must match n_variables.");
-                    }
-                    for (size_t j = 0; j < this->n_variables; ++j) {
-                        incoming_delta(j) = this->delta0_j[j];
-                    }
+            // At t=0, the "incoming" effect is just the user-provided initial
+            // condition
+            if (t == 0) {
+                if (this->delta0_j.size() != this->n_variables) {
+                    throw std::invalid_argument(
+                        "DSEMPrecisionMatrixBuilder: delta0_j size must match n_variables.");
                 }
-
-                // Add effects propagating from PAST time steps
-                for (size_t r = 0; r < this->paths.size(); ++r) {
-                    if (this->paths[r].type == 1) {  // Type 1 = Causal Path (P matrix)
-                        size_t t_from = (this->paths[r].from - 1) / this->n_variables;
-                        size_t t_to = (this->paths[r].to - 1) / this->n_variables;
-
-                        if (t_to == t && t_from < t) {
-                            size_t j_from = (this->paths[r].from - 1) % this->n_variables;
-                            size_t j_to = (this->paths[r].to - 1) % this->n_variables;
-
-                            Type path_val = this->beta_z[this->paths[r].beta_index - 1];
-
-                            incoming_delta(j_to) += path_val * delta_tj(t_from, j_from);
-                        }
-                    }
-                }
-
-                // 2. Gather WITHIN-YEAR causal paths (creates a local I - P matrix)
-                Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> I_minus_P_local =
-                    Eigen::Matrix<Type, Eigen::Dynamic,
-                    Eigen::Dynamic>::Identity(this->n_variables,
-                                           this->n_variables);
-
-                bool has_local_paths = false;
-                for (size_t r = 0; r < this->paths.size(); ++r) {
-                    if (this->paths[r].type == 1) {
-                        size_t t_from = (this->paths[r].from - 1) / this->n_variables;
-                        size_t t_to = (this->paths[r].to - 1) / this->n_variables;
-
-                        if (t_to == t && t_from == t) {
-                            size_t j_from = (this->paths[r].from - 1) % this->n_variables;
-                            size_t j_to = (this->paths[r].to - 1) % this->n_variables;
-
-                            Type path_val = this->beta_z[this->paths[r].beta_index - 1];
-                            I_minus_P_local(j_to, j_from) -= path_val;
-                            has_local_paths = true;
-                        }
-                    }
-                }
-
-                // 3. Solve for this year's final delta
-                if (has_local_paths) {
-                    delta_tj.row(t) =
-                        I_minus_P_local.colPivHouseholderQr().solve(incoming_delta).transpose();
-                } else {
-                    delta_tj.row(t) = incoming_delta.transpose();
+                for (size_t j = 0; j < this->n_variables; ++j) {
+                    incoming_delta(j) = this->delta0_j[j];
                 }
             }
 
-            // Flatten the matrix into a column vector for the final offset
-            Eigen::Matrix<Type, Eigen::Dynamic, 1> computed_delta_vector(n_k);
+            // Add effects propagating from PAST time steps
+            for (size_t r = 0; r < this->paths.size(); ++r) {
+                if (this->paths[r].type == 1) {  // Type 1 = Causal Path (P matrix)
+                    size_t t_from = (this->paths[r].from - 1) / this->n_variables;
+                    size_t t_to = (this->paths[r].to - 1) / this->n_variables;
+
+                    if (t_to == t && t_from < t) {
+                        size_t j_from = (this->paths[r].from - 1) % this->n_variables;
+                        size_t j_to = (this->paths[r].to - 1) % this->n_variables;
+
+                        Type path_val = this->beta_z[this->paths[r].beta_index - 1];
+
+                        incoming_delta(j_to) += path_val * delta_tj(t_from, j_from);
+                    }
+                }
+            }
+
+            // 2. Gather WITHIN-YEAR causal paths (creates a local I - P matrix)
+            Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> I_minus_P_local =
+                Eigen::Matrix<Type, Eigen::Dynamic,
+                Eigen::Dynamic>::Identity(this->n_variables,
+                                          this->n_variables);
+
+            bool has_local_paths = false;
+            for (size_t r = 0; r < this->paths.size(); ++r) {
+                if (this->paths[r].type == 1) {
+                    size_t t_from = (this->paths[r].from - 1) / this->n_variables;
+                    size_t t_to = (this->paths[r].to - 1) / this->n_variables;
+
+                    if (t_to == t && t_from == t) {
+                        size_t j_from = (this->paths[r].from - 1) % this->n_variables;
+                        size_t j_to = (this->paths[r].to - 1) % this->n_variables;
+
+                        Type path_val = this->beta_z[this->paths[r].beta_index - 1];
+                        I_minus_P_local(j_to, j_from) -= path_val;
+                        has_local_paths = true;
+                    }
+                }
+            }
+
+            // 3. Solve for this year's final delta
+            if (has_local_paths) {
+                delta_tj.row(t) =
+                    I_minus_P_local.colPivHouseholderQr().solve(incoming_delta).transpose();
+            } else {
+                delta_tj.row(t) = incoming_delta.transpose();
+            }
+        }
+
+        // Flatten the matrix into a column vector for the final offset
+        Eigen::Matrix<Type, Eigen::Dynamic, 1> computed_delta_vector(n_k);
             for (size_t t = 0; t < this->n_time; ++t) {
                 for (size_t j = 0; j < this->n_variables; ++j) {
                     computed_delta_vector(t * this->n_variables + j) = delta_tj(t, j);
                 }
             }
-            return computed_delta_vector;
-        #endif
+        return computed_delta_vector;
     }
 
     // Private means that the code can only be used for this class
@@ -470,6 +475,7 @@ struct DSEMPrecisionMatrixBuilder : public PrecisionMatrixBuilderBase<Type> {
         return Eigen::SparseMatrix<Type>();
     }
 };
+#endif
 
 }  // namespace fims_distributions
 

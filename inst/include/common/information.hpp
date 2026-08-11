@@ -16,13 +16,15 @@
 #include <memory>
 #include <vector>
 
-#include "../distributions/distributions.hpp"
-#include "../models/functors/fishery_model_base.hpp"
-#include "../population_dynamics/fleet/fleet.hpp"
-#include "../population_dynamics/growth/growth.hpp"
-#include "../population_dynamics/population/population.hpp"
-#include "../population_dynamics/recruitment/recruitment.hpp"
-#include "../population_dynamics/selectivity/selectivity.hpp"
+#include "distributions/distributions.hpp"
+#include "distributions/functors/gmrf.hpp"
+#include "distributions/functors/precision_builders.hpp"
+#include "models/functors/fishery_model_base.hpp"
+#include "population_dynamics/fleet/fleet.hpp"
+#include "population_dynamics/growth/growth.hpp"
+#include "population_dynamics/population/population.hpp"
+#include "population_dynamics/recruitment/recruitment.hpp"
+#include "population_dynamics/selectivity/selectivity.hpp"
 #include "fims_vector.hpp"
 #include "model_object.hpp"
 

@@ -2,7 +2,7 @@
 #define FIMS_INTERFACE_RCPP_RCPP_OBJECTS_RCPP_PRECISION_BUILDERS_HPP
 
 #include "rcpp_interface_base.hpp"
-#include "../../../distributions/functors/precision_builders.hpp"
+#include "distributions/functors/precision_builders.hpp"
 
 /**
  * @brief Rcpp interface for the Dynamic Structural Equation Model (DSEM).
