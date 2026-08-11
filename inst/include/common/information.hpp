@@ -17,8 +17,6 @@
 #include <vector>
 
 #include "../distributions/distributions.hpp"
-#include "../distributions/functors/gmrf.hpp"
-#include "../distributions/functors/precision_builders.hpp"
 #include "../models/functors/fishery_model_base.hpp"
 #include "../population_dynamics/fleet/fleet.hpp"
 #include "../population_dynamics/growth/growth.hpp"
