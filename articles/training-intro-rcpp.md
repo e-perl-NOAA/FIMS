@@ -64,7 +64,7 @@ add
 ```
 
     ## function (x, y, z) 
-    ## .Call(<pointer: 0x7f0397a6a3f0>, x, y, z)
+    ## .Call(<pointer: 0x7f8552eee3f0>, x, y, z)
 
 ``` r
 
@@ -193,9 +193,9 @@ microbenchmark(
 ```
 
     ## Unit: microseconds
-    ##      expr     min       lq     mean   median      uq      max neval
-    ##   mean(x) 364.561 376.9250 381.4851 379.7690 385.207  440.854   100
-    ##  meanC(x)  82.182  82.3775 166.3184  83.0135  83.519 8288.791   100
+    ##      expr     min       lq     mean   median      uq       max neval
+    ##   mean(x) 422.859 432.1575 438.2509 436.4300 443.348   507.277   100
+    ##  meanC(x)  94.065  94.2805 195.6211  94.5915  94.952 10087.296   100
 
 ### C++ in FIMS
 
@@ -245,8 +245,8 @@ management for you automatically.
 
 ### SEXP in R
 
-Under the hood, every R object—whether it’s a number, vector, list, or
-function—is represented in C code as a `SEXP` (S-expression). A `SEXP`
+Under the hood, every R object — whether it’s a number, vector, list, or
+function — is represented in C code as a `SEXP` (S-expression). A `SEXP`
 is essentially a pointer ([see the section on pointers in the C++
 vignette](https://NOAA-FIMS.github.io/FIMS/articles/training-intro-rcpp.html#pointers-and-references))
 to a data structure called a `SEXPREC`. The `SEXPREC` structure contains

@@ -18,7 +18,7 @@
   Maturity](https://NOAA-FIMS.github.io/FIMS/articles/fims-path-maturity.md):
 - [FIMS User Setup
   Guide](https://NOAA-FIMS.github.io/FIMS/articles/fims-user-setup-guide.md):
-- [RE
+- [Random Effects
   Sparsity](https://NOAA-FIMS.github.io/FIMS/articles/RD-re-sparsity.md):
 - [Intro to
   C++](https://NOAA-FIMS.github.io/FIMS/articles/training-intro-cpp.md):

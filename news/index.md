@@ -1,5 +1,36 @@
 # Changelog
 
+## FIMS 0.11.0
+
+- 
+
+## FIMS 0.10.0
+
+- Use
+  [`setup_default_parameters()`](https://NOAA-FIMS.github.io/FIMS/reference/setup_default_parameters.md)
+  to set up a model
+- Specify uncertainty using a formula with a distribution and arguments
+- Change time to timing in parameter tibble
+- Change value to observed in FIMSFrame
+- Rename `get_timing()` to
+  [`get_run_time()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
+- Change landings to catch everywhere (R and C++)
+
+## FIMS 0.9.4
+
+- Adds likelihood profiles and retrospective diagnostic tools
+- Adds priors on derived quantities
+- Adds tidy output with yardstick
+- Uses .data and .env for dplyr instead of globalVariable()
+- Uses translational units to decrease RAM during compile
+- Expose proportion_female as a scalar that can be set
+- Fixes sanitizing values for JSON
+- Fixes naming of phi_0
+- Fixes inability to initialize a fleet with index and catch
+- Breaking change: “name” to “fleet” in FIMSFrame
+- Breaking change: “fleet_name” to “fleet” in output from
+  [`get_estimates()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
+
 ## FIMS 0.9.3
 
 - Reduce verbose FIMS logging and refine messages
@@ -129,11 +160,11 @@
 
 ## FIMS 0.4.0
 
-- Allows for CPUE data and landings within a single fleet and changes
-  the composition data to be separate from the catch. If there are
-  catches, compositions are based on F, if you have survey compositions
-  those are scaled by q, and you can also have composition data without
-  catch or CPUE and those match the population.
+- Allows for CPUE data and catch within a single fleet and changes the
+  composition data to be separate from the catch. If there are catches,
+  compositions are based on F, if you have survey compositions those are
+  scaled by q, and you can also have composition data without catch or
+  CPUE and those match the population.
 - Fixes bug in `finalize()` where variables were going out of scope by
   using a shared pointer and RealVector, which allows for estimates
   tibble to return more. Output is integrated between json and TMB using
