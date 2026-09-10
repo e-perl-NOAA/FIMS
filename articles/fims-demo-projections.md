@@ -308,7 +308,7 @@ projection_fit <- parameters_projection |>
     ## ✔ Finished optimization
     ## ✔ Finished sdreport
     ## ℹ FIMS model version: 0.10.0.9000
-    ## ℹ Total run time was 13.42719 seconds
+    ## ℹ Total run time was 14.32842 seconds
     ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
     ## ℹ Maximum gradient= 0.00037
     ## ℹ Negative log likelihood (NLL):

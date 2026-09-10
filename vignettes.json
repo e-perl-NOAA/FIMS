@@ -16,7 +16,7 @@
   "vignettes/fims-demo-projections.Rmd": {
     "title": "Simple projections using FIMS",
     "summary": "Instructions for running a FIMS model with projections.",
-    "level": "intermediate",
+    "level": "intermediate-user",
     "page": "https://noaa-fims.github.io/FIMS/articles/fims-demo-projections.html",
     "source": "vignettes/fims-demo-projections.Rmd"
   },
@@ -61,13 +61,6 @@
     "level": "intermediate-user",
     "page": "https://noaa-fims.github.io/FIMS/articles/fims-user-setup-guide.html",
     "source": "vignettes/fims-user-setup-guide.Rmd"
-  },
-  "vignettes/r_example/read_write_google_cloud_storage_bucket.R": {
-    "title": "read_write_google_cloud_storage_bucket",
-    "summary": "",
-    "level": "new-user",
-    "page": "https://noaa-fims.github.io/FIMS/articles/read_write_google_cloud_storage_bucket.html",
-    "source": "vignettes/r_example/read_write_google_cloud_storage_bucket.R"
   },
   "vignettes/training-intro-cpp.Rmd": {
     "title": "Intro to C++",
