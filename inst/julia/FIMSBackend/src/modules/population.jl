@@ -33,7 +33,6 @@ function step_population!(
   fishing_mortality = Matrix{T}(catch_data[:fishing_mortality])
   catchability = T(get(catch_data, :catchability, one(T)))
   phi_0 = T(get(catch_data, :phi_0, one(T)))
-  plus_group = Bool(get(catch_data, :plus_group, true))
   recruit_devs = Vector{T}(get(catch_data, :log_recruit_devs, zeros(T, max(n_years - 1, 0))))
 
   for year in 1:n_years
@@ -52,7 +51,7 @@ function step_population!(
           pop.numbers_at_age[year - 1, age - 1] * exp(-pop.mortality_Z[year - 1, age - 1])
       end
 
-      if plus_group && year > 1 && age == n_ages
+      if year > 1 && age == n_ages
         pop.numbers_at_age[year, age] +=
           pop.numbers_at_age[year - 1, age] * exp(-pop.mortality_Z[year - 1, age])
       end

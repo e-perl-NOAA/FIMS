@@ -591,6 +591,9 @@ initialize_comp <- function(data,
 #' # Instantiate modules
 #' parameters_list <- setup_default_parameters(data = data_4_model) |>
 #'   initialize_fims(data = data_4_model)
+#' # Prepare the experimental Julia backend input bundle
+#' julia_parameters_list <- setup_default_parameters(data = data_4_model) |>
+#'   initialize_fims(data = data_4_model, backend = "julia")
 #' clear()
 #' }
 initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
@@ -931,12 +934,6 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
 
   attr(parameter_list, "backend") <- backend
   if (backend == "julia") {
-    if (!requireNamespace("JuliaCall", quietly = TRUE)) {
-      cli::cli_abort(
-        "The Julia backend requires the {.pkg JuliaCall} package to be installed."
-      )
-    }
-
     julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
     attr(parameter_list, "julia_input") <- julia_input
 

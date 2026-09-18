@@ -75,12 +75,6 @@ initialize_julia_backend <- function(libname = NULL, pkgname = "FIMS") {
     return(invisible(FALSE))
   }
 
-  if (!requireNamespace("JuliaCall", quietly = TRUE)) {
-    cli::cli_abort(
-      "The Julia backend requires the {.pkg JuliaCall} package to be installed."
-    )
-  }
-
   module_path <- julia_backend_module_path(libname = libname, pkgname = pkgname)
   package_path <- julia_backend_package_path(libname = libname, pkgname = pkgname)
 
@@ -271,10 +265,6 @@ as_julia_fims_parameters <- function(parameters, data) {
 #' @return Invisibly returns `TRUE` when assignments are attempted.
 #' @noRd
 assign_julia_backend_input <- function(julia_input) {
-  if (!requireNamespace("JuliaCall", quietly = TRUE)) {
-    return(invisible(FALSE))
-  }
-
   JuliaCall::julia_assign("fims_data", julia_input[["data"]])
   JuliaCall::julia_assign("fims_parameters", julia_input[["parameters"]])
   invisible(TRUE)
