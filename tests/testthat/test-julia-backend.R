@@ -88,11 +88,13 @@ test_that("Julia backend initialization assigns prepared input when Julia startu
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
   assigned <- FALSE
+  assigned_input <- NULL
 
   testthat::local_mocked_bindings(
     initialize_julia_backend = function(...) TRUE,
-    assign_julia_backend_input = function(...) {
+    assign_julia_backend_input = function(x) {
       assigned <<- TRUE
+      assigned_input <<- x
       invisible(TRUE)
     },
     .package = "FIMS"
@@ -102,6 +104,8 @@ test_that("Julia backend initialization assigns prepared input when Julia startu
 
   #' @description Test that the Julia assignment branch is reached when Julia startup succeeds.
   expect_true(assigned)
+  #' @description Test that the Julia assignment branch receives the same serialized input attached to the returned object.
+  expect_equal(assigned_input, attr(result, "julia_input"))
   #' @description Test that the Julia backend success branch still preserves backend metadata.
   expect_equal(attr(result, "backend"), "julia")
 

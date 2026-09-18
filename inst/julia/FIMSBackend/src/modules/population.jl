@@ -10,6 +10,7 @@ Base.@kwdef mutable struct PopulationModel{T <: Real}
   maturity_at_age::Matrix{T}
   proportion_female::Vector{T}
   numbers_at_age::Matrix{T}
+  catch_numbers_at_age::Matrix{T}
   biomass::Vector{T}
   spawning_biomass::Vector{T}
   expected_recruitment::Vector{T}
@@ -23,7 +24,7 @@ end
 function step_population!(
   pop::PopulationModel{T},
   sel,
-  rec::Union{BevertonHolt{T}, Ricker{T}},
+  rec,
   catch_data::AbstractDict
 ) where {T <: Real}
   n_years, n_ages = size(pop.numbers_at_age)
@@ -66,8 +67,10 @@ function step_population!(
       harvest_fraction =
         pop.mortality_F[year, age] / max(pop.mortality_Z[year, age], eps(T)) *
         (one(T) - exp(-pop.mortality_Z[year, age]))
+      pop.catch_numbers_at_age[year, age] =
+        pop.numbers_at_age[year, age] * harvest_fraction
       pop.catch_expected[year] +=
-        pop.numbers_at_age[year, age] * harvest_fraction * pop.weights_at_age[year, age]
+        pop.catch_numbers_at_age[year, age] * pop.weights_at_age[year, age]
       pop.index_expected[year] +=
         catchability * pop.numbers_at_age[year, age] * s * pop.weights_at_age[year, age]
     end
