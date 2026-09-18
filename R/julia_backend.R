@@ -158,7 +158,7 @@ as_julia_fims_data <- function(data, parameters) {
 
   weights_at_age <- model_weight_at_age(data)
   weights_at_age <- if (length(weights_at_age) == n_ages) {
-    matrix(rep(weights_at_age, each = n_years), nrow = n_years)
+    matrix(rep(weights_at_age, times = n_years), nrow = n_years, byrow = TRUE)
   } else if (length(weights_at_age) >= n_years * n_ages) {
     matrix(weights_at_age[seq_len(n_years * n_ages)], nrow = n_years, byrow = TRUE)
   } else {
@@ -178,7 +178,7 @@ as_julia_fims_data <- function(data, parameters) {
     start_year = get_start_year(data),
     end_year = get_end_year(data),
     weights_at_age = weights_at_age,
-    maturity_at_age = matrix(rep(maturity_by_age, each = n_years), nrow = n_years),
+    maturity_at_age = matrix(rep(maturity_by_age, times = n_years), nrow = n_years, byrow = TRUE),
     proportion_female = proportion_female
   )
 
@@ -235,8 +235,16 @@ as_julia_fims_parameters <- function(parameters, data) {
     if (length(out) == 0) default else out
   }
 
-  log_fmort <- value_or_default(catch_fleet_parameters, "log_Fmort", rep(-3, n_years))
-  log_m <- value_or_default(population_parameters, "log_M", rep(log(0.2), n_ages))
+  log_fmort <- value_or_default(
+    catch_fleet_parameters,
+    "log_Fmort",
+    rep(-3, n_years * n_ages)
+  )
+  log_m <- value_or_default(
+    population_parameters,
+    "log_M",
+    rep(log(0.2), n_years * n_ages)
+  )
 
   list(
     inflection_point = value_or_default(selectivity_parameters, "inflection_point", 2)[[1]],
@@ -250,7 +258,7 @@ as_julia_fims_parameters <- function(parameters, data) {
     log_devs = value_or_default(recruitment_parameters, "log_devs", rep(0, max(n_years - 1, 0))),
     log_init_naa = value_or_default(population_parameters, "log_init_naa", rep(log(1e6), n_ages)),
     log_M = rep(log_m, length.out = n_years * n_ages),
-    log_Fmort = rep(log_fmort, n_ages),
+    log_Fmort = rep(log_fmort, length.out = n_years * n_ages),
     log_q = value_or_default(catch_fleet_parameters, "log_q", 0)[[1]]
   )
 }
