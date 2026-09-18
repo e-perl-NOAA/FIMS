@@ -94,6 +94,26 @@ test_that("Julia backend serializer omits unavailable observed data entries", {
   clear()
 })
 
+test_that("Julia backend serializer rejects unsupported multi-fleet observation inputs", {
+  reset_julia_backend_state()
+  multi_fleet_data <- dplyr::bind_rows(
+    data_big,
+    data_big |>
+      dplyr::filter(.data$fleet == "fleet1") |>
+      dplyr::mutate(fleet = "fleet2")
+  ) |>
+    FIMS::FIMSFrame()
+  parameters <- FIMS::setup_default_parameters(data = multi_fleet_data)
+
+  #' @description Test that the experimental Julia serializer errors on unsupported multiple catch fleets.
+  expect_error(
+    FIMS:::prepare_julia_backend_input(parameters = parameters, data = multi_fleet_data),
+    regexp = "currently supports only one catch fleet"
+  )
+
+  clear()
+})
+
 test_that("Julia backend input errors in fit_fims until the fit bridge is complete", {
   reset_julia_backend_state()
   data <- FIMS::FIMSFrame(data_big)
