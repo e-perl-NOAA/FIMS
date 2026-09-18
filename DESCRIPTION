@@ -85,6 +85,7 @@ Imports:
     glue,
     graphics,
     jsonlite,
+    JuliaCall,
     methods,
     purrr,
     Rcpp,
