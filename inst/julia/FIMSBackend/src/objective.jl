@@ -3,6 +3,15 @@ using .Population: PopulationModel, step_population!
 using .Recruitment: BevertonHolt, Ricker
 using .Selectivity: DoubleLogisticSelectivity, LogisticSelectivity
 
+has_component(params, name::Symbol) = try
+  params[name]
+  true
+catch
+  false
+end
+
+get_component(params, name::Symbol, default) = has_component(params, name) ? params[name] : default
+
 function component_array_from_input(parameters_vector, model_config)
   if parameters_vector isa ComponentArray
     return parameters_vector
@@ -116,8 +125,14 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
   population = build_population_model(params, data_dict)
 
   fishing_mortality = reshape(exp.(Vector(params.log_Fmort)), data_dict[:n_years], data_dict[:n_ages])
-  catchability = hasproperty(params, :log_q) ? exp(params.log_q) : one(eltype(population.ages))
-  recruit_devs = hasproperty(params, :log_devs) ? Vector(params.log_devs) : zeros(eltype(population.ages), max(data_dict[:n_years] - 1, 0))
+  catchability = exp(get_component(params, :log_q, zero(eltype(population.ages))))
+  recruit_devs = Vector(
+    get_component(
+      params,
+      :log_devs,
+      zeros(eltype(population.ages), max(data_dict[:n_years] - 1, 0))
+    )
+  )
 
   step_population!(
     population,
@@ -150,7 +165,7 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
     )
   end
 
-  if hasproperty(params, :log_devs)
+  if has_component(params, :log_devs)
     recruit_sd = get(model_config, :recruitment_deviation_sd, one(eltype(recruit_devs)))
     total_nll += sum(0.5 * log(2π) + log(recruit_sd) + (dev^2) / (2 * recruit_sd^2) for dev in params.log_devs)
   end
