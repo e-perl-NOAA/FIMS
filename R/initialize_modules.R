@@ -935,8 +935,7 @@ initialize_fims <- function(parameters, data, backend = c("TMB", "julia")) {
     attr(parameter_list, "julia_input") <- julia_input
 
     if (initialize_julia_backend()) {
-      JuliaCall::julia_assign("fims_data", julia_input[["data"]])
-      JuliaCall::julia_assign("fims_parameters", julia_input[["parameters"]])
+      assign_julia_backend_input(julia_input)
     }
   }
 

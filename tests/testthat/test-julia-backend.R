@@ -44,12 +44,14 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   expect_true(is.list(julia_input))
   #' @description Test that Julia backend initialization stores Julia input data and parameters.
   expect_named(julia_input, c("data", "parameters"))
-  #' @description Test that Julia backend input preserves the parameter row count.
-  expect_equal(nrow(julia_input[["parameters"]]), nrow(parameters))
   #' @description Test that Julia backend input preserves the number of modeled years.
   expect_equal(julia_input[["data"]][["n_years"]], get_n_years(data))
   #' @description Test that Julia backend input preserves the modeled age bins.
   expect_equal(julia_input[["data"]][["ages"]], get_ages(data))
+  #' @description Test that Julia backend input now includes weight-at-age and maturity matrices.
+  expect_true(all(c("weights_at_age", "maturity_at_age") %in% names(julia_input[["data"]])))
+  #' @description Test that Julia backend parameters are serialized to the named structure expected by the Julia objective scaffold.
+  expect_true(all(c("log_Fmort", "log_M", "log_init_naa", "log_rzero", "logit_steep") %in% names(julia_input[["parameters"]])))
 
   clear()
 })
@@ -78,6 +80,30 @@ test_that("Julia backend initialization stays shaped correctly when Julia startu
   expect_named(result, c("parameters", "model"))
   #' @description Test that disabling Julia startup still preserves Julia input metadata.
   expect_true(is.list(attr(result, "julia_input")))
+
+  clear()
+})
+
+test_that("Julia backend initialization assigns prepared input when Julia startup succeeds", {
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+  assigned <- FALSE
+
+  testthat::local_mocked_bindings(
+    initialize_julia_backend = function(...) TRUE,
+    assign_julia_backend_input = function(...) {
+      assigned <<- TRUE
+      invisible(TRUE)
+    },
+    .package = "FIMS"
+  )
+
+  result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
+
+  #' @description Test that the Julia assignment branch is reached when Julia startup succeeds.
+  expect_true(assigned)
+  #' @description Test that the Julia backend success branch still preserves backend metadata.
+  expect_equal(attr(result, "backend"), "julia")
 
   clear()
 })
