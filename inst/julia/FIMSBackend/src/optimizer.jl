@@ -14,8 +14,9 @@ function _flatten_init_params(init_params)
   end
 
   if init_params isa AbstractDict
-    parameter_names = Symbol.(collect(keys(init_params)))
-    values = collect(values(init_params))
+    parameter_pairs = collect(pairs(init_params))
+    parameter_names = Symbol.(first.(parameter_pairs))
+    values = last.(parameter_pairs)
     return Float64.(values), parameter_names
   end
 
