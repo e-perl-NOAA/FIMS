@@ -1,7 +1,7 @@
 using ComponentArrays: ComponentArray
 using ForwardDiff: gradient, hessian
 using LinearAlgebra: diag, inv
-using Optim: LBFGS, NewtonTrustRegion, OnceDifferentiable, converged, iterations, minimum, minimizer, optimize
+using Optim: LBFGS, NewtonTrustRegion, OnceDifferentiable, converged, iterations, minimum, minimizer, optimize, termination_status
 
 function _flatten_init_params(init_params)
   if init_params isa ComponentArray
@@ -58,7 +58,8 @@ function fit_model(init_params, data_dict, config = Dict())
     "estimates" => Dict(String(name) => value for (name, value) in zip(parameter_names, xhat)),
     "nll" => minimum(result),
     "convergence" => converged(result),
-    "convergence_code" => iterations(result),
+    "convergence_code" => string(termination_status(result)),
+    "iterations" => iterations(result),
     "gradient" => gradient(objective, xhat),
     "hessian" => hessian_matrix,
     "covariance" => covariance,

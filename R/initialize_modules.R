@@ -593,8 +593,8 @@ initialize_comp <- function(data,
 #'   initialize_fims(data = data_4_model)
 #' clear()
 #' }
-initialize_fims <- function(parameters, data, backend = c("TMB", "julia")) {
-  backend <- rlang::arg_match(backend)
+initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
+  backend <- rlang::arg_match(tolower(backend))
   # Validate parameters input
   if (missing(parameters) || !tibble::is_tibble(parameters)) {
     cli::cli_abort("The {.var parameters} argument must be a tibble.")

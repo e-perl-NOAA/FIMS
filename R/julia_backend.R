@@ -157,11 +157,15 @@ as_julia_fims_data <- function(data, parameters) {
   }
 
   weights_at_age <- model_weight_at_age(data)
-  weights_at_age <- matrix(
-    weights_at_age[seq_len(min(length(weights_at_age), n_years * n_ages))],
-    nrow = n_years,
-    byrow = TRUE
-  )
+  weights_at_age <- if (length(weights_at_age) == n_ages) {
+    matrix(rep(weights_at_age, each = n_years), nrow = n_years)
+  } else if (length(weights_at_age) >= n_years * n_ages) {
+    matrix(weights_at_age[seq_len(n_years * n_ages)], nrow = n_years, byrow = TRUE)
+  } else {
+    cli::cli_abort(
+      "Julia backend serialization requires weight-at-age values for each modeled year-age cell or one full age vector."
+    )
+  }
 
   list(
     data = as.data.frame(fleet_data),

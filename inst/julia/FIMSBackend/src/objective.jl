@@ -69,6 +69,7 @@ function build_population_model(params, data_dict)
     maturity_at_age = Matrix{T}(data_dict[:maturity_at_age]),
     proportion_female = Vector{T}(get(data_dict, :proportion_female, ones(T, data_dict[:n_ages]))),
     numbers_at_age = numbers_at_age,
+    catch_numbers_at_age = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
     biomass = zeros(T, data_dict[:n_years]),
     spawning_biomass = zeros(T, data_dict[:n_years]),
     expected_recruitment = zeros(T, data_dict[:n_years]),
@@ -143,7 +144,7 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
   end
 
   if haskey(data_dict, :observed_age_comp)
-    expected_age_comp = copy(population.numbers_at_age)
+    expected_age_comp = copy(population.catch_numbers_at_age)
     for row in axes(expected_age_comp, 1)
       total_numbers = sum(view(expected_age_comp, row, :))
       if total_numbers > 0
