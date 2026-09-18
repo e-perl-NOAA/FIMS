@@ -22,8 +22,9 @@ function component_array_from_input(parameters_vector, model_config)
   end
 
   if parameters_vector isa AbstractDict
-    names_tuple = Tuple(Symbol.(collect(keys(parameters_vector))))
-    values_tuple = Tuple(collect(values(parameters_vector)))
+    parameter_pairs = collect(pairs(parameters_vector))
+    names_tuple = Tuple(Symbol.(first.(parameter_pairs)))
+    values_tuple = Tuple(last.(parameter_pairs))
     return ComponentArray(NamedTuple{names_tuple}(values_tuple))
   end
 
@@ -70,20 +71,20 @@ function build_population_model(params, data_dict)
   )
   numbers_at_age = Matrix{T}(undef, data_dict[:n_years], data_dict[:n_ages])
   numbers_at_age .= zero(T)
-  numbers_at_age[1, :] .= exp.(Vector{T}(params.log_init_naa))
+  numbers_at_age[1, :] .= exp.(collect(params.log_init_naa))
 
   PopulationModel(
-    ages = Vector{T}(data_dict[:ages]),
-    weights_at_age = Matrix{T}(data_dict[:weights_at_age]),
-    maturity_at_age = Matrix{T}(data_dict[:maturity_at_age]),
-    proportion_female = Vector{T}(get(data_dict, :proportion_female, ones(T, data_dict[:n_ages]))),
+    ages = collect(data_dict[:ages]),
+    weights_at_age = Matrix(data_dict[:weights_at_age]),
+    maturity_at_age = Matrix(data_dict[:maturity_at_age]),
+    proportion_female = collect(get(data_dict, :proportion_female, ones(T, data_dict[:n_ages]))),
     numbers_at_age = numbers_at_age,
     catch_numbers_at_age = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
     biomass = zeros(T, data_dict[:n_years]),
     spawning_biomass = zeros(T, data_dict[:n_years]),
     expected_recruitment = zeros(T, data_dict[:n_years]),
     mortality_F = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
-    mortality_M = Matrix{T}(exp.(reshape(Vector{T}(params.log_M), data_dict[:n_years], data_dict[:n_ages]))),
+    mortality_M = exp.(reshape(collect(params.log_M), data_dict[:n_years], data_dict[:n_ages])),
     mortality_Z = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
     catch_expected = zeros(T, data_dict[:n_years]),
     index_expected = zeros(T, data_dict[:n_years]),
@@ -124,14 +125,12 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
   recruitment = build_recruitment(params, model_config)
   population = build_population_model(params, data_dict)
 
-  fishing_mortality = reshape(exp.(Vector(params.log_Fmort)), data_dict[:n_years], data_dict[:n_ages])
+  fishing_mortality = reshape(exp.(collect(params.log_Fmort)), data_dict[:n_years], data_dict[:n_ages])
   catchability = exp(get_component(params, :log_q, zero(eltype(population.ages))))
-  recruit_devs = Vector(
-    get_component(
-      params,
-      :log_devs,
-      zeros(eltype(population.ages), max(data_dict[:n_years] - 1, 0))
-    )
+  recruit_devs = get_component(
+    params,
+    :log_devs,
+    zeros(eltype(population.ages), max(data_dict[:n_years] - 1, 0))
   )
 
   step_population!(
