@@ -46,14 +46,13 @@ function step_population!(
       pop.mortality_F[year, age] = fishing_mortality[year, age] * s
       pop.mortality_Z[year, age] = pop.mortality_F[year, age] + pop.mortality_M[year, age]
 
-      if year > 1 && age > 1
+      if year > 1 && age == n_ages
+        pop.numbers_at_age[year, age] =
+          pop.numbers_at_age[year - 1, age - 1] * exp(-pop.mortality_Z[year - 1, age - 1]) +
+          pop.numbers_at_age[year - 1, age] * exp(-pop.mortality_Z[year - 1, age])
+      elseif year > 1 && age > 1
         pop.numbers_at_age[year, age] =
           pop.numbers_at_age[year - 1, age - 1] * exp(-pop.mortality_Z[year - 1, age - 1])
-      end
-
-      if year > 1 && age == n_ages
-        pop.numbers_at_age[year, age] +=
-          pop.numbers_at_age[year - 1, age] * exp(-pop.mortality_Z[year - 1, age])
       end
 
       pop.biomass[year] += pop.numbers_at_age[year, age] * pop.weights_at_age[year, age]

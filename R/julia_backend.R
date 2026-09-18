@@ -109,25 +109,27 @@ as_julia_fims_data <- function(data, parameters) {
   fleets <- get_fleets(data)
   fleet_data <- get_data(data)
 
-  agecomp_fleet <- fleet_data |>
-    dplyr::filter(.data$type == "age_comp") |>
-    dplyr::pull(.data$fleet) |>
-    unique() |>
-    stats::na.omit() |>
-    {\(x) if (length(x) > 0) x[[1]] else NA_character_}()
+  assert_single_fleet <- function(data, data_type, description) {
+    matched_fleets <- data |>
+      dplyr::filter(.data$type == .env$data_type) |>
+      dplyr::pull(.data$fleet) |>
+      unique() |>
+      stats::na.omit()
 
-  catch_fleet <- fleet_data |>
-    dplyr::filter(.data$type == "catch") |>
-    dplyr::pull(.data$fleet) |>
-    unique() |>
-    stats::na.omit() |>
-    {\(x) if (length(x) > 0) x[[1]] else NA_character_}()
+    if (length(matched_fleets) > 1) {
+      cli::cli_abort(
+        "The experimental Julia backend currently supports only one {description} fleet, but found: {matched_fleets}."
+      )
+    }
 
-  index_fleet <- fleet_data |>
-    dplyr::filter(.data$type == "index") |>
-    dplyr::pull(.data$fleet) |>
-    unique() |>
-    stats::na.omit() |>
+    matched_fleets
+  }
+
+  agecomp_fleet <- assert_single_fleet(fleet_data, "age_comp", "age-composition") |>
+    {\(x) if (length(x) > 0) x[[1]] else NA_character_}()
+  catch_fleet <- assert_single_fleet(fleet_data, "catch", "catch") |>
+    {\(x) if (length(x) > 0) x[[1]] else NA_character_}()
+  index_fleet <- assert_single_fleet(fleet_data, "index", "index") |>
     {\(x) if (length(x) > 0) x[[1]] else NA_character_}()
 
   maturity_parameters <- parameters |>

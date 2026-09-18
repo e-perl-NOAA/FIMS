@@ -158,17 +158,21 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
 
   if haskey(data_dict, :observed_age_comp) && !isempty(data_dict[:observed_age_comp])
     expected_age_comp = copy(population.catch_numbers_at_age)
+    valid_rows = Int[]
     for row in axes(expected_age_comp, 1)
       total_numbers = sum(view(expected_age_comp, row, :))
       if total_numbers > 0
         expected_age_comp[row, :] .= view(expected_age_comp, row, :) ./ total_numbers
+        push!(valid_rows, row)
       end
     end
 
-    total_nll += multinomial_nll(
-      Matrix(data_dict[:observed_age_comp]),
-      expected_age_comp,
-    )
+    if !isempty(valid_rows)
+      total_nll += multinomial_nll(
+        Matrix(data_dict[:observed_age_comp])[valid_rows, :],
+        expected_age_comp[valid_rows, :],
+      )
+    end
   end
 
   if has_component(params, :log_devs)
