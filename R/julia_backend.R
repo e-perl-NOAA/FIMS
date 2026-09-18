@@ -76,7 +76,9 @@ initialize_julia_backend <- function(libname = NULL, pkgname = "FIMS") {
   }
 
   if (!requireNamespace("JuliaCall", quietly = TRUE)) {
-    return(invisible(FALSE))
+    cli::cli_abort(
+      "The Julia backend requires the {.pkg JuliaCall} package to be installed."
+    )
   }
 
   module_path <- julia_backend_module_path(libname = libname, pkgname = pkgname)
