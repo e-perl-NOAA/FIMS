@@ -56,6 +56,23 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   clear()
 })
 
+test_that("Julia backend serializer omits unavailable observed data entries", {
+  data <- data_big |>
+    dplyr::filter(!.data$type %in% c("catch", "index", "age_comp")) |>
+    FIMS::FIMSFrame()
+  parameters <- FIMS::setup_default_parameters(data = data)
+  julia_input <- FIMS:::prepare_julia_backend_input(parameters = parameters, data = data)
+
+  #' @description Test that missing catch data are omitted from the Julia serializer output.
+  expect_false("observed_catch" %in% names(julia_input[["data"]]))
+  #' @description Test that missing index data are omitted from the Julia serializer output.
+  expect_false("observed_index" %in% names(julia_input[["data"]]))
+  #' @description Test that missing age-composition data are omitted from the Julia serializer output.
+  expect_false("observed_age_comp" %in% names(julia_input[["data"]]))
+
+  clear()
+})
+
 test_that("Julia backend input errors in fit_fims until the fit bridge is complete", {
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)

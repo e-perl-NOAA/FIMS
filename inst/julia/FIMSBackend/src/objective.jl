@@ -133,17 +133,17 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
 
   total_nll = zero(eltype(population.ages))
 
-  if haskey(data_dict, :observed_catch)
+  if haskey(data_dict, :observed_catch) && !isempty(data_dict[:observed_catch])
     sigma_catch = get(model_config, :catch_sigma, eltype(population.ages)(0.1))
     total_nll += lognormal_nll(Vector(data_dict[:observed_catch]), population.catch_expected, sigma_catch)
   end
 
-  if haskey(data_dict, :observed_index)
+  if haskey(data_dict, :observed_index) && !isempty(data_dict[:observed_index])
     sigma_index = get(model_config, :index_sigma, eltype(population.ages)(0.1))
     total_nll += lognormal_nll(Vector(data_dict[:observed_index]), population.index_expected, sigma_index)
   end
 
-  if haskey(data_dict, :observed_age_comp)
+  if haskey(data_dict, :observed_age_comp) && !isempty(data_dict[:observed_age_comp])
     expected_age_comp = copy(population.catch_numbers_at_age)
     for row in axes(expected_age_comp, 1)
       total_numbers = sum(view(expected_age_comp, row, :))

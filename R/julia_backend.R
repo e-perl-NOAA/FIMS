@@ -113,12 +113,12 @@ as_julia_fims_data <- function(data, parameters) {
   fleets <- get_fleets(data)
   fleet_data <- get_data(data)
 
-  selectivity_fleet <- fleet_data |>
-    dplyr::filter(.data$type == "catch") |>
+  agecomp_fleet <- fleet_data |>
+    dplyr::filter(.data$type == "age_comp") |>
     dplyr::pull(.data$fleet) |>
     unique() |>
     stats::na.omit() |>
-    {\(x) if (length(x) > 0) x[[1]] else fleets[[1]]}()
+    {\(x) if (length(x) > 0) x[[1]] else NA_character_}()
 
   catch_fleet <- fleet_data |>
     dplyr::filter(.data$type == "catch") |>
@@ -167,7 +167,7 @@ as_julia_fims_data <- function(data, parameters) {
     )
   }
 
-  list(
+  julia_data <- list(
     data = as.data.frame(fleet_data),
     fleets = fleets,
     n_years = n_years,
@@ -179,15 +179,26 @@ as_julia_fims_data <- function(data, parameters) {
     end_year = get_end_year(data),
     weights_at_age = weights_at_age,
     maturity_at_age = matrix(rep(maturity_by_age, each = n_years), nrow = n_years),
-    proportion_female = proportion_female,
-    observed_catch = if (is.na(catch_fleet)) numeric() else model_catch(data, catch_fleet),
-    observed_index = if (is.na(index_fleet)) numeric() else model_index(data, index_fleet),
-    observed_age_comp = if (is.na(selectivity_fleet)) {
-      matrix(numeric(), nrow = 0, ncol = 0)
-    } else {
-      matrix(model_age_comp(data, selectivity_fleet), nrow = n_years, byrow = TRUE)
-    }
+    proportion_female = proportion_female
   )
+
+  if (!is.na(catch_fleet)) {
+    julia_data[["observed_catch"]] <- model_catch(data, catch_fleet)
+  }
+
+  if (!is.na(index_fleet)) {
+    julia_data[["observed_index"]] <- model_index(data, index_fleet)
+  }
+
+  if (!is.na(agecomp_fleet)) {
+    julia_data[["observed_age_comp"]] <- matrix(
+      model_age_comp(data, agecomp_fleet),
+      nrow = n_years,
+      byrow = TRUE
+    )
+  }
+
+  julia_data
 }
 
 #' Convert the current parameter tibble to a Julia-friendly list
