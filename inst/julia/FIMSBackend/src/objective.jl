@@ -107,12 +107,11 @@ function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
       continue
     end
 
-    row_sum = sum(view(expected, row, :))
-    if row_sum <= 0
+    probs = view(expected, row, :)
+    if sum(probs) <= 0
       continue
     end
 
-    probs = view(expected, row, :) ./ row_sum
     total -= sum(obs_row .* log.(max.(probs, eps(eltype(probs)))))
   end
 
@@ -158,9 +157,17 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
   end
 
   if haskey(data_dict, :observed_age_comp) && !isempty(data_dict[:observed_age_comp])
+    expected_age_comp = copy(population.catch_numbers_at_age)
+    for row in axes(expected_age_comp, 1)
+      total_numbers = sum(view(expected_age_comp, row, :))
+      if total_numbers > 0
+        expected_age_comp[row, :] .= view(expected_age_comp, row, :) ./ total_numbers
+      end
+    end
+
     total_nll += multinomial_nll(
       Matrix(data_dict[:observed_age_comp]),
-      population.catch_numbers_at_age,
+      expected_age_comp,
     )
   end
 
