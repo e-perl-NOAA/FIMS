@@ -34,13 +34,36 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
   result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
+  julia_input <- attr(result, "julia_input")
 
   #' @description Test that Julia backend initialization still returns the standard two-element list.
   expect_named(result, c("parameters", "model"))
   #' @description Test that Julia backend initialization stores backend metadata as an attribute.
   expect_equal(attr(result, "backend"), "julia")
   #' @description Test that Julia backend initialization stores Julia input metadata as an attribute.
-  expect_true(is.list(attr(result, "julia_input")))
+  expect_true(is.list(julia_input))
+  #' @description Test that Julia backend initialization stores Julia input data and parameters.
+  expect_named(julia_input, c("data", "parameters"))
+  #' @description Test that Julia backend input preserves the parameter row count.
+  expect_equal(nrow(julia_input[["parameters"]]), nrow(parameters))
+  #' @description Test that Julia backend input preserves the number of modeled years.
+  expect_equal(julia_input[["data"]][["n_years"]], get_n_years(data))
+  #' @description Test that Julia backend input preserves the modeled age bins.
+  expect_equal(julia_input[["data"]][["ages"]], get_ages(data))
+
+  clear()
+})
+
+test_that("Julia backend input errors in fit_fims until the fit bridge is complete", {
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+  result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
+
+  #' @description Test that Julia backend input triggers the current explicit fit_fims guard.
+  expect_error(
+    FIMS::fit_fims(result, optimize = TRUE),
+    regexp = "not yet fully wired into"
+  )
 
   clear()
 })
