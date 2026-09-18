@@ -931,6 +931,12 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
 
   attr(parameter_list, "backend") <- backend
   if (backend == "julia") {
+    if (!requireNamespace("JuliaCall", quietly = TRUE)) {
+      cli::cli_abort(
+        "The Julia backend requires the {.pkg JuliaCall} package to be installed."
+      )
+    }
+
     julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
     attr(parameter_list, "julia_input") <- julia_input
 

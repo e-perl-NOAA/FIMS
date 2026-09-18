@@ -1,6 +1,6 @@
 using ComponentArrays: ComponentArray
 using ForwardDiff: gradient, hessian
-using LinearAlgebra: diag, inv
+using LinearAlgebra: Symmetric, diag, inv, pinv
 using Optim: LBFGS, NewtonTrustRegion, OnceDifferentiable, converged, iterations, minimum, minimizer, optimize, termination_status
 
 function _flatten_init_params(init_params)
@@ -45,15 +45,11 @@ function fit_model(init_params, data_dict, config = Dict())
   xhat = minimizer(result)
   hessian_matrix = hessian(objective, xhat)
   covariance = try
-    inv(hessian_matrix)
+    inv(Symmetric(hessian_matrix))
   catch
-    fill(eltype(hessian_matrix)(NaN), size(hessian_matrix))
+    pinv(Matrix(hessian_matrix))
   end
-  standard_errors = if any(isnan, covariance)
-    fill(eltype(hessian_matrix)(NaN), length(parameter_names))
-  else
-    sqrt.(abs.(diag(covariance)))
-  end
+  standard_errors = sqrt.(abs.(diag(covariance)))
 
   Dict(
     "estimates" => Dict(String(name) => value for (name, value) in zip(parameter_names, xhat)),
