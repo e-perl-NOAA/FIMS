@@ -32,6 +32,7 @@ function step_population!(
   fishing_mortality = Matrix{T}(catch_data[:fishing_mortality])
   catchability = T(get(catch_data, :catchability, one(T)))
   phi_0 = T(get(catch_data, :phi_0, one(T)))
+  plus_group = Bool(get(catch_data, :plus_group, true))
   recruit_devs = Vector{T}(get(catch_data, :log_recruit_devs, zeros(T, max(n_years - 1, 0))))
 
   for year in 1:n_years
@@ -50,7 +51,7 @@ function step_population!(
           pop.numbers_at_age[year - 1, age - 1] * exp(-pop.mortality_Z[year - 1, age - 1])
       end
 
-      if year > 1 && age == n_ages
+      if plus_group && year > 1 && age == n_ages
         pop.numbers_at_age[year, age] +=
           pop.numbers_at_age[year - 1, age] * exp(-pop.mortality_Z[year - 1, age])
       end
@@ -62,11 +63,11 @@ function step_population!(
         pop.maturity_at_age[year, age] *
         pop.proportion_female[age]
 
-      survivorship =
-        one(T) - exp(-pop.mortality_Z[year, age]) * (
-          one(T) - pop.mortality_M[year, age] / max(pop.mortality_Z[year, age], eps(T))
-        )
-      pop.catch_expected[year] += pop.numbers_at_age[year, age] * survivorship * pop.weights_at_age[year, age]
+      harvest_fraction =
+        pop.mortality_F[year, age] / max(pop.mortality_Z[year, age], eps(T)) *
+        (one(T) - exp(-pop.mortality_Z[year, age]))
+      pop.catch_expected[year] +=
+        pop.numbers_at_age[year, age] * harvest_fraction * pop.weights_at_age[year, age]
       pop.index_expected[year] +=
         catchability * pop.numbers_at_age[year, age] * s * pop.weights_at_age[year, age]
     end

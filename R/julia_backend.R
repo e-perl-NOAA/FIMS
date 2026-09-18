@@ -11,11 +11,39 @@
 #' @return A character scalar containing the Julia backend path.
 #' @noRd
 julia_backend_package_path <- function(libname = NULL, pkgname = "FIMS") {
+  installed_root <- tryCatch(
+    system.file(package = pkgname),
+    error = function(...) ""
+  )
+
   if (!is.null(libname) && !is.null(pkgname)) {
-    return(file.path(libname, pkgname, "julia", "FIMSBackend"))
+    candidate_paths <- c(
+      file.path(installed_root, "julia", "FIMSBackend"),
+      file.path(installed_root, "inst", "julia", "FIMSBackend"),
+      file.path(libname, pkgname, "julia", "FIMSBackend"),
+      file.path(libname, pkgname, "inst", "julia", "FIMSBackend")
+    )
+    existing_path <- candidate_paths[dir.exists(candidate_paths)][1]
+
+    if (!is.na(existing_path)) {
+      return(existing_path)
+    }
+
+    return(candidate_paths[[1]])
   }
 
-  system.file("julia", "FIMSBackend", package = pkgname)
+  candidate_paths <- c(
+    file.path(installed_root, "julia", "FIMSBackend"),
+    file.path(installed_root, "inst", "julia", "FIMSBackend"),
+    system.file("julia", "FIMSBackend", package = pkgname)
+  )
+  existing_path <- candidate_paths[dir.exists(candidate_paths)][1]
+
+  if (!is.na(existing_path)) {
+    return(existing_path)
+  }
+
+  candidate_paths[[1]]
 }
 
 #' Get the Julia backend module file
