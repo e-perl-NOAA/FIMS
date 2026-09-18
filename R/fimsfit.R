@@ -531,6 +531,14 @@ fit_fims <- function(input,
                        trace = 0
                      ),
                      filename = NULL) {
+  if (identical(attr(input, "backend"), "julia")) {
+    cli::cli_abort(c(
+      "The Julia backend input path has been initialized but fitting is not yet fully wired into {.fun fit_fims}.",
+      "i" = "Current progress includes Julia backend scaffolding, startup, and input preparation.",
+      "i" = "Continue using the default TMB backend until the Julia fit-object bridge is complete."
+    ))
+  }
+
   # See issue 455 of sdmTMB to see what should be used.
   # https://github.com/pbs-assess/sdmTMB/issues/455
   # NOTE: When we add implementation for newton step we need to
