@@ -24,10 +24,6 @@
 # https://github.com/search?q=Rcpp%3A%3AloadModule%28+zzz.R&type=code.
 .onLoad <- function(libname, pkgname) {
   Rcpp::loadModule(module = "fims", what = TRUE)
-  tryCatch(
-    initialize_julia_backend(libname = libname, pkgname = pkgname),
-    error = function(...) invisible(FALSE)
-  )
 }
 
 .onUnload <- function(libpath) {

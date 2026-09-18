@@ -67,3 +67,17 @@ test_that("Julia backend input errors in fit_fims until the fit bridge is comple
 
   clear()
 })
+
+test_that("Julia backend initialization stays shaped correctly when Julia startup is disabled", {
+  withr::local_options(list(FIMS.disable_julia = TRUE))
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+  result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
+
+  #' @description Test that disabling Julia startup still preserves the standard initialize_fims output shape.
+  expect_named(result, c("parameters", "model"))
+  #' @description Test that disabling Julia startup still preserves Julia input metadata.
+  expect_true(is.list(attr(result, "julia_input")))
+
+  clear()
+})

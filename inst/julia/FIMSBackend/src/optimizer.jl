@@ -43,8 +43,16 @@ function fit_model(init_params, data_dict, config = Dict())
 
   xhat = minimizer(result)
   hessian_matrix = hessian(objective, xhat)
-  covariance = inv(hessian_matrix)
-  standard_errors = sqrt.(abs.(diag(covariance)))
+  covariance = try
+    inv(hessian_matrix)
+  catch
+    fill(eltype(hessian_matrix)(NaN), size(hessian_matrix))
+  end
+  standard_errors = if any(isnan, covariance)
+    fill(eltype(hessian_matrix)(NaN), length(parameter_names))
+  else
+    sqrt.(abs.(diag(covariance)))
+  end
 
   Dict(
     "estimates" => Dict(String(name) => value for (name, value) in zip(parameter_names, xhat)),
