@@ -52,6 +52,14 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   expect_true(all(c("weights_at_age", "maturity_at_age") %in% names(julia_input[["data"]])))
   #' @description Test that Julia backend parameters are serialized to the named structure expected by the Julia objective scaffold.
   expect_true(all(c("log_Fmort", "log_M", "log_init_naa", "log_rzero", "logit_steep") %in% names(julia_input[["parameters"]])))
+  #' @description Test that the Julia backend weight-at-age matrix has one row per modeled year and one column per age.
+  expect_equal(dim(julia_input[["data"]][["weights_at_age"]]), c(get_n_years(data), get_n_ages(data)))
+  #' @description Test that the Julia backend maturity-at-age matrix has one row per modeled year and one column per age.
+  expect_equal(dim(julia_input[["data"]][["maturity_at_age"]]), c(get_n_years(data), get_n_ages(data)))
+  #' @description Test that the serialized fishing mortality vector spans every year-age cell.
+  expect_length(julia_input[["parameters"]][["log_Fmort"]], get_n_years(data) * get_n_ages(data))
+  #' @description Test that the serialized natural mortality vector spans every year-age cell.
+  expect_length(julia_input[["parameters"]][["log_M"]], get_n_years(data) * get_n_ages(data))
 
   clear()
 })
