@@ -3,6 +3,10 @@ using .Population: PopulationModel, step_population!
 using .Recruitment: BevertonHolt, Ricker
 using .Selectivity: DoubleLogisticSelectivity, LogisticSelectivity
 
+normalize_keys(x) = x
+normalize_keys(x::NamedTuple) = Dict(Symbol(key) => normalize_keys(value) for (key, value) in pairs(x))
+normalize_keys(x::AbstractDict) = Dict(Symbol(key) => normalize_keys(value) for (key, value) in pairs(x))
+
 has_component(params, name::Symbol) = try
   params[name]
   true
@@ -120,6 +124,7 @@ function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
 end
 
 function evaluate_nll(parameters_vector, data_dict, model_config)
+  data_dict = normalize_keys(data_dict)
   params = component_array_from_input(parameters_vector, model_config)
   parameter_type = eltype(collect(params))
   selectivity = build_selectivity(params, model_config)
