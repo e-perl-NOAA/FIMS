@@ -87,6 +87,7 @@ initialize_julia_backend <- function(libname = NULL, pkgname = "FIMS") {
   JuliaCall::julia_command(
     sprintf('Pkg.activate(raw"%s")', normalizePath(package_path, "/"))
   )
+  JuliaCall::julia_command("Pkg.instantiate()")
   JuliaCall::julia_command(
     sprintf("Base.include(Main, raw\"%s\")", normalizePath(module_path, "/"))
   )

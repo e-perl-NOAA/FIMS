@@ -19,7 +19,8 @@ function _flatten_init_params(init_params)
   end
 
   if init_params isa AbstractVector
-    return Float64.(init_params), Symbol.(string.("parameter_", eachindex(init_params)))
+    parameter_names = [Symbol("parameter_$index") for index in eachindex(init_params)]
+    return Float64.(init_params), parameter_names
   end
 
   throw(ArgumentError("Unsupported initial parameter container for fit_model."))

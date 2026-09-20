@@ -14,7 +14,7 @@ function (r::BevertonHolt{T})(spawners::T, phi_0::T) where {T <: Real}
   steep = inv_logit(T(0.2), one(T), r.logit_steep)
   rzero = exp(r.log_rzero)
   numerator = T(0.8) * rzero * steep * spawners
-  denominator = T(0.2) * phi_0 * rzero * (one(T) - steep) +
+  denominator = T(0.2) * phi_0 * rzero * ((one(T) - steep) + oftype(steep, sqrt(eps(Float64)))) +
     spawners * (steep - T(0.2))
   numerator / denominator
 end

@@ -164,6 +164,10 @@ test_that("Julia backend serializer rejects unsupported multi-fleet observation 
 
 test_that("Julia backend input errors in fit_fims until the fit bridge is complete", {
   reset_julia_backend_state()
+  testthat::local_mocked_bindings(
+    initialize_julia_backend = function(...) FALSE,
+    .package = "FIMS"
+  )
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
   result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")

@@ -75,6 +75,7 @@ end
 
 function build_population_model(params, data_dict)
   T = promote_type(
+    eltype(collect(params.log_init_naa)),
     eltype(data_dict[:ages]),
     eltype(data_dict[:weights_at_age]),
     eltype(data_dict[:maturity_at_age]),
