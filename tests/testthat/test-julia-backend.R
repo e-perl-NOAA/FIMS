@@ -32,11 +32,30 @@ test_that("Julia backend package scaffolding exists", {
 test_that("Julia backend helpers return package paths", {
   backend_path <- FIMS:::julia_backend_package_path()
   module_path <- FIMS:::julia_backend_module_path()
+  installed_root <- system.file(package = "FIMS")
 
   #' @description Test that the Julia backend package path is a character scalar.
   expect_type(backend_path, "character")
   #' @description Test that the Julia backend module path is a character scalar.
   expect_type(module_path, "character")
+  #' @description Test that the explicit libname/pkgname lookup resolves the same Julia backend path.
+  expect_equal(
+    normalizePath(
+      FIMS:::julia_backend_package_path(libname = dirname(installed_root), pkgname = "FIMS"),
+      "/",
+      mustWork = TRUE
+    ),
+    backend_path
+  )
+  #' @description Test that the explicit libname/pkgname lookup resolves the same Julia backend module path.
+  expect_equal(
+    normalizePath(
+      FIMS:::julia_backend_module_path(libname = dirname(installed_root), pkgname = "FIMS"),
+      "/",
+      mustWork = TRUE
+    ),
+    module_path
+  )
 })
 
 test_that("initialize_fims validates backend selection", {
@@ -87,6 +106,20 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   expect_length(julia_input[["parameters"]][["log_Fmort"]], get_n_years(data) * get_n_ages(data))
   #' @description Test that the serialized natural mortality vector spans every year-age cell.
   expect_length(julia_input[["parameters"]][["log_M"]], get_n_years(data) * get_n_ages(data))
+  #' @description Test that the serialized initial numbers-at-age preserve the original parameter order.
+  expect_equal(
+    julia_input[["parameters"]][["log_init_naa"]],
+    parameters |>
+      dplyr::filter(.data$module_name == "Population", .data$label == "log_init_naa") |>
+      dplyr::pull(.data$value)
+  )
+  #' @description Test that the serialized fishing mortality preserves the original parameter order.
+  expect_equal(
+    julia_input[["parameters"]][["log_Fmort"]],
+    parameters |>
+      dplyr::filter(.data$module_name == "Fleet", .data$label == "log_Fmort") |>
+      dplyr::pull(.data$value)
+  )
 
   clear()
 })
@@ -186,6 +219,33 @@ test_that("Julia backend initialization assigns prepared input when Julia startu
   expect_equal(attr(result, "backend"), "julia")
 
   clear()
+})
+
+test_that("assign_julia_backend_input calls the Julia-side backend setter", {
+  payload <- list(
+    data = list(n_years = 1L),
+    parameters = list(log_rzero = 0)
+  )
+  called <- list(fun = NULL, data = NULL, parameters = NULL)
+
+  testthat::local_mocked_bindings(
+    julia_call = function(fun, data, parameters) {
+      called$fun <<- fun
+      called$data <<- data
+      called$parameters <<- parameters
+      invisible(TRUE)
+    },
+    .package = "JuliaCall"
+  )
+
+  FIMS:::assign_julia_backend_input(payload)
+
+  #' @description Test that assign_julia_backend_input targets the Julia-side backend setter.
+  expect_equal(called$fun, "FIMSBackend.set_backend_input!")
+  #' @description Test that assign_julia_backend_input forwards the data payload unchanged.
+  expect_equal(called$data, payload[["data"]])
+  #' @description Test that assign_julia_backend_input forwards the parameter payload unchanged.
+  expect_equal(called$parameters, payload[["parameters"]])
 })
 
 test_that("Julia backend initialization skips assignment when Julia startup does not complete", {
