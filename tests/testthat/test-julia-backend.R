@@ -12,7 +12,7 @@ reset_julia_backend_state <- function() {
 
 test_that("Julia backend package scaffolding exists", {
   backend_root <- normalizePath(
-    testthat::test_path("..", "..", "inst", "julia", "FIMSBackend"),
+    FIMS:::julia_backend_package_path(),
     "/",
     mustWork = TRUE
   )
