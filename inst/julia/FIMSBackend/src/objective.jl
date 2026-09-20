@@ -26,9 +26,13 @@ function component_array_from_input(parameters_vector, model_config)
   end
 
   if parameters_vector isa AbstractDict
-    parameter_keys = sort!(collect(keys(parameters_vector)); by = string)
-    names_tuple = Tuple(Symbol.(parameter_keys))
-    values_tuple = Tuple(parameters_vector[key] for key in parameter_keys)
+    normalized_parameters = normalize_keys(parameters_vector)
+    configured_names = Symbol.(get(model_config, :parameter_names, String[]))
+    parameter_keys =
+      !isempty(configured_names) && all(haskey(normalized_parameters, key) for key in configured_names) ?
+      configured_names : collect(keys(normalized_parameters))
+    names_tuple = Tuple(parameter_keys)
+    values_tuple = Tuple(normalized_parameters[key] for key in parameter_keys)
     return ComponentArray(NamedTuple{names_tuple}(values_tuple))
   end
 
@@ -76,12 +80,15 @@ function build_population_model(params, data_dict)
   numbers_at_age = Matrix{T}(undef, data_dict[:n_years], data_dict[:n_ages])
   numbers_at_age .= zero(T)
   numbers_at_age[1, :] .= exp.(collect(params.log_init_naa))
+  proportion_female = collect(get(data_dict, :proportion_female, ones(T, data_dict[:n_ages])))
+  length(proportion_female) == data_dict[:n_ages] ||
+    throw(ArgumentError("proportion_female must provide one value per age."))
 
   PopulationModel(
     ages = collect(data_dict[:ages]),
     weights_at_age = Matrix(data_dict[:weights_at_age]),
     maturity_at_age = Matrix(data_dict[:maturity_at_age]),
-    proportion_female = collect(get(data_dict, :proportion_female, ones(T, data_dict[:n_ages]))),
+    proportion_female = T.(proportion_female),
     numbers_at_age = numbers_at_age,
     catch_numbers_at_age = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
     biomass = zeros(T, data_dict[:n_years]),

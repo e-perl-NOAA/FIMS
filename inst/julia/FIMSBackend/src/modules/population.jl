@@ -35,7 +35,7 @@ function step_population!(
   fishing_mortality = Matrix{T}(catch_data[:fishing_mortality])
   catchability = T(get(catch_data, :catchability, one(T)))
   phi_0 = T(get(catch_data, :phi_0, one(T)))
-  recruit_devs = Vector{T}(get(catch_data, :log_recruit_devs, zeros(T, max(n_years - 1, 0))))
+  recruit_devs = T.(collect(get(catch_data, :log_recruit_devs, zeros(T, max(n_years - 1, 0)))))
 
   for year in 1:n_years
     pop.biomass[year] = zero(T)
