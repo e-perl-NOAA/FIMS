@@ -5,7 +5,9 @@ using .Selectivity: DoubleLogisticSelectivity, LogisticSelectivity
 
 normalize_keys(x) = x
 normalize_keys(x::NamedTuple) = Dict(Symbol(key) => normalize_keys(value) for (key, value) in pairs(x))
-normalize_keys(x::AbstractDict) = Dict(Symbol(key) => normalize_keys(value) for (key, value) in pairs(x))
+normalize_key(key::Symbol) = key
+normalize_key(key) = Symbol(key)
+normalize_keys(x::AbstractDict) = Dict(normalize_key(key) => normalize_keys(value) for (key, value) in pairs(x))
 
 has_component(params, name::Symbol) = try
   params[name]
