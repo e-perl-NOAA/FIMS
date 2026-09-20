@@ -4,6 +4,8 @@ using ..Recruitment: BevertonHolt, Ricker
 
 export PopulationModel, step_population!
 
+positive_guard(x) = x + oftype(x, sqrt(eps(Float64)))
+
 Base.@kwdef mutable struct PopulationModel{T <: Real}
   ages::Vector{T}
   weights_at_age::Matrix{T}
@@ -62,8 +64,9 @@ function step_population!(
         pop.maturity_at_age[year, age] *
         pop.proportion_female[age]
 
+      total_mortality = positive_guard(pop.mortality_Z[year, age])
       harvest_fraction =
-        pop.mortality_F[year, age] / max(pop.mortality_Z[year, age], eps(T)) *
+        pop.mortality_F[year, age] / total_mortality *
         (one(T) - exp(-pop.mortality_Z[year, age]))
       pop.catch_numbers_at_age[year, age] =
         pop.numbers_at_age[year, age] * harvest_fraction

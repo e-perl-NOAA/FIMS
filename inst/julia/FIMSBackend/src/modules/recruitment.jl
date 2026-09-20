@@ -27,7 +27,8 @@ end
 function (r::Ricker{T})(spawners::T, phi_0::T) where {T <: Real}
   steep = inv_logit(T(0.2), one(T), r.logit_steep)
   rzero = exp(r.log_rzero)
-  alpha = log((T(5) * steep) / max(one(T) - steep, eps(T))) / (T(0.8) * phi_0)
+  steep_gap = (one(T) - steep) + oftype(steep, sqrt(eps(Float64)))
+  alpha = log((T(5) * steep) / steep_gap) / (T(0.8) * phi_0)
   beta = alpha / (phi_0 * rzero)
   alpha * spawners * exp(-beta * spawners)
 end

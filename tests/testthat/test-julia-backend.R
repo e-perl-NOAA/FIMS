@@ -172,3 +172,28 @@ test_that("Julia backend initialization assigns prepared input when Julia startu
 
   clear()
 })
+
+test_that("Julia backend initialization skips assignment when Julia startup does not complete", {
+  reset_julia_backend_state()
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+  assigned <- FALSE
+
+  testthat::local_mocked_bindings(
+    initialize_julia_backend = function(...) FALSE,
+    assign_julia_backend_input = function(x) {
+      assigned <<- TRUE
+      invisible(x)
+    },
+    .package = "FIMS"
+  )
+
+  result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
+
+  #' @description Test that the Julia assignment branch is skipped when initialization does not complete.
+  expect_false(assigned)
+  #' @description Test that the Julia backend still records the backend metadata when initialization is skipped.
+  expect_equal(attr(result, "backend"), "julia")
+
+  clear()
+})

@@ -100,6 +100,7 @@ lognormal_nll(observed, expected, sigma) =
 
 function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
   total = zero(promote_type(eltype(observed), eltype(expected)))
+  probability_floor = oftype(total, sqrt(eps(Float64)))
 
   for row in axes(observed, 1)
     obs_row = observed[row, :]
@@ -112,7 +113,7 @@ function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
       continue
     end
 
-    total -= sum(obs_row .* log.(max.(probs, eps(eltype(probs)))))
+    total -= sum(obs_row .* log.(probs .+ probability_floor))
   end
 
   total
@@ -120,16 +121,17 @@ end
 
 function evaluate_nll(parameters_vector, data_dict, model_config)
   params = component_array_from_input(parameters_vector, model_config)
+  parameter_type = eltype(collect(params))
   selectivity = build_selectivity(params, model_config)
   recruitment = build_recruitment(params, model_config)
   population = build_population_model(params, data_dict)
 
   fishing_mortality = reshape(exp.(collect(params.log_Fmort)), data_dict[:n_years], data_dict[:n_ages])
-  catchability = exp(get_component(params, :log_q, zero(eltype(population.ages))))
+  catchability = exp(get_component(params, :log_q, zero(parameter_type)))
   recruit_devs = get_component(
     params,
     :log_devs,
-    zeros(eltype(population.ages), max(data_dict[:n_years] - 1, 0))
+    zeros(parameter_type, max(data_dict[:n_years] - 1, 0))
   )
 
   step_population!(
