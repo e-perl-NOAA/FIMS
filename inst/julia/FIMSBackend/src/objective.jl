@@ -22,9 +22,9 @@ function component_array_from_input(parameters_vector, model_config)
   end
 
   if parameters_vector isa AbstractDict
-    parameter_pairs = collect(pairs(parameters_vector))
-    names_tuple = Tuple(Symbol.(first.(parameter_pairs)))
-    values_tuple = Tuple(last.(parameter_pairs))
+    parameter_keys = sort!(collect(keys(parameters_vector)); by = string)
+    names_tuple = Tuple(Symbol.(parameter_keys))
+    values_tuple = Tuple(parameters_vector[key] for key in parameter_keys)
     return ComponentArray(NamedTuple{names_tuple}(values_tuple))
   end
 
