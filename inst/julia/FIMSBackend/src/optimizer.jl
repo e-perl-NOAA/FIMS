@@ -1,23 +1,21 @@
-using ComponentArrays: ComponentArray
+using ComponentArrays: ComponentArray, getaxes
 using ForwardDiff: gradient, hessian
 using LinearAlgebra: Symmetric, diag, inv, pinv
 using Optim: LBFGS, NewtonTrustRegion, OnceDifferentiable, converged, iterations, minimum, minimizer, optimize, termination_status
 
 function _flatten_init_params(init_params)
   if init_params isa ComponentArray
-    return collect(init_params), Symbol.(propertynames(init_params))
+    return Float64.(collect(init_params)), init_params
   end
 
   if init_params isa NamedTuple
     params = ComponentArray(init_params)
-    return collect(params), Symbol.(propertynames(params))
+    return Float64.(collect(params)), params
   end
 
   if init_params isa AbstractDict
-    parameter_keys = sort!(collect(keys(init_params)); by = string)
-    parameter_names = Symbol.(parameter_keys)
-    values = [init_params[key] for key in parameter_keys]
-    return Float64.(values), parameter_names
+    params = component_array_from_input(init_params, Dict())
+    return Float64.(collect(params)), params
   end
 
   if init_params isa AbstractVector
@@ -27,15 +25,27 @@ function _flatten_init_params(init_params)
   throw(ArgumentError("Unsupported initial parameter container for fit_model."))
 end
 
-function _named_component_array(x, parameter_names)
-  ComponentArray(NamedTuple{Tuple(parameter_names)}(Tuple(x)))
+function _named_component_array(x, parameter_layout)
+  if parameter_layout isa ComponentArray
+    return ComponentArray(x, getaxes(parameter_layout))
+  end
+
+  ComponentArray(NamedTuple{Tuple(parameter_layout)}(Tuple(x)))
+end
+
+function _result_dict(component)
+  Dict(String(name) => getproperty(component, name) for name in propertynames(component))
 end
 
 function fit_model(init_params, data_dict, config = Dict())
-  x0, parameter_names = _flatten_init_params(init_params)
-  objective_config = merge(Dict(:parameter_names => String.(parameter_names)), Dict(config))
+  x0, parameter_layout = _flatten_init_params(init_params)
+  parameter_names =
+    parameter_layout isa ComponentArray ?
+    String.(Symbol.(propertynames(parameter_layout))) :
+    String.(parameter_layout)
+  objective_config = merge(Dict(:parameter_names => parameter_names), Dict(config))
 
-  objective = x -> evaluate_nll(_named_component_array(x, parameter_names), data_dict, objective_config)
+  objective = x -> evaluate_nll(_named_component_array(x, parameter_layout), data_dict, objective_config)
   gradient! = (storage, x) -> copyto!(storage, gradient(objective, x))
 
   method = get(config, :optimizer, :lbfgs) == :newton ? NewtonTrustRegion() : LBFGS()
@@ -43,6 +53,7 @@ function fit_model(init_params, data_dict, config = Dict())
   result = optimize(objective_function, x0, method)
 
   xhat = minimizer(result)
+  estimate_components = _named_component_array(xhat, parameter_layout)
   hessian_matrix = hessian(objective, xhat)
   covariance = try
     inv(Symmetric(hessian_matrix))
@@ -50,9 +61,15 @@ function fit_model(init_params, data_dict, config = Dict())
     pinv(Matrix(hessian_matrix))
   end
   standard_errors = sqrt.(abs.(diag(covariance)))
+  se_components = _named_component_array(standard_errors, parameter_layout)
 
   Dict(
-    "estimates" => Dict(String(name) => value for (name, value) in zip(parameter_names, xhat)),
+    "estimates" =>
+      if parameter_layout isa ComponentArray
+        _result_dict(estimate_components)
+      else
+        Dict(String(name) => value for (name, value) in zip(parameter_layout, xhat))
+      end,
     "nll" => minimum(result),
     "convergence" => converged(result),
     "convergence_code" => string(termination_status(result)),
@@ -60,6 +77,11 @@ function fit_model(init_params, data_dict, config = Dict())
     "gradient" => gradient(objective, xhat),
     "hessian" => hessian_matrix,
     "covariance" => covariance,
-    "standard_errors" => Dict(String(name) => value for (name, value) in zip(parameter_names, standard_errors)),
+    "standard_errors" =>
+      if parameter_layout isa ComponentArray
+        _result_dict(se_components)
+      else
+        Dict(String(name) => value for (name, value) in zip(parameter_layout, standard_errors))
+      end,
   )
 end
