@@ -42,6 +42,9 @@ function step_population!(
     pop.spawning_biomass[year] = zero(T)
     pop.catch_expected[year] = zero(T)
     pop.index_expected[year] = zero(T)
+    if year == 1
+      pop.expected_recruitment[year] = pop.numbers_at_age[year, 1]
+    end
 
     for age in 1:n_ages
       s = sel(pop.ages[age])
@@ -81,10 +84,8 @@ function step_population!(
       if year <= length(recruit_devs)
         expected_recruitment *= exp(recruit_devs[year])
       end
-      pop.expected_recruitment[year] = expected_recruitment
+      pop.expected_recruitment[year + 1] = expected_recruitment
       pop.numbers_at_age[year + 1, 1] = expected_recruitment
-    else
-      pop.expected_recruitment[year] = rec(pop.spawning_biomass[year], phi_0)
     end
   end
 

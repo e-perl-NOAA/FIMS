@@ -39,6 +39,21 @@ test_that("Julia backend helpers return package paths", {
   expect_type(module_path, "character")
 })
 
+test_that("initialize_fims validates backend selection", {
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+
+  #' @description Test that initialize_fims keeps the default TMB backend when no backend is specified.
+  expect_null(attr(FIMS::initialize_fims(parameters = parameters, data = data), "backend"))
+  #' @description Test that initialize_fims rejects unsupported backend values.
+  expect_error(
+    FIMS::initialize_fims(parameters = parameters, data = data, backend = "bogus"),
+    regexp = "arg"
+  )
+
+  clear()
+})
+
 test_that("Julia backend input preparation preserves existing initialize_fims output shape", {
   reset_julia_backend_state()
   data <- FIMS::FIMSFrame(data_big)
