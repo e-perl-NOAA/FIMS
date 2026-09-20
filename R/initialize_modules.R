@@ -597,8 +597,7 @@ initialize_comp <- function(data,
 #' clear()
 #' }
 initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
-  backend <- if (length(backend) > 1) backend[[1]] else backend
-  backend <- match.arg(tolower(backend), c("tmb", "julia"))
+  backend <- tolower(match.arg(backend))
   # Validate parameters input
   if (missing(parameters) || !tibble::is_tibble(parameters)) {
     cli::cli_abort("The {.var parameters} argument must be a tibble.")

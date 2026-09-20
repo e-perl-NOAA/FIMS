@@ -267,8 +267,11 @@ as_julia_fims_parameters <- function(parameters, data) {
 #' @return Invisibly returns `TRUE` when assignments are attempted.
 #' @noRd
 assign_julia_backend_input <- function(julia_input) {
-  JuliaCall::julia_assign("fims_data", julia_input[["data"]])
-  JuliaCall::julia_assign("fims_parameters", julia_input[["parameters"]])
+  JuliaCall::julia_call(
+    "FIMSBackend.set_backend_input!",
+    julia_input[["data"]],
+    julia_input[["parameters"]]
+  )
   invisible(TRUE)
 }
 
