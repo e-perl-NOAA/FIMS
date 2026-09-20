@@ -562,6 +562,9 @@ initialize_comp <- function(data,
 #'   [FIMSFrame()]. Passing the data is required because initialization of the
 #'   modules requires passing the data and information regarding the uncertainty
 #'   of that data, i.e., input sample sizes for the multinomial distribution.
+#' @param backend A character scalar specifying the execution backend to prepare.
+#'   Use `"TMB"` for the current C++/TMB backend or `"julia"` to prepare Julia
+#'   backend input objects during the migration.
 #' @return
 #' A list is returned with two elements, `parameters` and `model`. The list can
 #' be passed to the `input` argument of [fit_fims()] to fit the model. The first
@@ -588,9 +591,13 @@ initialize_comp <- function(data,
 #' # Instantiate modules
 #' parameters_list <- setup_default_parameters(data = data_4_model) |>
 #'   initialize_fims(data = data_4_model)
+#' # Prepare the experimental Julia backend input bundle
+#' julia_parameters_list <- setup_default_parameters(data = data_4_model) |>
+#'   initialize_fims(data = data_4_model, backend = "julia")
 #' clear()
 #' }
-initialize_fims <- function(parameters, data) {
+initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
+  backend <- if (missing(backend)) NULL else tolower(match.arg(backend))
   # Validate parameters input
   if (missing(parameters) || !tibble::is_tibble(parameters)) {
     cli::cli_abort("The {.var parameters} argument must be a tibble.")
@@ -924,6 +931,16 @@ initialize_fims <- function(parameters, data) {
     ),
     model = fims_model
   )
+
+  if (identical(backend, "julia")) {
+    attr(parameter_list, "backend") <- backend
+    julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
+    attr(parameter_list, "julia_input") <- julia_input
+
+    if (initialize_julia_backend()) {
+      assign_julia_backend_input(julia_input)
+    }
+  }
 
   return(parameter_list)
 }

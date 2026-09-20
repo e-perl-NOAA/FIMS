@@ -1,0 +1,17 @@
+name = "FIMSBackend"
+uuid = "aa8ae2e8-e4be-4efc-87b2-2e2ba7767f85"
+authors = ["NOAA FIMS contributors"]
+version = "0.1.0"
+
+[deps]
+ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
+
+[compat]
+ComponentArrays = "0.15"
+ForwardDiff = "0.10"
+Optim = "1"
+julia = "1.10"
