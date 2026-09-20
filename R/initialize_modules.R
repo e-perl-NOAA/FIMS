@@ -597,7 +597,7 @@ initialize_comp <- function(data,
 #' clear()
 #' }
 initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
-  backend <- tolower(match.arg(backend))
+  backend <- if (missing(backend)) NULL else tolower(match.arg(backend))
   # Validate parameters input
   if (missing(parameters) || !tibble::is_tibble(parameters)) {
     cli::cli_abort("The {.var parameters} argument must be a tibble.")
@@ -932,7 +932,7 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
     model = fims_model
   )
 
-  if (backend == "julia") {
+  if (identical(backend, "julia")) {
     attr(parameter_list, "backend") <- backend
     julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
     attr(parameter_list, "julia_input") <- julia_input

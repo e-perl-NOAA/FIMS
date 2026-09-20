@@ -60,7 +60,12 @@ function fit_model(init_params, data_dict, config = Dict())
   catch
     pinv(Matrix(hessian_matrix))
   end
-  standard_errors = sqrt.(abs.(diag(covariance)))
+  variances = diag(covariance)
+  standard_errors = similar(variances)
+  for index in eachindex(variances)
+    standard_errors[index] =
+      variances[index] >= 0 ? sqrt(variances[index]) : oftype(variances[index], NaN)
+  end
   se_components = _named_component_array(standard_errors, parameter_layout)
 
   Dict(

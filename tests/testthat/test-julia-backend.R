@@ -215,6 +215,10 @@ test_that("Julia backend initialization assigns prepared input when Julia startu
   expect_true(assigned)
   #' @description Test that the Julia assignment branch receives the same serialized input attached to the returned object.
   expect_equal(assigned_input, attr(result, "julia_input"))
+  #' @description Test that the Julia assignment branch preserves the serialized data payload structure.
+  expect_named(assigned_input[["data"]], names(attr(result, "julia_input")[["data"]]))
+  #' @description Test that the Julia assignment branch preserves the serialized parameter payload structure.
+  expect_named(assigned_input[["parameters"]], names(attr(result, "julia_input")[["parameters"]]))
   #' @description Test that the Julia backend success branch still preserves backend metadata.
   expect_equal(attr(result, "backend"), "julia")
 
