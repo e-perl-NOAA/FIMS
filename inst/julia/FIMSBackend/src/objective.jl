@@ -156,20 +156,20 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
     Dict(
       :fishing_mortality => fishing_mortality,
       :catchability => catchability,
-      :phi_0 => get(data_dict, :phi_0, one(eltype(population.ages))),
+      :phi_0 => get(data_dict, :phi_0, one(parameter_type)),
       :log_recruit_devs => recruit_devs,
     ),
   )
 
-  total_nll = zero(eltype(population.ages))
+  total_nll = zero(parameter_type)
 
   if haskey(data_dict, :observed_catch) && !isempty(data_dict[:observed_catch])
-    sigma_catch = get(model_config, :catch_sigma, eltype(population.ages)(0.1))
+    sigma_catch = get(model_config, :catch_sigma, parameter_type(0.1))
     total_nll += lognormal_nll(Vector(data_dict[:observed_catch]), population.catch_expected, sigma_catch)
   end
 
   if haskey(data_dict, :observed_index) && !isempty(data_dict[:observed_index])
-    sigma_index = get(model_config, :index_sigma, eltype(population.ages)(0.1))
+    sigma_index = get(model_config, :index_sigma, parameter_type(0.1))
     total_nll += lognormal_nll(Vector(data_dict[:observed_index]), population.index_expected, sigma_index)
   end
 

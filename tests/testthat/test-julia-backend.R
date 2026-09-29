@@ -10,6 +10,15 @@ reset_julia_backend_state <- function() {
   FIMS:::.fims_julia_backend_state$initialized <- FALSE
 }
 
+test_that("reset_julia_backend_state restores the Julia initialization flag", {
+  FIMS:::.fims_julia_backend_state$initialized <- TRUE
+  local({
+    reset_julia_backend_state()
+    expect_false(FIMS:::.fims_julia_backend_state$initialized)
+  })
+  expect_true(FIMS:::.fims_julia_backend_state$initialized)
+})
+
 test_that("Julia backend package scaffolding exists", {
   backend_root <- normalizePath(
     FIMS:::julia_backend_package_path(),
@@ -75,6 +84,10 @@ test_that("initialize_fims validates backend selection", {
 
 test_that("Julia backend input preparation preserves existing initialize_fims output shape", {
   reset_julia_backend_state()
+  testthat::local_mocked_bindings(
+    initialize_julia_backend = function(...) FALSE,
+    .package = "FIMS"
+  )
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
   result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
@@ -144,19 +157,38 @@ test_that("Julia backend serializer omits unavailable observed data entries", {
 
 test_that("Julia backend serializer rejects unsupported multi-fleet observation inputs", {
   reset_julia_backend_state()
-  multi_fleet_data <- dplyr::bind_rows(
-    data_big,
-    data_big |>
-      dplyr::filter(.data$fleet == "fleet1") |>
-      dplyr::mutate(fleet = "fleet2")
-  ) |>
-    FIMS::FIMSFrame()
-  parameters <- FIMS::setup_default_parameters(data = multi_fleet_data)
+  make_multi_fleet_data <- function(data_type) {
+    dplyr::bind_rows(
+      data_big,
+      data_big |>
+        dplyr::filter(.data$type == .env$data_type, .data$fleet == "fleet1") |>
+        dplyr::mutate(fleet = "fleet2")
+    ) |>
+      FIMS::FIMSFrame()
+  }
 
+  catch_data <- make_multi_fleet_data("catch")
+  catch_parameters <- FIMS::setup_default_parameters(data = catch_data)
   #' @description Test that the experimental Julia serializer errors on unsupported multiple catch fleets.
   expect_error(
-    FIMS:::prepare_julia_backend_input(parameters = parameters, data = multi_fleet_data),
+    FIMS:::prepare_julia_backend_input(parameters = catch_parameters, data = catch_data),
     regexp = "currently supports only one catch fleet"
+  )
+
+  index_data <- make_multi_fleet_data("index")
+  index_parameters <- FIMS::setup_default_parameters(data = index_data)
+  #' @description Test that the experimental Julia serializer errors on unsupported multiple index fleets.
+  expect_error(
+    FIMS:::prepare_julia_backend_input(parameters = index_parameters, data = index_data),
+    regexp = "currently supports only one index fleet"
+  )
+
+  agecomp_data <- make_multi_fleet_data("age_comp")
+  agecomp_parameters <- FIMS::setup_default_parameters(data = agecomp_data)
+  #' @description Test that the experimental Julia serializer errors on unsupported multiple age-composition fleets.
+  expect_error(
+    FIMS:::prepare_julia_backend_input(parameters = agecomp_parameters, data = agecomp_data),
+    regexp = "currently supports only one age-composition fleet"
   )
 
   clear()
