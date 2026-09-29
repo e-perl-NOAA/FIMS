@@ -564,7 +564,7 @@ initialize_comp <- function(data,
 #'   of that data, i.e., input sample sizes for the multinomial distribution.
 #' @param backend A character scalar specifying the execution backend to prepare.
 #'   Use `"TMB"` for the current C++/TMB backend or `"julia"` to prepare Julia
-#'   backend input objects during the migration.
+#'   backend input objects and skip TMB setup.
 #' @return
 #' A list is returned with two elements, `parameters` and `model`. The list can
 #' be passed to the `input` argument of [fit_fims()] to fit the model. The first
@@ -572,8 +572,8 @@ initialize_comp <- function(data,
 #' [TMB::MakeADFun()] if you wish to have more control over the model-fitting
 #' process.
 #' The model element of the returned list stores the instantiated C++ model
-#' module, e.g., the results of `methods::new(CatchAtAge)` for a catch-at-age
-#' model.
+#' module for the default TMB backend. For the Julia backend this element is
+#' `NULL` because fitting proceeds through the Julia bridge instead of TMB.
 #' It is important that you only have one FIMS model initialized in your R
 #' workspace at a time. Thus, after you initialize and fit the model, you should
 #' run [clear()].
@@ -917,6 +917,25 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
     linked_ids = population_module_ids
   )
 
+  if (identical(backend, "julia")) {
+    julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
+    julia_model_config <- as_julia_fims_model_config(parameters = parameters, data = data)
+    parameter_list <- list(
+      parameters = julia_input[["parameters"]],
+      model = NULL
+    )
+    attr(parameter_list, "backend") <- backend
+    attr(parameter_list, "parameter_info") <- parameters
+    attr(parameter_list, "julia_input") <- julia_input
+    attr(parameter_list, "julia_model_config") <- julia_model_config
+
+    if (initialize_julia_backend()) {
+      assign_julia_backend_input(julia_input)
+    }
+
+    return(parameter_list)
+  }
+
   # Set-up TMB
   # Hard code to be a catch-at-age model
   fims_model <- methods::new(CatchAtAge)
@@ -931,19 +950,6 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
     ),
     model = fims_model
   )
-
-  if (identical(backend, "julia")) {
-    attr(parameter_list, "backend") <- backend
-    attr(parameter_list, "parameter_info") <- parameters
-    julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
-    julia_model_config <- as_julia_fims_model_config(parameters = parameters, data = data)
-    attr(parameter_list, "julia_input") <- julia_input
-    attr(parameter_list, "julia_model_config") <- julia_model_config
-
-    if (initialize_julia_backend()) {
-      assign_julia_backend_input(julia_input)
-    }
-  }
 
   return(parameter_list)
 }
