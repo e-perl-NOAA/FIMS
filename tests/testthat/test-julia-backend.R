@@ -101,6 +101,10 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   expect_true(is.list(julia_input))
   #' @description Test that Julia backend initialization stores Julia input data and parameters.
   expect_named(julia_input, c("data", "parameters"))
+  #' @description Test that Julia backend initialization now stores the Julia parameter payload directly in the returned list.
+  expect_equal(result[["parameters"]], julia_input[["parameters"]])
+  #' @description Test that Julia backend initialization no longer requires a TMB model object.
+  expect_null(result[["model"]])
   #' @description Test that Julia backend input preserves the number of modeled years.
   expect_equal(julia_input[["data"]][["n_years"]], get_n_years(data))
   #' @description Test that Julia backend input preserves the modeled age bins.
@@ -133,6 +137,28 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
       dplyr::filter(.data$module_name == "Fleet", .data$label == "log_Fmort") |>
       dplyr::pull(.data$value)
   )
+
+  clear()
+})
+
+test_that("Julia backend initialize_fims skips TMB setup helpers", {
+  reset_julia_backend_state()
+  testthat::local_mocked_bindings(
+    initialize_julia_backend = function(...) FALSE,
+    CreateTMBModel = function(...) stop("CreateTMBModel should not be called"),
+    get_fixed = function(...) stop("get_fixed should not be called"),
+    get_random = function(...) stop("get_random should not be called"),
+    .package = "FIMS"
+  )
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+
+  #' @description Test that initialize_fims() can prepare the Julia backend without calling the TMB setup helpers.
+  expect_no_error(
+    result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
+  )
+  #' @description Test that the Julia backend still records its backend metadata when TMB setup is skipped.
+  expect_equal(attr(result, "backend"), "julia")
 
   clear()
 })
