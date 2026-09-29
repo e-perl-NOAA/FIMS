@@ -194,23 +194,80 @@ test_that("Julia backend serializer rejects unsupported multi-fleet observation 
   clear()
 })
 
-test_that("Julia backend input errors in fit_fims until the fit bridge is complete", {
+test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bridge", {
+  reset_julia_backend_state()
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+  result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
+  julia_input <- attr(result, "julia_input")
+  parameter_lengths <- purrr::map_int(julia_input[["parameters"]], length)
+  flattened_parameter_count <- sum(parameter_lengths)
+  mocked_report <- list(
+   numbers_at_age = matrix(1, nrow = get_n_years(data), ncol = get_n_ages(data)),
+   catch_numbers_at_age = matrix(0.1, nrow = get_n_years(data), ncol = get_n_ages(data)),
+   biomass = rep(1, get_n_years(data)),
+   spawning_biomass = rep(0.5, get_n_years(data)),
+   expected_recruitment = rep(1, get_n_years(data)),
+   catch_expected = rep(1, get_n_years(data)),
+   index_expected = rep(0.5, get_n_years(data)),
+   agecomp_expected = matrix(1 / get_n_ages(data), nrow = get_n_years(data), ncol = get_n_ages(data))
+  )
+
+  testthat::local_mocked_bindings(
+   initialize_julia_backend = function(...) TRUE,
+   assign_julia_backend_input = function(...) invisible(TRUE),
+   fit_julia_backend_model = function(...) {
+     list(
+       estimates = julia_input[["parameters"]],
+       standard_errors = purrr::imap(
+         julia_input[["parameters"]],
+         \(value, name) rep(0.1, length(value))
+       ),
+       gradient = rep(0, flattened_parameter_count),
+       hessian = diag(flattened_parameter_count),
+       nll = 12.5,
+       convergence = TRUE,
+       convergence_code = "SUCCESS",
+       iterations = 4L,
+       report = mocked_report
+     )
+   },
+   .package = "FIMS"
+  )
+
+  fit <- FIMS::fit_fims(result, optimize = TRUE)
+
+  #' @description Test that the Julia backend fit bridge now returns a FIMSFit object.
+  expect_s4_class(fit, "FIMSFit")
+  #' @description Test that the Julia backend fit bridge preserves backend metadata in the fit input.
+  expect_equal(attr(FIMS::get_input(fit), "backend"), "julia")
+  #' @description Test that the Julia backend fit bridge records an optimizer result.
+  expect_equal(FIMS::get_opt(fit)[["convergence"]], 0L)
+  #' @description Test that the Julia backend fit bridge exposes the Julia report jnll through get_report().
+  expect_equal(FIMS::get_report(fit)[["jnll"]], 12.5)
+  #' @description Test that Julia backend fits produce estimate rows for the serialized catch data stream.
+  expect_true("catch_expected" %in% FIMS::get_estimates(fit)[["label"]])
+  #' @description Test that Julia backend fits support backend-neutral glance summaries.
+  expect_equal(generics::glance(fit)[["marginal_nll"]], 12.5)
+
+  clear()
+})
+
+test_that("Julia backend fit_fims errors cleanly when Julia cannot initialize", {
   reset_julia_backend_state()
   testthat::local_mocked_bindings(
-    initialize_julia_backend = function(...) FALSE,
-    .package = "FIMS"
+   initialize_julia_backend = function(...) FALSE,
+   .package = "FIMS"
   )
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
   result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
 
-  #' @description Test that Julia backend input triggers the current explicit fit_fims guard.
+  #' @description Test that Julia-backed fit_fims fails with a Julia initialization error when the runtime is unavailable.
   expect_error(
-    FIMS::fit_fims(result, optimize = TRUE),
-    regexp = "not yet fully wired into"
+   FIMS::fit_fims(result, optimize = TRUE),
+   regexp = "Julia backend initialization failed"
   )
-
-  clear()
 })
 
 test_that("Julia backend initialization stays shaped correctly when Julia startup is disabled", {

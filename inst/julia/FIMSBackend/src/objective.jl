@@ -133,7 +133,18 @@ function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
   total
 end
 
-function evaluate_nll(parameters_vector, data_dict, model_config)
+function expected_age_comp(population)
+  expected = copy(population.catch_numbers_at_age)
+  for row in axes(expected, 1)
+    total_numbers = sum(view(expected, row, :))
+    if total_numbers > 0
+      expected[row, :] .= view(expected, row, :) ./ total_numbers
+    end
+  end
+  expected
+end
+
+function evaluate_model(parameters_vector, data_dict, model_config)
   data_dict = normalize_keys(data_dict)
   params = component_array_from_input(parameters_vector, model_config)
   parameter_type = eltype(collect(params))
@@ -173,13 +184,12 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
     total_nll += lognormal_nll(Vector(data_dict[:observed_index]), population.index_expected, sigma_index)
   end
 
+  age_comp_expected = expected_age_comp(population)
   if haskey(data_dict, :observed_age_comp) && !isempty(data_dict[:observed_age_comp])
-    expected_age_comp = copy(population.catch_numbers_at_age)
     valid_rows = Int[]
-    for row in axes(expected_age_comp, 1)
-      total_numbers = sum(view(expected_age_comp, row, :))
+    for row in axes(age_comp_expected, 1)
+      total_numbers = sum(view(population.catch_numbers_at_age, row, :))
       if total_numbers > 0
-        expected_age_comp[row, :] .= view(expected_age_comp, row, :) ./ total_numbers
         push!(valid_rows, row)
       end
     end
@@ -187,7 +197,7 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
     if !isempty(valid_rows)
       total_nll += multinomial_nll(
         Matrix(data_dict[:observed_age_comp])[valid_rows, :],
-        expected_age_comp[valid_rows, :],
+        age_comp_expected[valid_rows, :],
       )
     end
   end
@@ -197,5 +207,22 @@ function evaluate_nll(parameters_vector, data_dict, model_config)
     total_nll += sum(0.5 * log(2π) + log(recruit_sd) + (dev^2) / (2 * recruit_sd^2) for dev in params.log_devs)
   end
 
-  total_nll
+  Dict(
+    "nll" => total_nll,
+    "report" => Dict(
+      "numbers_at_age" => population.numbers_at_age,
+      "catch_numbers_at_age" => population.catch_numbers_at_age,
+      "biomass" => population.biomass,
+      "spawning_biomass" => population.spawning_biomass,
+      "expected_recruitment" => population.expected_recruitment,
+      "catch_expected" => population.catch_expected,
+      "index_expected" => population.index_expected,
+      "agecomp_expected" => age_comp_expected,
+      "jnll" => total_nll,
+    ),
+  )
+end
+
+function evaluate_nll(parameters_vector, data_dict, model_config)
+  evaluate_model(parameters_vector, data_dict, model_config)["nll"]
 end
