@@ -236,14 +236,19 @@ glance.FIMSFit <- function(x, ...) {
 
   # Observations
   # Count rows that have both observed and expected values.
-  #
-  # don't call get_estimates() here. That function calls
-  # reshape_tmb_estimates() which in turn calls obj$gr()
-  # function can segfault after clear() has freed the C++ memory.
-  # reshape_json_estimates() only parses the stored JSON string (x@model_output)
-  # and is safe to call at any time.
-  json_estimates <- reshape_json_estimates(get_model_output(x))
-  nobs <- sum(!is.na(json_estimates[["observed"]]) & !is.na(json_estimates[["expected"]]))
+  if (is_julia_backend_input(get_input(x))) {
+    estimates <- get_estimates(x)
+    nobs <- sum(!is.na(estimates[["observed"]]) & !is.na(estimates[["expected"]]))
+  } else {
+    #
+    # don't call get_estimates() here. That function calls
+    # reshape_tmb_estimates() which in turn calls obj$gr()
+    # function can segfault after clear() has freed the C++ memory.
+    # reshape_json_estimates() only parses the stored JSON string (x@model_output)
+    # and is safe to call at any time.
+    json_estimates <- reshape_json_estimates(get_model_output(x))
+    nobs <- sum(!is.na(json_estimates[["observed"]]) & !is.na(json_estimates[["expected"]]))
+  }
 
   # information criteria
   aic <- if (optimized) 2 * npar_fixed - 2 * log_lik else NA_real_

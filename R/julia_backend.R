@@ -303,3 +303,88 @@ prepare_julia_backend_input <- function(parameters, data) {
     parameters = as_julia_fims_parameters(parameters = parameters, data = data)
   )
 }
+
+#' Build Julia backend model configuration
+#'
+#' @param parameters Parameter tibble.
+#' @param data A `FIMSFrame` object.
+#' @return A named list of Julia backend configuration values.
+#' @noRd
+as_julia_fims_model_config <- function(parameters, data) {
+  fleet_data <- get_data(data)
+  extract_sdlog <- function(uncertainty, default = 0.1) {
+    parsed <- parse_data_distribution(uncertainty)
+    if (!"sdlog" %in% names(parsed) || length(parsed[["sdlog"]]) == 0) {
+      return(default)
+    }
+
+    value <- tryCatch(
+      eval(parsed[["sdlog"]][[1]]),
+      error = function(...) default
+    )
+    if (!is.finite(value)) default else value
+  }
+
+  catch_sigma <- fleet_data |>
+    dplyr::filter(.data$type == "catch", !is.na(.data$uncertainty)) |>
+    dplyr::pull(.data$uncertainty) |>
+    {\(x) if (length(x) > 0) extract_sdlog(x[[1]]) else 0.1}()
+
+  index_sigma <- fleet_data |>
+    dplyr::filter(.data$type == "index", !is.na(.data$uncertainty)) |>
+    dplyr::pull(.data$uncertainty) |>
+    {\(x) if (length(x) > 0) extract_sdlog(x[[1]]) else 0.1}()
+
+  selectivity_type <- if (all(
+    c("inflection_point_asc", "slope_asc", "inflection_point_desc", "slope_desc") %in%
+      parameters[["label"]]
+  )) {
+    "double_logistic"
+  } else {
+    "logistic"
+  }
+
+  recruitment_type <- "beverton_holt"
+  if ("Ricker" %in% parameters[["module_name"]]) {
+    recruitment_type <- "ricker"
+  }
+
+  list(
+    selectivity = selectivity_type,
+    recruitment = recruitment_type,
+    catch_sigma = catch_sigma,
+    index_sigma = index_sigma,
+    recruitment_deviation_sd = 1,
+    parameter_names = names(as_julia_fims_parameters(parameters = parameters, data = data))
+  )
+}
+
+#' Run the Julia backend optimizer
+#'
+#' @param julia_input Prepared Julia input list.
+#' @param model_config Julia backend configuration list.
+#' @return A Julia result dictionary converted to an R list.
+#' @noRd
+fit_julia_backend_model <- function(julia_input, model_config) {
+  JuliaCall::julia_call(
+    "FIMSBackend.fit_model",
+    julia_input[["parameters"]],
+    julia_input[["data"]],
+    model_config
+  )
+}
+
+#' Evaluate the Julia backend without optimization
+#'
+#' @param julia_input Prepared Julia input list.
+#' @param model_config Julia backend configuration list.
+#' @return A Julia report dictionary converted to an R list.
+#' @noRd
+evaluate_julia_backend_model <- function(julia_input, model_config) {
+  JuliaCall::julia_call(
+    "FIMSBackend.evaluate_model",
+    julia_input[["parameters"]],
+    julia_input[["data"]],
+    model_config
+  )
+}

@@ -55,6 +55,7 @@ function fit_model(init_params, data_dict, config = Dict())
 
   xhat = minimizer(result)
   estimate_components = _named_component_array(xhat, parameter_layout)
+   evaluated_model = evaluate_model(estimate_components, data_dict, objective_config)
   hessian_matrix = hessian(objective, xhat)
   covariance = try
     inv(Symmetric(hessian_matrix))
@@ -81,6 +82,7 @@ function fit_model(init_params, data_dict, config = Dict())
     "convergence_code" => string(termination_status(result)),
     "iterations" => iterations(result),
     "gradient" => gradient(objective, xhat),
+    "report" => evaluated_model["report"],
     "hessian" => hessian_matrix,
     "covariance" => covariance,
     "standard_errors" =>

@@ -934,8 +934,11 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
 
   if (identical(backend, "julia")) {
     attr(parameter_list, "backend") <- backend
+    attr(parameter_list, "parameter_info") <- parameters
     julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
+    julia_model_config <- as_julia_fims_model_config(parameters = parameters, data = data)
     attr(parameter_list, "julia_input") <- julia_input
+    attr(parameter_list, "julia_model_config") <- julia_model_config
 
     if (initialize_julia_backend()) {
       assign_julia_backend_input(julia_input)
