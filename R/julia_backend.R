@@ -82,16 +82,25 @@ initialize_julia_backend <- function(libname = NULL, pkgname = "FIMS") {
     return(invisible(FALSE))
   }
 
-  JuliaCall::julia_setup(installJulia = FALSE)
-  JuliaCall::julia_command("using Pkg")
-  JuliaCall::julia_command(
-    sprintf('Pkg.activate(raw"%s")', normalizePath(package_path, "/"))
+  initialized <- tryCatch(
+    {
+      JuliaCall::julia_setup(installJulia = FALSE)
+      JuliaCall::julia_command("using Pkg")
+      JuliaCall::julia_command(
+        sprintf('Pkg.activate(raw"%s")', normalizePath(package_path, "/"))
+      )
+      JuliaCall::julia_command(
+        sprintf("Base.include(Main, raw\"%s\")", normalizePath(module_path, "/"))
+      )
+      JuliaCall::julia_command("using .FIMSBackend")
+      TRUE
+    },
+    error = function(...) FALSE
   )
-  JuliaCall::julia_command("Pkg.instantiate()")
-  JuliaCall::julia_command(
-    sprintf("Base.include(Main, raw\"%s\")", normalizePath(module_path, "/"))
-  )
-  JuliaCall::julia_command("using .FIMSBackend")
+
+  if (!initialized) {
+    return(invisible(FALSE))
+  }
 
   .fims_julia_backend_state$initialized <- TRUE
   invisible(TRUE)
@@ -151,8 +160,14 @@ as_julia_fims_data <- function(data, parameters) {
     dplyr::pull(.data$value)
   proportion_female <- if (length(proportion_female) == 0) {
     rep(0.5, n_ages)
+  } else if (length(proportion_female) == 1) {
+    rep(proportion_female, n_ages)
+  } else if (length(proportion_female) == n_ages) {
+    proportion_female
   } else {
-    rep(proportion_female, length.out = n_ages)
+    cli::cli_abort(
+      "Julia backend serialization requires {.var proportion_female} to have length 1 or {.val {n_ages}}, but found length {.val {length(proportion_female)}}."
+    )
   }
 
   weights_at_age <- model_weight_at_age(data)
