@@ -14,6 +14,9 @@
 #' The initialized module as an object.
 #' @noRd
 initialize_module <- function(parameters, data, module_name, fleet = NA_character_) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the {.val {module_name}} module")
+  )
   module_input <- parameters |>
     # Using !! to unquote the variables
     dplyr::filter(.data$module_name == !!module_name)
@@ -580,6 +583,9 @@ initialize_fleet <- function(parameters, data, fleet, linked_ids) {
 #' The initialized catch module as an object.
 #' @noRd
 initialize_catch <- function(data, fleet) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the catch module for fleet {.val {fleet}}")
+  )
   assert_presence_of_fleet(data, fleet)
 
   fleet_type <- dplyr::filter(
@@ -610,6 +616,9 @@ initialize_catch <- function(data, fleet) {
 #' The initialized index module as an object.
 #' @noRd
 initialize_index <- function(data, fleet) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the index module for fleet {.val {fleet}}")
+  )
   assert_presence_of_fleet(data, fleet)
 
   fleet_type <- dplyr::filter(
@@ -649,6 +658,9 @@ initialize_comp <- function(data,
                             fleet,
                             parameters = NULL,
                             type = c("AgeComp", "LengthComp")) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the {.val {type[[1]]}} composition module for fleet {.val {fleet}}")
+  )
   comp_types <- list(
     "AgeComp" = list(
       "name" = "age_comp",

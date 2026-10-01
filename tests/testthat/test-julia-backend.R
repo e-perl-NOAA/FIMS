@@ -131,6 +131,61 @@ test_that("default initialize_fims errors cleanly when the C++ backend is unavai
   )
 })
 
+test_that("low-level compiled distribution helpers error cleanly when the C++ backend is unavailable", {
+  testthat::local_mocked_bindings(
+    is_fims_cpp_backend_available = function() FALSE,
+    .package = "FIMS"
+  )
+
+  #' @description Test that initialize_data_distribution() emits an informative unavailable-backend error before touching compiled distribution types.
+  expect_error(
+    FIMS::initialize_data_distribution(
+      module = NULL,
+      data_type = "catch",
+      uncertainty = "~dlnorm(meanlog = log_catch_expected, sdlog = 0.1)"
+    ),
+    regexp = "requires the optional C\\+\\+/TMB backend"
+  )
+  #' @description Test that initialize_process_distribution() emits an informative unavailable-backend error before touching compiled process distribution types.
+  expect_error(
+    FIMS::initialize_process_distribution(
+      module = NULL,
+      par = "log_devs",
+      family = gaussian(),
+      sd = list(value = 1, estimation_type = "constant")
+    ),
+    regexp = "requires the optional C\\+\\+/TMB backend"
+  )
+  #' @description Test that initialize_process_structure() emits an informative unavailable-backend error before touching compiled process structure types.
+  expect_error(
+    FIMS::initialize_process_structure(
+      module = NULL,
+      par = "log_devs"
+    ),
+    regexp = "requires the optional C\\+\\+/TMB backend"
+  )
+})
+
+test_that("low-level compiled module helpers error cleanly when the C++ backend is unavailable", {
+  data <- FIMS::FIMSFrame(data_big)
+
+  testthat::local_mocked_bindings(
+    is_fims_cpp_backend_available = function() FALSE,
+    .package = "FIMS"
+  )
+
+  #' @description Test that initialize_comp() emits an informative unavailable-backend error before touching compiled composition types.
+  expect_error(
+    FIMS:::initialize_comp(data = data, fleet = "fleet1", type = "AgeComp"),
+    regexp = "requires the optional C\\+\\+/TMB backend"
+  )
+  #' @description Test that initialize_catch() emits an informative unavailable-backend error before touching compiled catch types.
+  expect_error(
+    FIMS:::initialize_catch(data = data, fleet = "fleet1"),
+    regexp = "requires the optional C\\+\\+/TMB backend"
+  )
+})
+
 test_that("Julia backend input preparation preserves existing initialize_fims output shape", {
   reset_julia_backend_state()
   testthat::local_mocked_bindings(

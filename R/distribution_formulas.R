@@ -155,6 +155,9 @@ initialize_data_distribution <- function(
   data_type = c("catch", "index", "age_comp", "length_comp"),
   uncertainty
 ) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the {.val {data_type[[1]]}} data distribution")
+  )
   data_type <- rlang::arg_match(data_type)
   uncertainty_split <- parse_data_distribution(uncertainty) |>
     validate_distribution_families()
@@ -256,6 +259,9 @@ initialize_process_distribution <- function(
     estimation_type = "fixed_effects"
   )
 ) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the {.val {par}} process distribution")
+  )
   # validity check on user input
   args <- list(family = family, sd = sd)
   check_distribution_validity(args)
@@ -347,6 +353,9 @@ initialize_process_distribution <- function(
 #' @keywords distribution
 #' @export
 initialize_process_structure <- function(module, par) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the {.val {par}} recruitment process structure")
+  )
   if (!is.element(par, c("log_devs", "log_r"))) {
     return()
   }
