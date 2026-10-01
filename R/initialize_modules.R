@@ -662,13 +662,12 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
     return(parameter_list)
   }
 
-  if (!is_fims_cpp_backend_available()) {
-    cli::cli_abort(c(
-      "The C++/TMB backend is unavailable in this FIMS session.",
-      "i" = "Use {.code backend = \"julia\"} with {.fun initialize_fims} to continue with the Julia backend.",
-      "i" = "Reinstall FIMS with the compiled backend available to use the default TMB path."
-    ))
-  }
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the default TMB backend via {.fun initialize_fims}"),
+    guidance = c(
+      "i" = "Use {.code backend = \"julia\"} with {.fun initialize_fims} to continue with the Julia backend."
+    )
+  )
 
   # Clear any previous FIMS settings
   clear()
