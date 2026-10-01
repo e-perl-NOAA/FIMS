@@ -893,9 +893,6 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
     ))
   }
 
-  # Clear any previous FIMS settings
-  clear()
-
   fleets <- parameters |>
     dplyr::pull(.data$fleet) |>
     unique() |>
@@ -909,6 +906,28 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
       which fills in {.var fleet} for each fleet."
     ))
   }
+
+  if (identical(backend, "julia")) {
+    julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
+    julia_model_config <- as_julia_fims_model_config(parameters = parameters, data = data)
+    parameter_list <- list(
+      parameters = julia_input[["parameters"]],
+      model = NULL
+    )
+    attr(parameter_list, "backend") <- backend
+    attr(parameter_list, "parameter_info") <- parameters
+    attr(parameter_list, "julia_input") <- julia_input
+    attr(parameter_list, "julia_model_config") <- julia_model_config
+
+    if (initialize_julia_backend()) {
+      assign_julia_backend_input(julia_input)
+    }
+
+    return(parameter_list)
+  }
+
+  # Clear any previous FIMS settings
+  clear()
 
   # Initialize lists to store fleet-related objects
   fleet <- fleet_selectivity <-
@@ -1216,25 +1235,6 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
     # parameters tibble
     linked_ids = population_module_ids
   )
-
-  if (identical(backend, "julia")) {
-    julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
-    julia_model_config <- as_julia_fims_model_config(parameters = parameters, data = data)
-    parameter_list <- list(
-      parameters = julia_input[["parameters"]],
-      model = NULL
-    )
-    attr(parameter_list, "backend") <- backend
-    attr(parameter_list, "parameter_info") <- parameters
-    attr(parameter_list, "julia_input") <- julia_input
-    attr(parameter_list, "julia_model_config") <- julia_model_config
-
-    if (initialize_julia_backend()) {
-      assign_julia_backend_input(julia_input)
-    }
-
-    return(parameter_list)
-  }
 
   # Set-up TMB
   # Hard code to be a catch-at-age model
