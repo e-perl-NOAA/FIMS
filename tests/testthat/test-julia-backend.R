@@ -10,6 +10,15 @@ reset_julia_backend_state <- function() {
   FIMS:::.fims_julia_backend_state$initialized <- FALSE
 }
 
+reset_cpp_backend_state <- function() {
+  original_state <- FIMS:::.fims_cpp_backend_state$available
+  withr::defer(
+    FIMS:::.fims_cpp_backend_state$available <- original_state,
+    envir = parent.frame()
+  )
+  FIMS:::.fims_cpp_backend_state$available <- FALSE
+}
+
 test_that("reset_julia_backend_state restores the Julia initialization flag", {
   FIMS:::.fims_julia_backend_state$initialized <- TRUE
   local({
@@ -17,6 +26,30 @@ test_that("reset_julia_backend_state restores the Julia initialization flag", {
     expect_false(FIMS:::.fims_julia_backend_state$initialized)
   })
   expect_true(FIMS:::.fims_julia_backend_state$initialized)
+})
+
+test_that("load_fims_cpp_backend installs placeholders when the C++ module is unavailable", {
+  reset_cpp_backend_state()
+  placeholder_env <- new.env(parent = emptyenv())
+
+  testthat::local_mocked_bindings(
+    loadModule = function(...) stop("missing compiled backend"),
+    .package = "Rcpp"
+  )
+
+  loaded <- FIMS:::.load_fims_cpp_backend(ns = placeholder_env)
+
+  #' @description Test that the optional C++ backend loader returns FALSE when Rcpp module loading fails.
+  expect_false(loaded)
+  #' @description Test that the optional C++ backend loader marks the compiled backend as unavailable after a failed load.
+  expect_false(FIMS:::is_fims_cpp_backend_available())
+  #' @description Test that the optional C++ backend loader installs exported placeholders when the compiled backend is unavailable.
+  expect_true(exists("CreateTMBModel", envir = placeholder_env, inherits = FALSE))
+  #' @description Test that compiled-backend placeholders emit an informative Julia fallback message when called.
+  expect_error(
+    placeholder_env$CreateTMBModel(),
+    regexp = "backend = \"julia\""
+  )
 })
 
 test_that("Julia backend package scaffolding exists", {
@@ -80,6 +113,22 @@ test_that("initialize_fims validates backend selection", {
   )
 
   clear()
+})
+
+test_that("default initialize_fims errors cleanly when the C++ backend is unavailable", {
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+
+  testthat::local_mocked_bindings(
+    is_fims_cpp_backend_available = function() FALSE,
+    .package = "FIMS"
+  )
+
+  #' @description Test that the default initialize_fims path emits an informative error when the compiled backend is unavailable.
+  expect_error(
+    FIMS::initialize_fims(parameters = parameters, data = data),
+    regexp = "C\\+\\+/TMB backend is unavailable"
+  )
 })
 
 test_that("Julia backend input preparation preserves existing initialize_fims output shape", {

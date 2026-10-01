@@ -991,6 +991,14 @@ fit_fims <- function(input,
                          return(fit)
                        }
 
+  if (!is_fims_cpp_backend_available()) {
+    cli::cli_abort(c(
+      "The C++/TMB backend is unavailable in this FIMS session.",
+      "i" = "Fit Julia-backed models with input created using {.code backend = \"julia\"}.",
+      "i" = "Reinstall FIMS with the compiled backend available to use the default TMB fit path."
+    ))
+  }
+
   # See issue 455 of sdmTMB to see what should be used.
   # https://github.com/pbs-assess/sdmTMB/issues/455
   # NOTE: When we add implementation for newton step we need to
