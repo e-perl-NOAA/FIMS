@@ -79,13 +79,14 @@ is_fims_cpp_backend_available <- function() {
   isTRUE(.fims_cpp_backend_state$available)
 }
 
-require_fims_cpp_backend <- function(context = "This operation") {
+require_fims_cpp_backend <- function(context = "This operation", guidance = character()) {
   if (is_fims_cpp_backend_available()) {
     return(invisible(TRUE))
   }
 
   cli::cli_abort(c(
     "{context} requires the optional C++/TMB backend, but it is unavailable in this FIMS session.",
+    guidance,
     "i" = "Use {.code backend = \"julia\"} for Julia-backed workflows where supported.",
     "i" = "Reinstall FIMS with the compiled backend available to use this operation."
   ))

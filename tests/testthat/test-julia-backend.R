@@ -127,7 +127,30 @@ test_that("default initialize_fims errors cleanly when the C++ backend is unavai
   #' @description Test that the default initialize_fims path emits an informative error when the compiled backend is unavailable.
   expect_error(
     FIMS::initialize_fims(parameters = parameters, data = data),
-    regexp = "C\\+\\+/TMB backend is unavailable"
+    regexp = "requires the optional C\\+\\+/TMB backend"
+  )
+  #' @description Test that the default initialize_fims path preserves Julia fallback guidance in the unavailable-backend error.
+  expect_error(
+    FIMS::initialize_fims(parameters = parameters, data = data),
+    regexp = "backend = \"julia\""
+  )
+})
+
+test_that("default fit_fims errors cleanly when the C++ backend is unavailable", {
+  testthat::local_mocked_bindings(
+    is_fims_cpp_backend_available = function() FALSE,
+    .package = "FIMS"
+  )
+
+  #' @description Test that the default fit_fims path emits an informative error when the compiled backend is unavailable.
+  expect_error(
+    FIMS::fit_fims(input = list(parameters = list(a = 1), model = NULL), optimize = TRUE),
+    regexp = "requires the optional C\\+\\+/TMB backend"
+  )
+  #' @description Test that the default fit_fims path points callers to Julia-backed input when the compiled backend is unavailable.
+  expect_error(
+    FIMS::fit_fims(input = list(parameters = list(a = 1), model = NULL), optimize = TRUE),
+    regexp = "Fit Julia-backed models"
   )
 })
 
