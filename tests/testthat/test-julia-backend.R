@@ -163,6 +163,28 @@ test_that("Julia backend initialize_fims skips TMB setup helpers", {
   clear()
 })
 
+test_that("Julia backend initialize_fims returns before C++ initialization begins", {
+  reset_julia_backend_state()
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data)
+
+  testthat::local_mocked_bindings(
+    clear = function(...) cli::cli_abort("clear should not run for the Julia backend initialize path"),
+    initialize_selectivity = function(...) cli::cli_abort("C++ module initialization should not run for the Julia backend initialize path"),
+    initialize_julia_backend = function(...) FALSE,
+    .package = "FIMS"
+  )
+
+  result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
+
+  #' @description Test that the Julia initialize path no longer calls clear() or C++ module initialization before returning.
+  expect_equal(attr(result, "backend"), "julia")
+  #' @description Test that the Julia initialize path still returns the serialized Julia parameter payload directly.
+  expect_equal(result[["parameters"]], attr(result, "julia_input")[["parameters"]])
+  #' @description Test that the Julia initialize path still omits the TMB model object.
+  expect_null(result[["model"]])
+})
+
 test_that("Julia backend serializer omits unavailable observed data entries", {
   reset_julia_backend_state()
   data <- data_big |>
