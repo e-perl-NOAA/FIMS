@@ -14,6 +14,9 @@
 #' The initialized module as an object.
 #' @noRd
 initialize_module <- function(parameters, data, module_name, fleet = NA_character_) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the {.val {module_name}} module")
+  )
   module_input <- parameters |>
     # Using !! to unquote the variables
     dplyr::filter(.data$module_name == !!module_name)
@@ -394,6 +397,9 @@ initialize_fleet <- function(parameters, data, fleet, linked_ids) {
 #' The initialized catch module as an object.
 #' @noRd
 initialize_catch <- function(data, fleet) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the catch module for fleet {.val {fleet}}")
+  )
   # Check if the specified fleet exists in the data
   fleet_exists <- fleet %in% get_fleets(data)
   if (!fleet_exists) {
@@ -428,6 +434,9 @@ initialize_catch <- function(data, fleet) {
 #' The initialized index module as an object.
 #' @noRd
 initialize_index <- function(data, fleet) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the index module for fleet {.val {fleet}}")
+  )
   # Check if the specified fleet exists in the data
   fleet_exists <- fleet %in% get_fleets(data)
   if (!fleet_exists) {
@@ -470,6 +479,9 @@ initialize_index <- function(data, fleet) {
 initialize_comp <- function(data,
                             fleet,
                             type = c("AgeComp", "LengthComp")) {
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the {.val {type[[1]]}} composition module for fleet {.val {fleet}}")
+  )
   # Edit this list if a new type is added
   # Set up the specifics for the given type.
   comp_types <- list(
@@ -562,6 +574,9 @@ initialize_comp <- function(data,
 #'   [FIMSFrame()]. Passing the data is required because initialization of the
 #'   modules requires passing the data and information regarding the uncertainty
 #'   of that data, i.e., input sample sizes for the multinomial distribution.
+#' @param backend A character scalar specifying the execution backend to prepare.
+#'   Use `"TMB"` for the current C++/TMB backend or `"julia"` to prepare Julia
+#'   backend input objects and skip TMB setup.
 #' @return
 #' A list is returned with two elements, `parameters` and `model`. The list can
 #' be passed to the `input` argument of [fit_fims()] to fit the model. The first
@@ -569,8 +584,8 @@ initialize_comp <- function(data,
 #' [TMB::MakeADFun()] if you wish to have more control over the model-fitting
 #' process.
 #' The model element of the returned list stores the instantiated C++ model
-#' module, e.g., the results of `methods::new(CatchAtAge)` for a catch-at-age
-#' model.
+#' module for the default TMB backend. For the Julia backend this element is
+#' `NULL` because fitting proceeds through the Julia bridge instead of TMB.
 #' It is important that you only have one FIMS model initialized in your R
 #' workspace at a time. Thus, after you initialize and fit the model, you should
 #' run [clear()].
@@ -588,9 +603,13 @@ initialize_comp <- function(data,
 #' # Instantiate modules
 #' parameters_list <- setup_default_parameters(data = data_4_model) |>
 #'   initialize_fims(data = data_4_model)
+#' # Prepare the experimental Julia backend input bundle
+#' julia_parameters_list <- setup_default_parameters(data = data_4_model) |>
+#'   initialize_fims(data = data_4_model, backend = "julia")
 #' clear()
 #' }
-initialize_fims <- function(parameters, data) {
+initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
+  backend <- if (missing(backend)) NULL else tolower(match.arg(backend))
   # Validate parameters input
   if (missing(parameters) || !tibble::is_tibble(parameters)) {
     cli::cli_abort("The {.var parameters} argument must be a tibble.")
@@ -613,9 +632,6 @@ initialize_fims <- function(parameters, data) {
     ))
   }
 
-  # Clear any previous FIMS settings
-  clear()
-
   fleets <- parameters |>
     dplyr::pull(.data$fleet) |>
     unique() |>
@@ -626,6 +642,35 @@ initialize_fims <- function(parameters, data) {
       "No fleets found in the provided {.var parameters}."
     ))
   }
+
+  if (identical(backend, "julia")) {
+    julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
+    julia_model_config <- as_julia_fims_model_config(parameters = parameters, data = data)
+    parameter_list <- list(
+      parameters = julia_input[["parameters"]],
+      model = NULL
+    )
+    attr(parameter_list, "backend") <- backend
+    attr(parameter_list, "parameter_info") <- parameters
+    attr(parameter_list, "julia_input") <- julia_input
+    attr(parameter_list, "julia_model_config") <- julia_model_config
+
+    if (initialize_julia_backend()) {
+      assign_julia_backend_input(julia_input)
+    }
+
+    return(parameter_list)
+  }
+
+  require_fims_cpp_backend(
+    context = cli::format_inline("Initializing the default TMB backend via {.fun initialize_fims}"),
+    guidance = c(
+      "i" = "Use {.code backend = \"julia\"} with {.fun initialize_fims} to continue with the Julia backend."
+    )
+  )
+
+  # Clear any previous FIMS settings
+  clear()
 
   # Initialize lists to store fleet-related objects
   fleet <- fleet_selectivity <-
