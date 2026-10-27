@@ -22,12 +22,84 @@
 # `stan-dev/rstan` and several others do call `Rcpp::loadModule()` within
 # their `.onLoad()` functions. See examples from
 # https://github.com/search?q=Rcpp%3A%3AloadModule%28+zzz.R&type=code.
+
+.fims_cpp_backend_state <- new.env(parent = emptyenv())
+.fims_cpp_backend_state$available <- FALSE
+
+.fims_cpp_backend_exports <- c(
+  "AgeComp", "BevertonHoltRecruitment", "Catch", "CatchAtAge",
+  "CreateTMBModel", "DlnormDistribution", "DmultinomDistribution",
+  "DnormDistribution", "DoubleLogisticSelectivity", "EWAAGrowth", "Fleet",
+  "Index", "LengthComp", "LogDevsRecruitmentProcess", "LogRRecruitmentProcess",
+  "LogisticMaturity", "LogisticSelectivity", "Population", "RealVector",
+  "SharedInt", "SharedReal", "SharedString", "Variable", "VariableVector",
+  "clear", "get_fixed", "get_log", "get_log_errors", "get_log_warnings",
+  "get_parameter_names", "get_random", "get_random_names", "inv_logit",
+  "log_error", "log_info", "log_warning", "logit", "set_fixed",
+  "set_log_throw_on_error", "set_random"
+)
+
+.register_fims_cpp_backend_placeholders <- function(ns) {
+  unavailable_backend <- function(name) {
+    force(name)
+    function(...) {
+      cli::cli_abort(c(
+        "{.fun {name}} is unavailable because the optional C++/TMB backend did not load.",
+        "i" = "Use {.code backend = \"julia\"} for Julia-backed workflows, or reinstall FIMS with the compiled backend available."
+      ))
+    }
+  }
+
+  for (name in .fims_cpp_backend_exports) {
+    assign(name, unavailable_backend(name), envir = ns)
+  }
+
+  invisible(FALSE)
+}
+
+.load_fims_cpp_backend <- function(ns = parent.env(environment())) {
+  loaded <- tryCatch(
+    {
+      Rcpp::loadModule(module = "fims", what = TRUE, env = ns)
+      TRUE
+    },
+    error = function(...) FALSE
+  )
+
+  .fims_cpp_backend_state$available <- loaded
+
+  if (!loaded) {
+    .register_fims_cpp_backend_placeholders(ns)
+  }
+
+  invisible(loaded)
+}
+
+is_fims_cpp_backend_available <- function() {
+  isTRUE(.fims_cpp_backend_state$available)
+}
+
+require_fims_cpp_backend <- function(context = "This operation", guidance = character()) {
+  if (is_fims_cpp_backend_available()) {
+    return(invisible(TRUE))
+  }
+
+  cli::cli_abort(c(
+    "{context} requires the optional C++/TMB backend, but it is unavailable in this FIMS session.",
+    guidance,
+    "i" = "Use {.code backend = \"julia\"} for Julia-backed workflows where supported.",
+    "i" = "Reinstall FIMS with the compiled backend available to use this operation."
+  ))
+}
+
 .onLoad <- function(libname, pkgname) {
-  Rcpp::loadModule(module = "fims", what = TRUE)
+  .load_fims_cpp_backend(ns = parent.env(environment()))
 }
 
 .onUnload <- function(libpath) {
-  library.dynam.unload("FIMS", libpath)
+  if (is_fims_cpp_backend_available()) {
+    library.dynam.unload("FIMS", libpath)
+  }
 }
 
 if (!methods::isClass("Rcpp_Variable")) {

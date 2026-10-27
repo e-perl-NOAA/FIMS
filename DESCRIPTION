@@ -67,9 +67,9 @@ Description: The Fisheries Integrated Modeling System is a next-generation
     climate effects and other drivers within the marine environment, into
     stock assessment models.
 License: GPL (>= 3) | file LICENSE
-URL: https://github.com/noaa-fims/fims, https://noaa-fims.github.io,
-    https://noaa-fisheries-integrated-toolbox.r-universe.dev/FIMS,
-    https://noaa-fims.github.io/FIMS
+URL: https://github.com/noaa-fims/fims, https://NOAA-FIMS.github.io/FIMS,
+    https://noaa-fims.github.io,
+    https://noaa-fisheries-integrated-toolbox.r-universe.dev/FIMS
 BugReports: https://github.com/noaa-fims/fims/issues
 Depends:
     R (>= 4.2.0)
@@ -83,6 +83,7 @@ Imports:
     glue,
     graphics,
     jsonlite,
+    JuliaCall,
     methods,
     purrr,
     Rcpp,
