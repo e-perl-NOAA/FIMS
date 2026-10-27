@@ -2,9 +2,9 @@
 % Please edit documentation in R/initialize_modules.R
 \name{initialize_fims}
 \alias{initialize_fims}
-\title{Initialize C++ modules via Rcpp for a FIMS model}
+\title{Initialize modules for a FIMS model}
 \usage{
-initialize_fims(parameters, data)
+initialize_fims(parameters, data, backend = c("tmb", "julia"), priors = NULL)
 }
 \arguments{
 \item{parameters}{A tibble returned from \code{\link[=setup_default_parameters]{setup_default_parameters()}}. It
@@ -17,6 +17,17 @@ initialized for that fleet.}
 \code{\link[=FIMSFrame]{FIMSFrame()}}. Passing the data is required because initialization of the
 modules requires passing the data and information regarding the uncertainty
 of that data, i.e., input sample sizes for the multinomial distribution.}
+
+\item{backend}{A character scalar specifying the execution backend to prepare.
+Use \code{"TMB"} for the current C++/TMB backend or \code{"julia"} to prepare Julia
+backend input objects and skip TMB setup.}
+
+\item{priors}{An optional tibble for the Julia backend with columns
+\code{module_name}, \code{fleet}, \code{label}, \code{timing}, \code{age}, \code{distribution}, \code{mean},
+and \code{sd}. The first five columns identify one row of \code{parameters}.
+\code{distribution} supports \code{"Dnorm"} and \code{"Dlnorm"}; for \code{"Dlnorm"}, \code{mean}
+and \code{sd} are the mean and standard deviation on the log scale. Not used
+with the TMB backend.}
 }
 \value{
 A list is returned with two elements, \code{parameters} and \code{model}. The list can
@@ -32,13 +43,10 @@ workspace at a time. Thus, after you initialize and fit the model, you should
 run \code{\link[=clear]{clear()}}.
 }
 \description{
-This function uses information from a parameter data frame that stores the
-model specifications and a\code{FIMSFrame} object that stores the data to
-instantiate, i.e., create an instance of a class, the required C++ modules.
-Several C++ modules are needed to run a FIMS model and the required modules
-will be different for each model type. For example, for a catch-at-age
-model one needs to instantiate recruitment, growth, and maturity modules and
-at least one fleet and population module.
+This function uses a parameter tibble and a \code{FIMSFrame} object to prepare
+the modules and inputs required by the selected backend. The required
+modules differ by model type; for example, a catch-at-age model uses
+recruitment, growth, maturity, fleet, and population modules.
 }
 \examples{
 \dontrun{
@@ -48,6 +56,24 @@ data_4_model <- FIMSFrame(data_big)
 # Instantiate modules
 parameters_list <- setup_default_parameters(data = data_4_model) |>
   initialize_fims(data = data_4_model)
+# Prepare Julia inputs and a normal prior on fleet selectivity
+julia_parameters <- setup_default_parameters(data = data_4_model)
+slope_prior <- tibble::tibble(
+  module_name = "Selectivity",
+  fleet = "fleet1",
+  label = "slope",
+  timing = NA_integer_,
+  age = NA_real_,
+  distribution = "Dnorm",
+  mean = 1.5,
+  sd = 3
+)
+julia_parameters_list <- initialize_fims(
+  parameters = julia_parameters,
+  data = data_4_model,
+  backend = "julia",
+  priors = slope_prior
+)
 clear()
 }
 }

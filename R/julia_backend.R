@@ -416,20 +416,203 @@ prepare_julia_backend_input <- function(parameters, data) {
   )
 }
 
+#' Convert parameter priors to Julia component locations
+#'
+#' @param priors A tibble describing prior distributions on parameter rows.
+#' @param parameters Parameter tibble.
+#' @param data A `FIMSFrame` object.
+#' @return A list describing prior targets and distributions.
+#' @noRd
+as_julia_fims_priors <- function(priors, parameters, data) {
+  empty_priors <- list(
+    parameter_prior_components = character(),
+    parameter_prior_indices = integer(),
+    parameter_prior_distributions = character(),
+    parameter_prior_means = numeric(),
+    parameter_prior_sds = numeric()
+  )
+  if (is.null(priors)) {
+    return(empty_priors)
+  }
+  if (!tibble::is_tibble(priors)) {
+    cli::cli_abort("{.var priors} must be a tibble.")
+  }
+
+  required_columns <- c(
+    "module_name", "fleet", "label", "timing", "age",
+    "distribution", "mean", "sd"
+  )
+  missing_columns <- setdiff(required_columns, names(priors))
+  if (length(missing_columns) > 0L) {
+    cli::cli_abort(
+      "{.var priors} is missing required columns: {.val {missing_columns}}."
+    )
+  }
+  if (nrow(priors) == 0L) {
+    return(empty_priors)
+  }
+  if (anyNA(priors[["module_name"]]) || anyNA(priors[["label"]]) ||
+    anyNA(priors[["distribution"]])) {
+    cli::cli_abort(
+      "{.var module_name}, {.var label}, and {.var distribution} cannot be missing in {.var priors}."
+    )
+  }
+  if (!is.numeric(priors[["mean"]]) || any(!is.finite(priors[["mean"]]))) {
+    cli::cli_abort("{.var mean} in {.var priors} must contain finite numeric values.")
+  }
+  if (!is.numeric(priors[["sd"]]) || any(!is.finite(priors[["sd"]]) | priors[["sd"]] <= 0)) {
+    cli::cli_abort(
+      "{.var sd} in {.var priors} must contain finite positive numeric values."
+    )
+  }
+
+  distributions <- tolower(priors[["distribution"]])
+  unsupported_distributions <- setdiff(unique(distributions), c("dnorm", "dlnorm"))
+  if (length(unsupported_distributions) > 0L) {
+    cli::cli_abort(
+      "Julia parameter priors support only {.val Dnorm} and {.val Dlnorm}; found {.val {unsupported_distributions}}."
+    )
+  }
+
+  parameter_keys <- c("module_name", "fleet", "label", "timing", "age")
+  target_rows <- vector("list", nrow(priors))
+  for (prior_index in seq_len(nrow(priors))) {
+    matches <- rep(TRUE, nrow(parameters))
+    for (key in parameter_keys) {
+      expected <- priors[[key]][[prior_index]]
+      observed <- parameters[[key]]
+      matches <- matches & if (is.na(expected)) {
+        is.na(observed)
+      } else {
+        !is.na(observed) & observed == expected
+      }
+    }
+    target_rows[[prior_index]] <- parameters[matches, , drop = FALSE]
+    if (nrow(target_rows[[prior_index]]) != 1L) {
+      cli::cli_abort(
+        "Prior row {.val {prior_index}} must identify exactly one parameter row; found {.val {nrow(target_rows[[prior_index]])}}."
+      )
+    }
+  }
+
+  component_names <- character(nrow(priors))
+  component_indices <- integer(nrow(priors))
+  fleet_names <- get_fleets(data)
+  n_years <- get_n_years(data)
+  start_year <- get_start_year(data)
+  ages <- get_ages(data)
+
+  parameter_row_matches <- function(rows, target) {
+    matches <- rep(TRUE, nrow(rows))
+    for (key in parameter_keys) {
+      expected <- target[[key]][[1]]
+      observed <- rows[[key]]
+      matches <- matches & if (is.na(expected)) {
+        is.na(observed)
+      } else {
+        !is.na(observed) & observed == expected
+      }
+    }
+    which(matches)
+  }
+
+  for (prior_index in seq_len(nrow(priors))) {
+    target <- target_rows[[prior_index]]
+    module_name <- target[["module_name"]][[1]]
+    label <- target[["label"]][[1]]
+    fleet <- target[["fleet"]][[1]]
+    component_names[[prior_index]] <- label
+
+    if (module_name == "Selectivity" || module_name == "Fleet") {
+      fleet_index <- match(fleet, fleet_names)
+      if (is.na(fleet_index)) {
+        cli::cli_abort("Prior row {.val {prior_index}} refers to an unknown fleet.")
+      }
+      if (module_name == "Selectivity") {
+        supported_labels <- c(
+          "inflection_point", "slope", "inflection_point_asc", "slope_asc",
+          "inflection_point_desc", "slope_desc"
+        )
+        if (!label %in% supported_labels) {
+          cli::cli_abort("Julia cannot apply a prior to Selectivity parameter {.val {label}}.")
+        }
+        component_indices[[prior_index]] <- fleet_index
+      } else if (label == "log_q") {
+        component_indices[[prior_index]] <- fleet_index
+      } else if (label == "log_Fmort") {
+        timing <- target[["timing"]][[1]]
+        year_index <- as.integer(timing - start_year + 1L)
+        if (is.na(year_index) || year_index < 1L || year_index > n_years) {
+          cli::cli_abort(
+            "A prior on Fleet {.val log_Fmort} requires a modeled {.field timing}."
+          )
+        }
+        component_indices[[prior_index]] <- year_index + (fleet_index - 1L) * n_years
+      } else {
+        cli::cli_abort("Julia cannot apply a prior to Fleet parameter {.val {label}}.")
+      }
+    } else if (module_name == "Recruitment") {
+      related_rows <- parameters |>
+        dplyr::filter(.data$module_name == "Recruitment", .data$label == .env$label) |>
+        dplyr::arrange(dplyr::across(dplyr::any_of(c("timing", "age"))))
+      target_position <- parameter_row_matches(related_rows, target)
+      component_indices[[prior_index]] <- target_position[[1]]
+    } else if (module_name == "Population" && label == "log_init_naa") {
+      related_rows <- parameters |>
+        dplyr::filter(.data$module_name == "Population", .data$label == "log_init_naa") |>
+        dplyr::arrange(dplyr::across(dplyr::any_of(c("timing", "age"))))
+      target_position <- parameter_row_matches(related_rows, target)
+      component_indices[[prior_index]] <- target_position[[1]]
+    } else if (module_name == "Population" && label == "log_M") {
+      year_index <- as.integer(target[["timing"]][[1]] - start_year + 1L)
+      age_index <- match(target[["age"]][[1]], ages)
+      if (is.na(year_index) || year_index < 1L || year_index > n_years ||
+        is.na(age_index)) {
+        cli::cli_abort(
+          "A prior on Population {.val log_M} requires a modeled {.field timing} and {.field age}."
+        )
+      }
+      component_indices[[prior_index]] <- year_index + (age_index - 1L) * n_years
+    } else {
+      cli::cli_abort(
+        "Julia cannot apply a prior to parameter {.val {module_name}/{label}}."
+      )
+    }
+  }
+
+  target_ids <- paste(component_names, component_indices, sep = "::")
+  if (anyDuplicated(target_ids)) {
+    cli::cli_abort("Each Julia parameter can have at most one prior.")
+  }
+
+  list(
+    parameter_prior_components = component_names,
+    parameter_prior_indices = component_indices,
+    parameter_prior_distributions = distributions,
+    parameter_prior_means = priors[["mean"]],
+    parameter_prior_sds = priors[["sd"]]
+  )
+}
+
 #' Build Julia backend model configuration
 #'
 #' @param parameters Parameter tibble.
 #' @param data A `FIMSFrame` object.
+#' @param priors Optional tibble of prior distributions keyed to parameter rows.
 #' @return A named list of Julia backend configuration values.
 #' @noRd
-as_julia_fims_model_config <- function(parameters, data) {
+as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
   fleet_data <- get_data(data)
-  has_parameter_priors <- any(parameters[["distribution_type"]] == "prior", na.rm = TRUE)
-  if (has_parameter_priors) {
+  has_legacy_prior_metadata <- any(
+    parameters[["distribution_type"]] == "prior",
+    na.rm = TRUE
+  )
+  if (has_legacy_prior_metadata && is.null(priors)) {
     cli::cli_abort(
-      "Julia backend does not yet support parameter prior distributions; they cannot be included in the objective."
+      "Julia parameter priors must be supplied with the {.arg priors} argument; {.field distribution_type} metadata does not identify prior targets or parameters."
     )
   }
+  julia_priors <- as_julia_fims_priors(priors, parameters, data)
 
   extract_data_likelihood <- function(data_type, default = 0.1) {
     rows <- fleet_data |>
@@ -694,7 +877,7 @@ as_julia_fims_model_config <- function(parameters, data) {
   fixed_parameter_mask <- parameter_mask("fixed_effects")
   random_parameter_mask <- parameter_mask("random_effects")
 
-  list(
+  c(list(
     fleet_names = get_fleets(data),
     selectivity_types = parameters |>
       dplyr::filter(.data$module_name == "Selectivity") |>
@@ -719,7 +902,7 @@ as_julia_fims_model_config <- function(parameters, data) {
     parameter_names = names(as_julia_fims_parameters(parameters = parameters, data = data)),
     fixed_parameter_mask = fixed_parameter_mask,
     random_parameter_mask = random_parameter_mask
-  )
+  ), julia_priors)
 }
 
 #' Run the Julia backend optimizer

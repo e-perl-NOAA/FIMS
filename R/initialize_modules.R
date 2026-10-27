@@ -827,16 +827,13 @@ initialize_comp <- function(data,
   return(module)
 }
 
-#' Initialize C++ modules via Rcpp for a FIMS model
+#' Initialize modules for a FIMS model
 #'
 #' @description
-#' This function uses information from a parameter data frame that stores the
-#' model specifications and a`FIMSFrame` object that stores the data to
-#' instantiate, i.e., create an instance of a class, the required C++ modules.
-#' Several C++ modules are needed to run a FIMS model and the required modules
-#' will be different for each model type. For example, for a catch-at-age
-#' model one needs to instantiate recruitment, growth, and maturity modules and
-#' at least one fleet and population module.
+#' This function uses a parameter tibble and a `FIMSFrame` object to prepare
+#' the modules and inputs required by the selected backend. The required
+#' modules differ by model type; for example, a catch-at-age model uses
+#' recruitment, growth, maturity, fleet, and population modules.
 #'
 #' @param parameters A tibble returned from [setup_default_parameters()]. It
 #'   is the primary source of information for what is initialized. That is, if a
@@ -850,6 +847,12 @@ initialize_comp <- function(data,
 #' @param backend A character scalar specifying the execution backend to prepare.
 #'   Use `"TMB"` for the current C++/TMB backend or `"julia"` to prepare Julia
 #'   backend input objects and skip TMB setup.
+#' @param priors An optional tibble for the Julia backend with columns
+#'   `module_name`, `fleet`, `label`, `timing`, `age`, `distribution`, `mean`,
+#'   and `sd`. The first five columns identify one row of `parameters`.
+#'   `distribution` supports `"Dnorm"` and `"Dlnorm"`; for `"Dlnorm"`, `mean`
+#'   and `sd` are the mean and standard deviation on the log scale. Not used
+#'   with the TMB backend.
 #' @return
 #' A list is returned with two elements, `parameters` and `model`. The list can
 #' be passed to the `input` argument of [fit_fims()] to fit the model. The first
@@ -877,11 +880,26 @@ initialize_comp <- function(data,
 #' parameters_list <- setup_default_parameters(data = data_4_model) |>
 #'   initialize_fims(data = data_4_model)
 #' # Prepare the experimental Julia backend input bundle
-#' julia_parameters_list <- setup_default_parameters(data = data_4_model) |>
-#'   initialize_fims(data = data_4_model, backend = "julia")
+#' julia_parameters <- setup_default_parameters(data = data_4_model)
+#' slope_prior <- tibble::tibble(
+#'   module_name = "Selectivity",
+#'   fleet = "fleet1",
+#'   label = "slope",
+#'   timing = NA_integer_,
+#'   age = NA_real_,
+#'   distribution = "Dnorm",
+#'   mean = 1.5,
+#'   sd = 3
+#' )
+#' julia_parameters_list <- initialize_fims(
+#'   parameters = julia_parameters,
+#'   data = data_4_model,
+#'   backend = "julia",
+#'   priors = slope_prior
+#' )
 #' clear()
 #' }
-initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
+initialize_fims <- function(parameters, data, backend = c("tmb", "julia"), priors = NULL) {
   backend <- if (missing(backend)) NULL else tolower(match.arg(backend))
   # Validate parameters input
   if (missing(parameters) || !tibble::is_tibble(parameters)) {
@@ -919,9 +937,17 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia")) {
     ))
   }
 
+  if (!is.null(priors) && !identical(backend, "julia")) {
+    cli::cli_abort("{.var priors} can be used only with {.code backend = \"julia\"}.")
+  }
+
   if (identical(backend, "julia")) {
     julia_input <- prepare_julia_backend_input(parameters = parameters, data = data)
-    julia_model_config <- as_julia_fims_model_config(parameters = parameters, data = data)
+    julia_model_config <- as_julia_fims_model_config(
+      parameters = parameters,
+      data = data,
+      priors = priors
+    )
     parameter_list <- list(
       parameters = julia_input[["parameters"]],
       model = NULL

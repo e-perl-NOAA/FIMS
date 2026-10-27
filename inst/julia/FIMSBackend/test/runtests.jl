@@ -116,8 +116,42 @@ end
     data,
     merge(config, Dict(:recruitment_process_active => false)),
   )
+  normal_prior_result = evaluate_model(
+    parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :parameter_prior_components => ["slope"],
+        :parameter_prior_indices => [1],
+        :parameter_prior_distributions => ["dnorm"],
+        :parameter_prior_means => [1.5],
+        :parameter_prior_sds => [3.0],
+      ),
+    ),
+  )
+  lognormal_prior_result = evaluate_model(
+    parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :parameter_prior_components => ["slope"],
+        :parameter_prior_indices => [1],
+        :parameter_prior_distributions => ["dlnorm"],
+        :parameter_prior_means => [0.2],
+        :parameter_prior_sds => [0.5],
+      ),
+    ),
+  )
 
   @test isfinite(result["nll"])
+  @test normal_prior_result["nll"] - result["nll"] ≈
+    0.5 * log(2π) + log(3.0) + (1.0 - 1.5)^2 / (2 * 3.0^2)
+  @test normal_prior_result["report"]["parameter_prior_nll"] ≈
+    0.5 * log(2π) + log(3.0) + (1.0 - 1.5)^2 / (2 * 3.0^2)
+  @test lognormal_prior_result["nll"] - result["nll"] ≈
+    0.5 * log(2π) + log(0.5) + log(1.0) + (log(1.0) - 0.2)^2 / (2 * 0.5^2)
   @test isapprox(result["nll"] - no_process_result["nll"], 0.5 * log(2π); atol = 1e-8)
   log_r_result = evaluate_model(
     parameters,
@@ -210,6 +244,11 @@ end
     Dict(
       :fixed_parameter_mask => fixed_mask,
       :random_parameter_mask => random_mask,
+      :parameter_prior_components => ["log_rzero"],
+      :parameter_prior_indices => [1],
+      :parameter_prior_distributions => ["dnorm"],
+      :parameter_prior_means => [log(1000.0)],
+      :parameter_prior_sds => [1.5],
     ),
   )
   fit_result = fit_model(parameters, data, fit_config)

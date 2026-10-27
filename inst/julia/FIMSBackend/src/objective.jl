@@ -182,6 +182,56 @@ function lognormal_random_effect_nll(observed, expected, sigma)
   normal_nll(log.(observed), expected, sigma)
 end
 
+function parameter_prior_nll(params, model_config)
+  components = get(model_config, :parameter_prior_components, String[])
+  indices = get(model_config, :parameter_prior_indices, Int[])
+  distributions = get(model_config, :parameter_prior_distributions, String[])
+  means = get(model_config, :parameter_prior_means, Float64[])
+  standard_deviations = get(model_config, :parameter_prior_sds, Float64[])
+  n_priors = length(components)
+  all(length(values) == n_priors for values in (
+    indices,
+    distributions,
+    means,
+    standard_deviations,
+  )) || throw(DimensionMismatch("Parameter prior fields must have matching lengths."))
+
+  total = zero(eltype(collect(params)))
+  for prior_index in 1:n_priors
+    component_name = Symbol(components[prior_index])
+    component = get_component(params, component_name, nothing)
+    isnothing(component) &&
+      throw(ArgumentError("Parameter prior refers to unknown component $(components[prior_index])."))
+    component_values = component isa Number ? [component] : vec(component)
+    component_index = indices[prior_index]
+    1 <= component_index <= length(component_values) ||
+      throw(BoundsError(component_values, component_index))
+    value = component_values[component_index]
+    mean = means[prior_index]
+    standard_deviation = standard_deviations[prior_index]
+    isfinite(standard_deviation) && standard_deviation > 0 ||
+      throw(ArgumentError("Parameter prior standard deviations must be finite and positive."))
+
+    distribution = lowercase(string(distributions[prior_index]))
+    if distribution == "dnorm"
+      total +=
+        0.5 * log(2π) + log(standard_deviation) +
+        ((value - mean)^2) / (2 * standard_deviation^2)
+    elseif distribution == "dlnorm"
+      if !isfinite(value) || value <= 0
+        total += oftype(total, Inf)
+      else
+        total +=
+          0.5 * log(2π) + log(standard_deviation) + log(value) +
+          ((log(value) - mean)^2) / (2 * standard_deviation^2)
+      end
+    else
+      throw(ArgumentError("Unsupported parameter prior distribution: $distribution"))
+    end
+  end
+  total
+end
+
 function data_likelihood_nll(observed, expected, sigma, family)
   if family isa AbstractArray
     size(observed) == size(expected) ||
@@ -397,9 +447,13 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     end
   end
 
+  prior_nll_value = parameter_prior_nll(params, model_config)
+  total_nll += prior_nll_value
+
   Dict(
     "nll" => total_nll,
     "report" => Dict(
+      "parameter_prior_nll" => prior_nll_value,
       "numbers_at_age" => population.numbers_at_age,
       "catch_numbers_at_age" => population.catch_numbers_at_age,
       "biomass" => population.biomass,

@@ -441,25 +441,62 @@ test_that("Julia backend config preserves normal catch and lognormal index likel
   expect_true(all(config[["index_sigma"]] > 0))
   expect_true(config[["recruitment_process_active"]])
 
-  unsupported_prior_parameters <- parameters |>
-    dplyr::mutate(
-      distribution_type = dplyr::if_else(
-        .data$module_name == "Selectivity" & .data$label == "slope",
-        "prior",
-        .data$distribution_type
-      ),
-      distribution = dplyr::if_else(
-        .data$module_name == "Selectivity" & .data$label == "slope",
-        "Dnorm",
-        .data$distribution
-      )
-    )
+  slope_prior <- tibble::tibble(
+    module_name = "Selectivity",
+    fleet = "fleet1",
+    label = "slope",
+    timing = NA_integer_,
+    age = NA_real_,
+    distribution = "Dnorm",
+    mean = 1.5,
+    sd = 3
+  )
+  prior_config <- FIMS:::as_julia_fims_model_config(
+    parameters = parameters,
+    data = data,
+    priors = slope_prior
+  )
+  expect_equal(prior_config[["parameter_prior_components"]], "slope")
+  expect_equal(prior_config[["parameter_prior_indices"]], 1L)
+  expect_equal(prior_config[["parameter_prior_distributions"]], "dnorm")
+  expect_equal(prior_config[["parameter_prior_means"]], 1.5)
+  expect_equal(prior_config[["parameter_prior_sds"]], 3)
+
+  testthat::local_mocked_bindings(
+    initialize_julia_backend = function(...) FALSE,
+    .package = "FIMS"
+  )
+  initialized <- FIMS::initialize_fims(
+    parameters = parameters,
+    data = data,
+    backend = "julia",
+    priors = slope_prior
+  )
+  expect_equal(
+    attr(initialized, "julia_model_config")[["parameter_prior_components"]],
+    "slope"
+  )
   expect_error(
     FIMS:::as_julia_fims_model_config(
-      parameters = unsupported_prior_parameters,
+      parameters = parameters,
+      data = data,
+      priors = dplyr::mutate(slope_prior, label = "unknown_parameter")
+    ),
+    regexp = "identify exactly one parameter row"
+  )
+  expect_error(
+    FIMS:::as_julia_fims_model_config(
+      parameters = parameters |>
+        dplyr::mutate(
+          distribution_type = dplyr::if_else(
+            .data$module_name == "Selectivity" & .data$label == "slope",
+            "prior",
+            .data$distribution_type
+          )
+        ),
       data = data
     ),
-    regexp = "does not yet support.*prior"
+    regexp = "must be supplied with the.*priors"
   )
 
   lognormal_process_parameters <- parameters |>
