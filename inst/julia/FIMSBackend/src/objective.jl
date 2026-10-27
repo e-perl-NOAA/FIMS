@@ -4,6 +4,19 @@ using .Recruitment: BevertonHolt, Ricker
 using .Selectivity: DoubleLogisticSelectivity, LogisticSelectivity
 using SpecialFunctions: erf, loggamma
 
+struct AgeSpecificSelectivity{T <: Real, A <: Real}
+  logit_sel_at_age::Vector{T}
+  ages::Vector{A}
+end
+
+function (selectivity::AgeSpecificSelectivity)(age::Real)
+  age_index = findfirst(==(age), selectivity.ages)
+  isnothing(age_index) &&
+    throw(ArgumentError("Age-specific selectivity received an age outside the modeled range."))
+  logit_value = selectivity.logit_sel_at_age[age_index]
+  one(logit_value) / (one(logit_value) + exp(-logit_value))
+end
+
 normalize_keys(x) = x
 normalize_keys(x::NamedTuple) = Dict(Symbol(key) => normalize_keys(value) for (key, value) in pairs(x))
 normalize_key(key::Symbol) = key
@@ -44,14 +57,20 @@ function component_array_from_input(parameters_vector, model_config)
   throw(ArgumentError("Unsupported parameter container for Julia FIMS backend."))
 end
 
-function build_selectivity(params, model_config, fleet_index)
+function build_selectivity(params, model_config, fleet_index, ages)
   selectivity_types = get(model_config, :selectivity_types, String[])
   isempty(selectivity_types) || length(selectivity_types) >= fleet_index ||
     throw(ArgumentError("selectivity_types must provide one type for each fleet."))
   selectivity_type =
     isempty(selectivity_types) ? "Logistic" : string(selectivity_types[fleet_index])
 
-  if selectivity_type == "DoubleLogistic"
+  if selectivity_type == "AgeSpecific"
+    has_component(params, :logit_sel_at_age) ||
+      throw(ArgumentError("AgeSpecific selectivity parameters are missing."))
+    size(params.logit_sel_at_age) == (length(ages), length(selectivity_types)) ||
+      throw(ArgumentError("AgeSpecific selectivity parameters must match the age and fleet dimensions."))
+    return AgeSpecificSelectivity(collect(params.logit_sel_at_age[:, fleet_index]), collect(ages))
+  elseif selectivity_type == "DoubleLogistic"
     return DoubleLogisticSelectivity(
       params.inflection_point_asc[fleet_index],
       params.slope_asc[fleet_index],
@@ -702,7 +721,7 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     n_fleets,
   )
   for fleet_index in 1:n_fleets
-    selectivity = build_selectivity(params, model_config, fleet_index)
+    selectivity = build_selectivity(params, model_config, fleet_index, data_dict[:ages])
     for year in 1:data_dict[:n_years], age in 1:data_dict[:n_ages]
       fleet_selectivity[year, age, fleet_index] = selectivity(data_dict[:ages][age])
     end

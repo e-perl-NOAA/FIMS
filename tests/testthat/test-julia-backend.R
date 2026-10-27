@@ -450,6 +450,86 @@ test_that("Julia backend serializes maturity parameters and estimation masks", {
   expect_true(julia_config[["fixed_parameter_mask"]][slope_start])
 })
 
+test_that("Julia backend serializes AgeSpecific selectivity by fleet and age", {
+  data <- FIMS::FIMSFrame(data_big)
+  fleet_names <- FIMS:::get_fleets(data)
+  default_parameters <- FIMS::setup_default_parameters(data = data)
+  selectivity_parameters <- purrr::map_dfr(
+    fleet_names,
+    \(fleet) FIMS::setup_default_Selectivity(
+      data,
+      fleet,
+      module_type = "AgeSpecific"
+    )
+  )
+  parameters <- dplyr::bind_rows(
+    default_parameters |>
+      dplyr::filter(.data$module_name != "Selectivity"),
+    selectivity_parameters
+  )
+
+  julia_parameters <- FIMS:::as_julia_fims_parameters(parameters, data)
+  julia_config <- FIMS:::as_julia_fims_model_config(parameters, data)
+  expected_values <- matrix(
+    0,
+    nrow = FIMS:::get_n_ages(data),
+    ncol = length(fleet_names)
+  )
+  expected_fixed_mask <- matrix(FALSE, nrow = nrow(expected_values), ncol = ncol(expected_values))
+  for (fleet_index in seq_along(fleet_names)) {
+    fleet_rows <- selectivity_parameters |>
+      dplyr::filter(.data$fleet == .env$fleet_names[[fleet_index]]) |>
+      dplyr::arrange(.data$age)
+    expected_values[, fleet_index] <- fleet_rows[["value"]]
+    expected_fixed_mask[, fleet_index] <-
+      fleet_rows[["estimation_type"]] == "fixed_effects"
+  }
+
+  expect_equal(julia_config[["selectivity_types"]], rep("AgeSpecific", length(fleet_names)))
+  expect_equal(julia_parameters[["logit_sel_at_age"]], expected_values)
+  expect_equal(
+    unname(tail(
+      julia_config[["fixed_parameter_mask"]],
+      length(expected_fixed_mask)
+    )),
+    unname(as.vector(expected_fixed_mask))
+  )
+  expect_equal(
+    length(julia_config[["fixed_parameter_mask"]]),
+    sum(purrr::map_int(julia_parameters, length))
+  )
+  flattened_selectivity <- FIMS:::flatten_julia_parameter_rows(
+    selectivity_parameters,
+    estimates = list(logit_sel_at_age = expected_values),
+    standard_errors = list(
+      logit_sel_at_age = matrix(0.1, nrow = nrow(expected_values), ncol = ncol(expected_values))
+    )
+  )
+  expect_equal(flattened_selectivity[["estimated"]], as.numeric(expected_values))
+  expect_equal(flattened_selectivity[["uncertainty"]], rep(0.1, length(expected_values)))
+
+  prior_age <- FIMS:::get_ages(data)[[2]]
+  age_prior <- tibble::tibble(
+    module_name = "Selectivity",
+    fleet = fleet_names[[2]],
+    label = "logit_sel_at_age",
+    timing = NA_integer_,
+    age = prior_age,
+    distribution = "Dnorm",
+    mean = 0,
+    sd = 1
+  )
+  prior_config <- FIMS:::as_julia_fims_model_config(
+    parameters = parameters,
+    data = data,
+    priors = age_prior
+  )
+  expect_equal(
+    prior_config[["parameter_prior_indices"]],
+    2L + (2L - 1L) * FIMS:::get_n_ages(data)
+  )
+})
+
 test_that("Julia backend serializes VonBertalanffy growth parameters and masks", {
   data <- data_big |>
     dplyr::filter(.data$fleet == "fleet1") |>

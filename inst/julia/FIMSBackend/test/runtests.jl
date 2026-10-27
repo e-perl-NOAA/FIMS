@@ -4,6 +4,28 @@ using ComponentArrays: ComponentArray
 using ForwardDiff: derivative
 using SpecialFunctions: erf
 
+@testset "age-specific selectivity" begin
+  ages = [1.0, 2.0, 3.0]
+  parameters = ComponentArray((
+    logit_sel_at_age = [
+      log(1 / 3) log(3);
+      0.0 log(1 / 3);
+      log(3) 0.0;
+    ],
+  ))
+  model_config = Dict(:selectivity_types => ["AgeSpecific", "AgeSpecific"])
+  first_fleet = FIMSBackend.build_selectivity(parameters, model_config, 1, ages)
+  second_fleet = FIMSBackend.build_selectivity(parameters, model_config, 2, ages)
+
+  @test [first_fleet(age) for age in ages] ≈ [0.25, 0.5, 0.75]
+  @test [second_fleet(age) for age in ages] ≈ [0.75, 0.25, 0.5]
+  @test_throws ArgumentError first_fleet(4.0)
+  @test derivative(
+    value -> FIMSBackend.AgeSpecificSelectivity([value], [1.0])(1.0),
+    0.0,
+  ) ≈ 0.25
+end
+
 @testset "spawning biomass per recruit" begin
   natural_mortality = [0.1, 0.2, 0.3]
   weights_at_age = repeat(reshape([2.0, 4.0, 8.0], 1, 3), 2, 1)
@@ -167,6 +189,23 @@ end
     merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
   )
   maturity_result = evaluate_model(maturity_parameters, data, config)
+  age_specific_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (
+        logit_sel_at_age = [
+          log(1 / 3) log(3);
+          0.0 log(1 / 3);
+          log(3) 0.0;
+        ],
+      ),
+    ),
+  )
+  age_specific_result = evaluate_model(
+    age_specific_parameters,
+    data,
+    merge(config, Dict(:selectivity_types => ["AgeSpecific", "AgeSpecific"])),
+  )
   no_process_result = evaluate_model(
     parameters,
     data,
@@ -206,6 +245,7 @@ end
   @test maturity_result["report"]["proportion_mature_at_age"] ≈
     repeat(reshape(expected_maturity, 1, :), 2, 1)
   @test maturity_result["nll"] != result["nll"]
+  @test age_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
   expected_lengths = [
     275.0 +
     (725.0 - 275.0) *
