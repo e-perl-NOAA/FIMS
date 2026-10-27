@@ -441,6 +441,27 @@ test_that("Julia backend config preserves normal catch and lognormal index likel
   expect_true(all(config[["index_sigma"]] > 0))
   expect_true(config[["recruitment_process_active"]])
 
+  unsupported_prior_parameters <- parameters |>
+    dplyr::mutate(
+      distribution_type = dplyr::if_else(
+        .data$module_name == "Selectivity" & .data$label == "slope",
+        "prior",
+        .data$distribution_type
+      ),
+      distribution = dplyr::if_else(
+        .data$module_name == "Selectivity" & .data$label == "slope",
+        "Dnorm",
+        .data$distribution
+      )
+    )
+  expect_error(
+    FIMS:::as_julia_fims_model_config(
+      parameters = unsupported_prior_parameters,
+      data = data
+    ),
+    regexp = "does not yet support.*prior"
+  )
+
   lognormal_process_parameters <- parameters |>
     dplyr::mutate(
       distribution = dplyr::if_else(

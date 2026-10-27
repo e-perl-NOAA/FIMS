@@ -424,6 +424,13 @@ prepare_julia_backend_input <- function(parameters, data) {
 #' @noRd
 as_julia_fims_model_config <- function(parameters, data) {
   fleet_data <- get_data(data)
+  has_parameter_priors <- any(parameters[["distribution_type"]] == "prior", na.rm = TRUE)
+  if (has_parameter_priors) {
+    cli::cli_abort(
+      "Julia backend does not yet support parameter prior distributions; they cannot be included in the objective."
+    )
+  }
+
   extract_data_likelihood <- function(data_type, default = 0.1) {
     rows <- fleet_data |>
       dplyr::filter(.data$type == .env$data_type)
