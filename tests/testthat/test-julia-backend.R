@@ -561,6 +561,69 @@ test_that("Julia backend serializes fleet-specific VonBertalanffy length bins", 
   }
 })
 
+test_that("Julia backend respects explicit fleet bins without compositions", {
+  fleet_names <- FIMS:::get_fleets(FIMS::FIMSFrame(data_big))
+  skip_if(length(fleet_names) < 2L)
+  explicit_bins <- lapply(seq_along(fleet_names), function(fleet_index) {
+    seq(fleet_index, by = 50, length.out = 5)
+  })
+  length_bin_data <- purrr::map2_dfr(
+    fleet_names,
+    explicit_bins,
+    function(fleet, bins) {
+      fleet_unit <- unique(
+        data_big$unit[which(data_big$fleet == fleet)]
+      )[1]
+      tibble::tibble(
+        type = "length_bin",
+        fleet = fleet,
+        age = NA_real_,
+        length = bins,
+        observed = NA_real_,
+        unit = fleet_unit,
+        timing = NA_real_,
+        uncertainty = NA_character_
+      )
+    }
+  )
+  data <- data_big |>
+    dplyr::filter(!.data$type %in% c(
+      "length_comp",
+      "age_to_length_conversion",
+      "length_bin"
+    )) |>
+    dplyr::bind_rows(length_bin_data) |>
+    FIMS::FIMSFrame()
+  default_parameters <- FIMS::setup_default_parameters(data = data)
+  parameters <- dplyr::bind_rows(
+    default_parameters |>
+      dplyr::filter(.data$module_name != "Growth"),
+    FIMS::setup_default_Growth(data, module_type = "VonBertalanffySchnute")
+  )
+
+  julia_data <- FIMS:::as_julia_fims_data(data, parameters)
+  expected_length_bins <- matrix(
+    0,
+    nrow = julia_data[["n_lengths"]],
+    ncol = length(fleet_names)
+  )
+  for (fleet_index in seq_along(fleet_names)) {
+    expected_length_bins[
+      seq_along(explicit_bins[[fleet_index]]),
+      fleet_index
+    ] <- explicit_bins[[fleet_index]]
+  }
+
+  expect_equal(
+    julia_data[["lengths_by_fleet"]],
+    expected_length_bins
+  )
+  expect_equal(
+    julia_data[["n_lengths_by_fleet"]],
+    rep(length(explicit_bins[[1]]), length(fleet_names))
+  )
+})
+
 test_that("Julia backend serializes VonBertalanffy delta-method variability", {
   data <- data_big |>
     dplyr::filter(.data$fleet == "fleet1") |>

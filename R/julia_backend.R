@@ -131,21 +131,18 @@ as_julia_fims_data <- function(data, parameters) {
     unique() |>
     stats::na.omit()
   is_vonb_growth <- "VonBertalanffySchnute" %in% growth_types
-  has_length_comp <- any(raw_data$type == "length_comp")
+  has_length_bins <- any(raw_data$type %in% c("length_comp", "length_bin"))
   length_bins_by_fleet <- NULL
-  lengths <- if (is_vonb_growth && any(raw_data$type == "length_comp")) {
-    sort(unique(raw_data$length[raw_data$type == "length_comp"]))
+  if (is_vonb_growth && has_length_bins) {
+    length_bins_by_fleet <- resolve_fleet_length_bins(raw_data)[fleets]
+    lengths <- sort(unique(unlist(
+      length_bins_by_fleet,
+      use.names = FALSE
+    )))
   } else {
-    get_lengths(data)
+    lengths <- get_lengths(data)
   }
   n_lengths <- length(lengths)
-  if (is_vonb_growth && has_length_comp) {
-    length_bins_by_fleet <- lapply(fleets, function(fleet) {
-      sort(unique(raw_data$length[
-        raw_data$type == "length_comp" & raw_data$fleet == fleet
-      ]))
-    })
-  }
 
   year_index <- function(year) as.integer(year - get_start_year(data) + 1L)
   age_index <- function(age) match(age, ages)
@@ -188,7 +185,7 @@ as_julia_fims_data <- function(data, parameters) {
         model_length_comp(data, fleets[[fleet_index]])
       }
       stream_data[, , fleet_index][positions] <- observed
-      if (data_type == "length_comp" && is_vonb_growth) {
+      if (data_type == "length_comp" && is_vonb_growth && !is.null(length_bins_by_fleet)) {
         fleet_bin_indices <- match(length_bins_by_fleet[[fleet_index]], lengths)
         structural_zero_bins <- setdiff(seq_len(n_bins), fleet_bin_indices)
         observed_years <- unique(positions[, 1])
@@ -260,7 +257,7 @@ as_julia_fims_data <- function(data, parameters) {
     proportion_female = proportion_female
   )
 
-  if (is_vonb_growth && has_length_comp) {
+  if (is_vonb_growth && has_length_bins) {
     n_lengths_by_fleet <- unname(purrr::map_int(length_bins_by_fleet, length))
     lengths_by_fleet <- matrix(0, nrow = n_lengths, ncol = length(fleets))
     for (fleet_index in seq_along(fleets)) {
