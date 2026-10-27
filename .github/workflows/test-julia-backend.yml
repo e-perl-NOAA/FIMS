@@ -1,0 +1,68 @@
+name: Test Julia backend
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/test-julia-backend.yml"
+      - "inst/julia/FIMSBackend/**"
+      - "R/julia_backend.R"
+      - "R/fimsfit.R"
+      - "tests/testthat/test-julia-backend.R"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/test-julia-backend.yml"
+      - "inst/julia/FIMSBackend/**"
+      - "R/julia_backend.R"
+      - "R/fimsfit.R"
+      - "tests/testthat/test-julia-backend.R"
+
+permissions: {}
+
+concurrency:
+  group: julia-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  julia-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.10"
+      - uses: julia-actions/cache@v2
+      - name: Run Julia backend tests
+        id: julia-tests
+        shell: bash
+        run: |
+          set +e
+          julia --project=inst/julia/FIMSBackend -e 'using Pkg; Pkg.test()' 2>&1 | tee julia-backend-test.log
+          test_status=${PIPESTATUS[0]}
+          echo "status=${test_status}" >> "${GITHUB_OUTPUT}"
+          exit "${test_status}"
+      - name: Report Julia test result
+        if: always()
+        env:
+          TEST_STATUS: ${{ steps.julia-tests.outputs.status }}
+        run: |
+          if [ "${TEST_STATUS}" = "0" ]; then
+            echo "## Julia backend tests: passed" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ -n "${TEST_STATUS}" ]; then
+            echo "## Julia backend tests: failed (exit code ${TEST_STATUS})" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "## Julia backend tests: did not complete" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+      - name: Upload Julia test log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: julia-backend-test-log
+          path: julia-backend-test.log
+          if-no-files-found: warn
+          retention-days: 7

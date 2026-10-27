@@ -1,7 +1,8 @@
 using ComponentArrays: ComponentArray
-using .Population: PopulationModel, step_population!
+using .Population: PopulationModel, spawning_biomass_per_recruit, step_population!
 using .Recruitment: BevertonHolt, Ricker
 using .Selectivity: DoubleLogisticSelectivity, LogisticSelectivity
+using SpecialFunctions: loggamma
 
 normalize_keys(x) = x
 normalize_keys(x::NamedTuple) = Dict(Symbol(key) => normalize_keys(value) for (key, value) in pairs(x))
@@ -9,12 +10,7 @@ normalize_key(key::Symbol) = key
 normalize_key(key) = Symbol(key)
 normalize_keys(x::AbstractDict) = Dict(normalize_key(key) => normalize_keys(value) for (key, value) in pairs(x))
 
-has_component(params, name::Symbol) = try
-  params[name]
-  true
-catch
-  false
-end
+has_component(params, name::Symbol) = name in propertynames(params)
 
 get_component(params, name::Symbol, default) = has_component(params, name) ? params[name] : default
 
@@ -48,29 +44,37 @@ function component_array_from_input(parameters_vector, model_config)
   throw(ArgumentError("Unsupported parameter container for Julia FIMS backend."))
 end
 
-function build_selectivity(params, model_config)
-  selectivity_type = get(model_config, :selectivity, :logistic)
+function build_selectivity(params, model_config, fleet_index)
+  selectivity_types = get(model_config, :selectivity_types, String[])
+  isempty(selectivity_types) || length(selectivity_types) >= fleet_index ||
+    throw(ArgumentError("selectivity_types must provide one type for each fleet."))
+  selectivity_type =
+    isempty(selectivity_types) ? "Logistic" : string(selectivity_types[fleet_index])
 
-  if selectivity_type == :double_logistic
+  if selectivity_type == "DoubleLogistic"
     return DoubleLogisticSelectivity(
-      params.inflection_point_asc,
-      params.slope_asc,
-      params.inflection_point_desc,
-      params.slope_desc,
+      params.inflection_point_asc[fleet_index],
+      params.slope_asc[fleet_index],
+      params.inflection_point_desc[fleet_index],
+      params.slope_desc[fleet_index],
     )
+  elseif selectivity_type == "Logistic"
+    return LogisticSelectivity(params.inflection_point[fleet_index], params.slope[fleet_index])
   end
 
-  LogisticSelectivity(params.inflection_point, params.slope)
+  throw(ArgumentError("Unsupported selectivity type: $selectivity_type"))
 end
 
 function build_recruitment(params, model_config)
   recruitment_type = get(model_config, :recruitment, :beverton_holt)
 
-  if recruitment_type == :ricker
+  if string(recruitment_type) in ("ricker", ":ricker")
     return Ricker(params.logit_steep, params.log_rzero)
+  elseif string(recruitment_type) in ("beverton_holt", ":beverton_holt")
+    return BevertonHolt(params.logit_steep, params.log_rzero)
   end
 
-  BevertonHolt(params.logit_steep, params.log_rzero)
+  throw(ArgumentError("Unsupported recruitment type: $recruitment_type"))
 end
 
 function build_population_model(params, data_dict)
@@ -79,7 +83,9 @@ function build_population_model(params, data_dict)
     eltype(data_dict[:ages]),
     eltype(data_dict[:weights_at_age]),
     eltype(data_dict[:maturity_at_age]),
+    eltype(collect(params.log_Fmort)),
   )
+  n_fleets = size(params.log_Fmort, 2)
   numbers_at_age = Matrix{T}(undef, data_dict[:n_years], data_dict[:n_ages])
   numbers_at_age .= zero(T)
   numbers_at_age[1, :] .= exp.(collect(params.log_init_naa))
@@ -102,15 +108,108 @@ function build_population_model(params, data_dict)
     mortality_Z = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
     catch_expected = zeros(T, data_dict[:n_years]),
     index_expected = zeros(T, data_dict[:n_years]),
+    catch_numbers_at_age_by_fleet = zeros(T, data_dict[:n_years], data_dict[:n_ages], n_fleets),
+    index_numbers_at_age_by_fleet = zeros(T, data_dict[:n_years], data_dict[:n_ages], n_fleets),
+    catch_expected_by_fleet = zeros(T, data_dict[:n_years], n_fleets),
+    index_expected_by_fleet = zeros(T, data_dict[:n_years], n_fleets),
   )
 end
 
-lognormal_nll(observed, expected, sigma) =
-  sum(
-    0.5 * log(2π) + log(sigma) + log(obs) +
-      ((log(obs) - log(exp_val))^2) / (2 * sigma^2)
-    for (obs, exp_val) in zip(observed, expected) if isfinite(obs) && obs > 0 && exp_val > 0
-  )
+sigma_element_type(sigma::Number) = typeof(sigma)
+sigma_element_type(sigma) = eltype(sigma)
+sigma_at(sigma::Number, index) = sigma
+sigma_at(sigma, index) = sigma[index]
+
+function validate_sigma(sigma)
+  valid = sigma isa Number ?
+    isfinite(sigma) && sigma > 0 :
+    all(value -> isfinite(value) && value > 0, sigma)
+  valid ||
+    throw(ArgumentError("Observation uncertainty values must be finite and positive."))
+end
+
+function lognormal_nll(observed, expected, sigma)
+  size(observed) == size(expected) ||
+    throw(DimensionMismatch("Observed and expected data must have matching dimensions."))
+  sigma isa Number || size(sigma) == size(observed) ||
+    throw(DimensionMismatch("Observation uncertainty must be scalar or match the data dimensions."))
+  validate_sigma(sigma)
+  total = zero(promote_type(eltype(observed), eltype(expected), sigma_element_type(sigma)))
+  for index in eachindex(observed, expected)
+    obs = observed[index]
+    exp_val = expected[index]
+    sigma_value = sigma_at(sigma, index)
+    if obs == -999
+      continue
+    elseif (isfinite(obs) && obs <= 0) || (isfinite(exp_val) && exp_val <= 0)
+      total += oftype(total, Inf)
+    else
+      total +=
+        0.5 * log(2π) + log(sigma_value) + log(obs) +
+        ((log(obs) - log(exp_val))^2) / (2 * sigma_value^2)
+    end
+  end
+  total
+end
+
+function normal_nll(observed, expected, sigma)
+  size(observed) == size(expected) ||
+    throw(DimensionMismatch("Observed and expected data must have matching dimensions."))
+  sigma isa Number || size(sigma) == size(observed) ||
+    throw(DimensionMismatch("Observation uncertainty must be scalar or match the data dimensions."))
+  validate_sigma(sigma)
+  total = zero(promote_type(eltype(observed), eltype(expected), sigma_element_type(sigma)))
+  for index in eachindex(observed, expected)
+    obs = observed[index]
+    exp_val = expected[index]
+    sigma_value = sigma_at(sigma, index)
+    if isfinite(obs) && obs != -999 && isfinite(exp_val)
+      total +=
+        0.5 * log(2π) + log(sigma_value) + ((obs - exp_val)^2) / (2 * sigma_value^2)
+    end
+  end
+  total
+end
+
+function lognormal_random_effect_nll(observed, expected, sigma)
+  size(observed) == size(expected) ||
+    throw(DimensionMismatch("Observed and expected recruitment values must have matching dimensions."))
+  sigma isa Number || size(sigma) == size(observed) ||
+    throw(DimensionMismatch("Recruitment uncertainty must be scalar or match the recruitment values."))
+  validate_sigma(sigma)
+  all(value -> isfinite(value) && value > 0, observed) ||
+    throw(ArgumentError("Lognormal recruitment process values must be finite and positive."))
+  normal_nll(log.(observed), expected, sigma)
+end
+
+function data_likelihood_nll(observed, expected, sigma, family)
+  if family isa AbstractArray
+    size(observed) == size(expected) ||
+      throw(DimensionMismatch("Observed and expected data must have matching dimensions."))
+    size(family) == size(observed) ||
+      throw(DimensionMismatch("Likelihood families must match the data dimensions."))
+    sigma isa Number || size(sigma) == size(observed) ||
+      throw(DimensionMismatch("Observation uncertainty must be scalar or match the data dimensions."))
+    total = zero(promote_type(eltype(observed), eltype(expected), sigma_element_type(sigma)))
+    for index in eachindex(observed, expected, family)
+      total += data_likelihood_nll(
+        [observed[index]],
+        [expected[index]],
+        sigma_at(sigma, index),
+        family[index],
+      )
+    end
+    return total
+  end
+
+  normalized_family = lowercase(string(family))
+  if normalized_family == "dnorm"
+    return normal_nll(observed, expected, sigma)
+  elseif normalized_family == "dlnorm"
+    return lognormal_nll(observed, expected, sigma)
+  end
+  throw(ArgumentError("Unsupported data likelihood family: $family"))
+end
 
 function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
   total = zero(promote_type(eltype(observed), eltype(expected)))
@@ -118,16 +217,20 @@ function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
 
   for row in axes(observed, 1)
     obs_row = observed[row, :]
-    if any(!isfinite, obs_row)
+    if any(x -> !isfinite(x) || x == -999, obs_row)
       continue
     end
 
     probs = view(expected, row, :)
-    if sum(probs) <= 0
+    probability_sum = sum(probs)
+    if probability_sum <= 0
       continue
     end
 
-    total -= sum(obs_row .* log.(probs .+ probability_floor))
+    normalized_probabilities = probs ./ probability_sum
+    total -=
+      loggamma(sum(obs_row) + 1) - sum(loggamma.(obs_row .+ 1)) +
+      sum(obs_row .* log.(normalized_probabilities .+ probability_floor))
   end
 
   total
@@ -148,27 +251,49 @@ function evaluate_model(parameters_vector, data_dict, model_config)
   data_dict = normalize_keys(data_dict)
   params = component_array_from_input(parameters_vector, model_config)
   parameter_type = eltype(collect(params))
-  selectivity = build_selectivity(params, model_config)
+  n_fleets = length(data_dict[:fleets])
+  fleet_selectivity = zeros(
+    parameter_type,
+    data_dict[:n_years],
+    data_dict[:n_ages],
+    n_fleets,
+  )
+  for fleet_index in 1:n_fleets
+    selectivity = build_selectivity(params, model_config, fleet_index)
+    for year in 1:data_dict[:n_years], age in 1:data_dict[:n_ages]
+      fleet_selectivity[year, age, fleet_index] = selectivity(data_dict[:ages][age])
+    end
+  end
   recruitment = build_recruitment(params, model_config)
   population = build_population_model(params, data_dict)
 
-  fishing_mortality = reshape(exp.(collect(params.log_Fmort)), data_dict[:n_years], data_dict[:n_ages])
-  catchability = exp(get_component(params, :log_q, zero(parameter_type)))
+  fishing_mortality = Matrix(params.log_Fmort)
+  catchability = exp.(collect(get_component(params, :log_q, zeros(parameter_type, n_fleets))))
   recruit_devs = get_component(
     params,
     :log_devs,
     zeros(parameter_type, max(data_dict[:n_years] - 1, 0))
   )
+  log_recruitment = get_component(
+    params,
+    :log_r,
+    zeros(parameter_type, max(data_dict[:n_years] - 1, 0))
+  )
+  recruitment_mode = string(get(model_config, :recruitment_process_mode, "log_devs"))
+  phi_0 = get(data_dict, :phi_0, spawning_biomass_per_recruit(population))
 
   step_population!(
     population,
-    selectivity,
+    nothing,
     recruitment,
     Dict(
       :fishing_mortality => fishing_mortality,
+      :fleet_selectivity => fleet_selectivity,
       :catchability => catchability,
-      :phi_0 => get(data_dict, :phi_0, one(parameter_type)),
+      :phi_0 => phi_0,
       :log_recruit_devs => recruit_devs,
+      :log_recruitment => log_recruitment,
+      :recruitment_mode => recruitment_mode,
     ),
   )
 
@@ -176,35 +301,100 @@ function evaluate_model(parameters_vector, data_dict, model_config)
 
   if haskey(data_dict, :observed_catch) && !isempty(data_dict[:observed_catch])
     sigma_catch = get(model_config, :catch_sigma, parameter_type(0.1))
-    total_nll += lognormal_nll(Vector(data_dict[:observed_catch]), population.catch_expected, sigma_catch)
+    catch_family = get(model_config, :catch_distribution, "dlnorm")
+    total_nll += data_likelihood_nll(
+      data_dict[:observed_catch],
+      population.catch_expected_by_fleet,
+      sigma_catch,
+      catch_family,
+    )
   end
 
   if haskey(data_dict, :observed_index) && !isempty(data_dict[:observed_index])
     sigma_index = get(model_config, :index_sigma, parameter_type(0.1))
-    total_nll += lognormal_nll(Vector(data_dict[:observed_index]), population.index_expected, sigma_index)
+    index_family = get(model_config, :index_distribution, "dlnorm")
+    total_nll += data_likelihood_nll(
+      data_dict[:observed_index],
+      population.index_expected_by_fleet,
+      sigma_index,
+      index_family,
+    )
   end
 
-  age_comp_expected = expected_age_comp(population)
-  if haskey(data_dict, :observed_age_comp) && !isempty(data_dict[:observed_age_comp])
-    valid_rows = Int[]
-    for row in axes(age_comp_expected, 1)
-      total_numbers = sum(view(population.catch_numbers_at_age, row, :))
+  age_comp_expected = zeros(parameter_type, data_dict[:n_years], data_dict[:n_ages], n_fleets)
+  length_comp_expected = zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
+  fleet_has_catch = get(data_dict, :fleet_has_catch, trues(n_fleets))
+  for fleet_index in 1:n_fleets
+    numbers_at_age = fleet_has_catch[fleet_index] ?
+      view(population.catch_numbers_at_age_by_fleet, :, :, fleet_index) :
+      view(population.index_numbers_at_age_by_fleet, :, :, fleet_index)
+    for year in 1:data_dict[:n_years]
+      total_numbers = sum(view(numbers_at_age, year, :))
       if total_numbers > 0
-        push!(valid_rows, row)
+        age_comp_expected[year, :, fleet_index] .= numbers_at_age[year, :] ./ total_numbers
+      end
+      if haskey(data_dict, :age_to_length_conversion)
+        length_numbers =
+          transpose(data_dict[:age_to_length_conversion]) * numbers_at_age[year, :]
+        total_length_numbers = sum(length_numbers)
+        if total_length_numbers > 0
+          length_comp_expected[year, :, fleet_index] .= length_numbers ./ total_length_numbers
+        end
       end
     end
+  end
 
-    if !isempty(valid_rows)
+  if haskey(data_dict, :observed_age_comp) && !isempty(data_dict[:observed_age_comp])
+    for fleet_index in 1:n_fleets
       total_nll += multinomial_nll(
-        Matrix(data_dict[:observed_age_comp])[valid_rows, :],
-        age_comp_expected[valid_rows, :],
+        Matrix(data_dict[:observed_age_comp][:, :, fleet_index]),
+        Matrix(age_comp_expected[:, :, fleet_index]),
       )
     end
   end
 
-  if has_component(params, :log_devs)
-    recruit_sd = get(model_config, :recruitment_deviation_sd, one(eltype(recruit_devs)))
-    total_nll += sum(0.5 * log(2π) + log(recruit_sd) + (dev^2) / (2 * recruit_sd^2) for dev in params.log_devs)
+  if haskey(data_dict, :observed_length_comp) && !isempty(data_dict[:observed_length_comp])
+    for fleet_index in 1:n_fleets
+      total_nll += multinomial_nll(
+        Matrix(data_dict[:observed_length_comp][:, :, fleet_index]),
+        Matrix(length_comp_expected[:, :, fleet_index]),
+      )
+    end
+  end
+
+  catch_numbers_at_age_by_fleet = population.catch_numbers_at_age_by_fleet
+  index_numbers_at_age_by_fleet = population.index_numbers_at_age_by_fleet
+  catch_weight_at_age_by_fleet =
+    catch_numbers_at_age_by_fleet .* reshape(data_dict[:weights_at_age], data_dict[:n_years], data_dict[:n_ages], 1)
+  index_weight_at_age_by_fleet =
+    index_numbers_at_age_by_fleet .* reshape(data_dict[:weights_at_age], data_dict[:n_years], data_dict[:n_ages], 1)
+  catch_numbers_by_fleet = dropdims(sum(catch_numbers_at_age_by_fleet, dims = 2), dims = 2)
+  index_numbers_by_fleet = dropdims(sum(index_numbers_at_age_by_fleet, dims = 2), dims = 2)
+
+  has_recruitment_process_values =
+    recruitment_mode == "log_r" ? has_component(params, :log_r) : has_component(params, :log_devs)
+  if get(model_config, :recruitment_process_active, false) && has_recruitment_process_values
+    process_family = lowercase(string(get(model_config, :recruitment_process_distribution, "dnorm")))
+    process_family in ("dnorm", "dlnorm") ||
+      throw(ArgumentError("Unsupported recruitment process distribution: $process_family"))
+    process_nll = process_family == "dlnorm" ? lognormal_random_effect_nll : normal_nll
+    recruit_sd =
+      has_component(params, :log_sd) ?
+      exp.(params.log_sd) :
+      get(model_config, :recruitment_deviation_sd, one(eltype(recruit_devs)))
+    if recruitment_mode == "log_r"
+      expected_log_recruitment = [
+        log(recruitment(population.spawning_biomass[year], phi_0)) for
+        year in 1:(data_dict[:n_years] - 1)
+      ]
+      total_nll += process_nll(params.log_r, expected_log_recruitment, recruit_sd)
+    else
+      total_nll += process_nll(
+        params.log_devs,
+        zeros(parameter_type, length(params.log_devs)),
+        recruit_sd,
+      )
+    end
   end
 
   Dict(
@@ -215,9 +405,25 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       "biomass" => population.biomass,
       "spawning_biomass" => population.spawning_biomass,
       "expected_recruitment" => population.expected_recruitment,
+      "mortality_F" => population.mortality_F,
+      "mortality_M" => population.mortality_M,
+      "mortality_Z" => population.mortality_Z,
+      "proportion_mature_at_age" => data_dict[:maturity_at_age],
+      "sum_selectivity" => dropdims(sum(fleet_selectivity, dims = 3), dims = 3),
       "catch_expected" => population.catch_expected,
       "index_expected" => population.index_expected,
+      "total_catch_numbers" => vec(sum(catch_numbers_by_fleet, dims = 2)),
+      "total_catch_weight" => population.catch_expected,
+      "catch_expected_by_fleet" => population.catch_expected_by_fleet,
+      "index_expected_by_fleet" => population.index_expected_by_fleet,
+      "catch_numbers_by_fleet" => catch_numbers_by_fleet,
+      "index_numbers_by_fleet" => index_numbers_by_fleet,
+      "catch_weight_at_age_by_fleet" => catch_weight_at_age_by_fleet,
+      "index_weight_at_age_by_fleet" => index_weight_at_age_by_fleet,
+      "catch_numbers_at_age_by_fleet" => catch_numbers_at_age_by_fleet,
+      "index_numbers_at_age_by_fleet" => index_numbers_at_age_by_fleet,
       "agecomp_expected" => age_comp_expected,
+      "lengthcomp_expected" => length_comp_expected,
       "jnll" => total_nll,
     ),
   )

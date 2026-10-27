@@ -407,13 +407,28 @@ build_julia_backend_report <- function(julia_input, fit_result) {
     biomass = list(as_julia_backend_numeric(report[["biomass"]])),
     spawning_biomass = list(as_julia_backend_numeric(report[["spawning_biomass"]])),
     expected_recruitment = list(as_julia_backend_numeric(report[["expected_recruitment"]])),
+    mortality_F = list(as.numeric(t(as.matrix(report[["mortality_F"]])))),
+    mortality_M = list(as.numeric(t(as.matrix(report[["mortality_M"]])))),
+    mortality_Z = list(as.numeric(t(as.matrix(report[["mortality_Z"]])))),
+    proportion_mature_at_age = list(as.numeric(t(as.matrix(report[["proportion_mature_at_age"]])))),
+    sum_selectivity = list(as.numeric(t(as.matrix(report[["sum_selectivity"]])))),
     log_recruit_dev = list(as_julia_backend_numeric(parameters[["log_devs"]])),
+    log_r = list(as_julia_backend_numeric(parameters[["log_r"]])),
     catch_expected = list(as_julia_backend_numeric(report[["catch_expected"]])),
     index_expected = list(as_julia_backend_numeric(report[["index_expected"]])),
-    agecomp_expected = list(as.numeric(t(as_julia_backend_matrix(
-      report[["agecomp_expected"]],
-      nrow = data[["n_years"]]
-    )))),
+    total_catch_numbers = list(as_julia_backend_numeric(report[["total_catch_numbers"]])),
+    total_catch_weight = list(as_julia_backend_numeric(report[["total_catch_weight"]])),
+    catch_expected_by_fleet = list(as.array(report[["catch_expected_by_fleet"]])),
+    index_expected_by_fleet = list(as.array(report[["index_expected_by_fleet"]])),
+    catch_numbers_at_age_by_fleet = list(as.array(report[["catch_numbers_at_age_by_fleet"]])),
+    index_numbers_at_age_by_fleet = list(as.array(report[["index_numbers_at_age_by_fleet"]])),
+    catch_numbers_by_fleet = list(as.array(report[["catch_numbers_by_fleet"]])),
+    index_numbers_by_fleet = list(as.array(report[["index_numbers_by_fleet"]])),
+    catch_weight_at_age_by_fleet = list(as.array(report[["catch_weight_at_age_by_fleet"]])),
+    index_weight_at_age_by_fleet = list(as.array(report[["index_weight_at_age_by_fleet"]])),
+    agecomp_expected = list(as.numeric(t(as.matrix(report[["agecomp_expected"]][, , 1])))),
+    agecomp_expected_by_fleet = list(as.array(report[["agecomp_expected"]])),
+    lengthcomp_expected_by_fleet = list(as.array(report[["lengthcomp_expected"]])),
     jnll = as.numeric(fit_result[["nll"]])
   )
 }
@@ -432,9 +447,17 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
     rows <- parameter_info |>
       dplyr::filter(.data$label == .env$label_name)
 
-    estimate_values <- as_julia_backend_numeric(estimates[[label_name]])
+    estimate_values <- if (label_name == "log_M" && is.matrix(estimates[[label_name]])) {
+      as.numeric(t(estimates[[label_name]]))
+    } else {
+      as_julia_backend_numeric(estimates[[label_name]])
+    }
     se_values <- if (!is.null(standard_errors[[label_name]])) {
-      as_julia_backend_numeric(standard_errors[[label_name]])
+      if (label_name == "log_M" && is.matrix(standard_errors[[label_name]])) {
+        as.numeric(t(standard_errors[[label_name]]))
+      } else {
+        as_julia_backend_numeric(standard_errors[[label_name]])
+      }
     } else {
       rep(NA_real_, length(estimate_values))
     }
@@ -590,68 +613,96 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
       vector_values = report[["expected_recruitment"]][[1]]
     ),
     make_julia_matrix_estimate_rows(
-      label = "catch_numbers_at_age",
-      matrix_values = matrix(
-        report[["catch_numbers_at_age"]][[1]],
-        nrow = data[["n_years"]],
-        byrow = TRUE
-      ),
-      module_name = "Fleet",
-      module_id = 1L,
-      fleet = raw_data |>
-        dplyr::filter(.data$type == "catch") |>
-        dplyr::pull(.data$fleet) |>
-        {\(x) if (length(x) > 0) x[[1]] else NA_character_}()
+      label = "mortality_F",
+      matrix_values = matrix(report[["mortality_F"]][[1]], nrow = data[["n_years"]], byrow = TRUE)
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "mortality_M",
+      matrix_values = matrix(report[["mortality_M"]][[1]], nrow = data[["n_years"]], byrow = TRUE)
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "mortality_Z",
+      matrix_values = matrix(report[["mortality_Z"]][[1]], nrow = data[["n_years"]], byrow = TRUE)
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "proportion_mature_at_age",
+      matrix_values = matrix(report[["proportion_mature_at_age"]][[1]], nrow = data[["n_years"]], byrow = TRUE)
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "sum_selectivity",
+      matrix_values = matrix(report[["sum_selectivity"]][[1]], nrow = data[["n_years"]], byrow = TRUE)
+    ),
+    make_julia_vector_estimate_rows(
+      label = "total_catch_numbers",
+      vector_values = report[["total_catch_numbers"]][[1]]
+    ),
+    make_julia_vector_estimate_rows(
+      label = "total_catch_weight",
+      vector_values = report[["total_catch_weight"]][[1]]
     )
   )
 
-  if (!is.null(data[["observed_catch"]])) {
-    output[[length(output) + 1]] <- make_julia_vector_estimate_rows(
-      label = "catch_expected",
-      vector_values = report[["catch_expected"]][[1]],
-      module_name = "Fleet",
-      module_id = 1L,
-      fleet = raw_data |>
-        dplyr::filter(.data$type == "catch") |>
-        dplyr::pull(.data$fleet) |>
-        {\(x) if (length(x) > 0) x[[1]] else NA_character_}(),
-      distribution = "dlnorm",
-      observed_values = data[["observed_catch"]]
-    )
-  }
+  fleet_names <- data[["fleets"]]
+  for (fleet_index in seq_along(fleet_names)) {
+    fleet_name <- fleet_names[[fleet_index]]
+    if (!is.null(data[["observed_catch"]]) &&
+      any(raw_data$type == "catch" & raw_data$fleet == fleet_name)) {
+      output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+        label = "catch_numbers_at_age",
+        matrix_values = report[["catch_numbers_at_age_by_fleet"]][[1]][, , fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name
+      )
+      output[[length(output) + 1]] <- make_julia_vector_estimate_rows(
+        label = "catch_expected",
+        vector_values = report[["catch_expected_by_fleet"]][[1]][, fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        distribution = "dlnorm",
+        observed_values = data[["observed_catch"]][, fleet_index]
+      )
+    }
 
-  if (!is.null(data[["observed_index"]])) {
-    output[[length(output) + 1]] <- make_julia_vector_estimate_rows(
-      label = "index_expected",
-      vector_values = report[["index_expected"]][[1]],
-      module_name = "Fleet",
-      module_id = 2L,
-      fleet = raw_data |>
-        dplyr::filter(.data$type == "index") |>
-        dplyr::pull(.data$fleet) |>
-        {\(x) if (length(x) > 0) x[[1]] else NA_character_}(),
-      distribution = "dlnorm",
-      observed_values = data[["observed_index"]]
-    )
-  }
+    if (!is.null(data[["observed_index"]]) &&
+      any(raw_data$type == "index" & raw_data$fleet == fleet_name)) {
+      output[[length(output) + 1]] <- make_julia_vector_estimate_rows(
+        label = "index_expected",
+        vector_values = report[["index_expected_by_fleet"]][[1]][, fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        distribution = "dlnorm",
+        observed_values = data[["observed_index"]][, fleet_index]
+      )
+    }
 
-  if (!is.null(data[["observed_age_comp"]])) {
-    output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
-      label = "agecomp_expected",
-      matrix_values = matrix(
-        report[["agecomp_expected"]][[1]],
-        nrow = data[["n_years"]],
-        byrow = TRUE
-      ),
-      module_name = "Fleet",
-      module_id = 1L,
-      fleet = raw_data |>
-        dplyr::filter(.data$type == "age_comp") |>
-        dplyr::pull(.data$fleet) |>
-        {\(x) if (length(x) > 0) x[[1]] else NA_character_}(),
-      distribution = "dmultinom",
-      observed_matrix = data[["observed_age_comp"]]
-    )
+    if (!is.null(data[["observed_age_comp"]]) &&
+      any(raw_data$type == "age_comp" & raw_data$fleet == fleet_name)) {
+      output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+        label = "agecomp_expected",
+        matrix_values = report[["agecomp_expected_by_fleet"]][[1]][, , fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        distribution = "dmultinom",
+        observed_matrix = data[["observed_age_comp"]][, , fleet_index]
+      )
+    }
+
+    if (!is.null(data[["observed_length_comp"]]) &&
+      any(raw_data$type == "length_comp" & raw_data$fleet == fleet_name)) {
+      output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+        label = "lengthcomp_expected",
+        matrix_values = report[["lengthcomp_expected_by_fleet"]][[1]][, , fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        distribution = "dmultinom",
+        observed_matrix = data[["observed_length_comp"]][, , fleet_index]
+      )
+    }
   }
 
   dplyr::bind_rows(output)
@@ -659,7 +710,9 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
 
 build_julia_backend_stub_obj <- function(parameters, report, fit_result) {
   parameter_vector <- purrr::flatten_dbl(parameters)
-  gradient_vector <- if (!is.null(fit_result[["gradient"]])) {
+  gradient_vector <- if (!is.null(fit_result[["fixed_gradient"]])) {
+    as.numeric(fit_result[["fixed_gradient"]])
+  } else if (!is.null(fit_result[["gradient"]])) {
     as.numeric(fit_result[["gradient"]])
   } else {
     rep(NA_real_, length(parameter_vector))
@@ -767,7 +820,9 @@ FIMSFit <- function(
     } else {
       purrr::flatten_dbl(attr(input, "julia_input")[["parameters"]])
     }
-    fixed_effect_count <- as.integer(length(optimized_parameters))
+    fixed_effect_count <- as.integer(
+      input[["julia_fixed_parameter_count"]] %||% length(optimized_parameters)
+    )
     gradient_vector <- if (!is.null(obj[["gr"]])) {
       as.numeric(obj[["gr"]](optimized_parameters))
     } else {
@@ -793,7 +848,7 @@ FIMSFit <- function(
       sdreport = sdreport,
       number_of_parameters = c(
         fixed_effects = fixed_effect_count,
-        random_effects = 0L
+          random_effects = as.integer(input[["julia_random_parameter_count"]] %||% 0L)
       ),
       run_time = run_time,
       version = version,
@@ -947,6 +1002,9 @@ fit_fims <- function(input,
                              estimates = parameter_template,
                              standard_errors = purrr::map(parameter_template, \(x) rep(NA_real_, length(as_julia_backend_numeric(x)))),
                              gradient = rep(NA_real_, length(purrr::flatten_dbl(parameter_template))),
+                             fixed_gradient = rep(NA_real_, sum(julia_model_config[["fixed_parameter_mask"]])),
+                             fixed_effect_count = sum(julia_model_config[["fixed_parameter_mask"]]),
+                             random_effect_count = sum(julia_model_config[["random_parameter_mask"]]),
                              hessian = diag(length(purrr::flatten_dbl(parameter_template))),
                              nll = evaluated[["nll"]],
                              report = evaluated[["report"]],
@@ -967,11 +1025,15 @@ fit_fims <- function(input,
                            report = report
                          )
 
-                         optimized_parameters <- if (!is.null(fit_result[["estimates"]])) {
-                           purrr::flatten_dbl(fit_result[["estimates"]])
+                         optimized_parameters <- if (!is.null(fit_result[["fixed_parameters"]])) {
+                           as.numeric(fit_result[["fixed_parameters"]])
                          } else {
-                           purrr::flatten_dbl(julia_input[["parameters"]])
+                           purrr::flatten_dbl(fit_result[["estimates"]])
                          }
+                         input[["julia_fixed_parameter_count"]] <-
+                           fit_result[["fixed_effect_count"]] %||% length(optimized_parameters)
+                         input[["julia_random_parameter_count"]] <-
+                           fit_result[["random_effect_count"]] %||% 0L
 
                          obj <- build_julia_backend_stub_obj(
                            parameters = if (!is.null(fit_result[["estimates"]])) fit_result[["estimates"]] else julia_input[["parameters"]],
@@ -990,6 +1052,8 @@ fit_fims <- function(input,
                            opt = if (optimize) {
                              list(
                                par = optimized_parameters,
+                               fixed_effect_count = input[["julia_fixed_parameter_count"]],
+                               random_effect_count = input[["julia_random_parameter_count"]],
                                objective = as.numeric(fit_result[["nll"]]),
                                convergence = if (isTRUE(fit_result[["convergence"]])) 0L else 1L,
                                message = fit_result[["convergence_code"]]

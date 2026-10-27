@@ -100,6 +100,59 @@ test_that("Julia backend helpers return package paths", {
   )
 })
 
+test_that("initialize_julia_backend installs and instantiates its runtime on demand", {
+  reset_julia_backend_state()
+  package_path <- withr::local_tempdir()
+  module_path <- file.path(package_path, "src", "FIMSBackend.jl")
+  dir.create(dirname(module_path))
+  file.create(module_path)
+  setup_arguments <- NULL
+  julia_commands <- character()
+
+  testthat::local_mocked_bindings(
+    julia_backend_module_path = function(...) module_path,
+    julia_backend_package_path = function(...) package_path,
+    .package = "FIMS"
+  )
+  testthat::local_mocked_bindings(
+    julia_setup = function(...) setup_arguments <<- list(...),
+    julia_command = function(command, ...) julia_commands <<- c(julia_commands, command),
+    .package = "JuliaCall"
+  )
+
+  expect_true(FIMS:::initialize_julia_backend())
+  expect_true(setup_arguments[["installJulia"]])
+  expect_equal(setup_arguments[["version"]], "latest")
+  expect_true(any(grepl("Pkg.activate", julia_commands, fixed = TRUE)))
+  expect_true("Pkg.instantiate()" %in% julia_commands)
+  expect_true(any(grepl("using .FIMSBackend", julia_commands, fixed = TRUE)))
+  expect_true(FIMS:::.fims_julia_backend_state$initialized)
+})
+
+test_that("initialize_julia_backend surfaces Julia runtime errors", {
+  reset_julia_backend_state()
+  package_path <- withr::local_tempdir()
+  module_path <- file.path(package_path, "src", "FIMSBackend.jl")
+  dir.create(dirname(module_path))
+  file.create(module_path)
+
+  testthat::local_mocked_bindings(
+    julia_backend_module_path = function(...) module_path,
+    julia_backend_package_path = function(...) package_path,
+    .package = "FIMS"
+  )
+  testthat::local_mocked_bindings(
+    julia_setup = function(...) stop("runtime unavailable"),
+    .package = "JuliaCall"
+  )
+
+  expect_error(
+    FIMS:::initialize_julia_backend(),
+    regexp = "Underlying error: runtime unavailable"
+  )
+  expect_false(FIMS:::.fims_julia_backend_state$initialized)
+})
+
 test_that("initialize_fims validates backend selection", {
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
@@ -239,7 +292,7 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   #' @description Test that Julia backend input now includes weight-at-age and maturity matrices.
   expect_true(all(c("weights_at_age", "maturity_at_age") %in% names(julia_input[["data"]])))
   #' @description Test that Julia backend input includes serialized population and observation values.
-  expect_true(all(c("proportion_female", "observed_catch") %in% names(julia_input[["data"]])))
+  expect_true(all(c("proportion_female", "fleet_has_catch", "observed_catch", "observed_age_comp", "observed_length_comp", "age_to_length_conversion") %in% names(julia_input[["data"]])))
   #' @description Test that Julia backend parameters are serialized to the named structure expected by the Julia objective scaffold.
   expect_true(all(c("log_Fmort", "log_M", "log_init_naa", "log_rzero", "logit_steep") %in% names(julia_input[["parameters"]])))
   #' @description Test that the Julia backend weight-at-age matrix has one row per modeled year and one column per age.
@@ -247,9 +300,9 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   #' @description Test that the Julia backend maturity-at-age matrix has one row per modeled year and one column per age.
   expect_equal(dim(julia_input[["data"]][["maturity_at_age"]]), c(get_n_years(data), get_n_ages(data)))
   #' @description Test that the serialized fishing mortality vector spans every year-age cell.
-  expect_length(julia_input[["parameters"]][["log_Fmort"]], get_n_years(data) * get_n_ages(data))
+  expect_equal(dim(julia_input[["parameters"]][["log_Fmort"]]), c(get_n_years(data), length(get_fleets(data))))
   #' @description Test that the serialized natural mortality vector spans every year-age cell.
-  expect_length(julia_input[["parameters"]][["log_M"]], get_n_years(data) * get_n_ages(data))
+  expect_equal(dim(julia_input[["parameters"]][["log_M"]]), c(get_n_years(data), get_n_ages(data)))
   #' @description Test that the serialized initial numbers-at-age preserve the original parameter order.
   expect_equal(
     julia_input[["parameters"]][["log_init_naa"]],
@@ -259,9 +312,9 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   )
   #' @description Test that the serialized fishing mortality preserves the original parameter order.
   expect_equal(
-    julia_input[["parameters"]][["log_Fmort"]],
+    julia_input[["parameters"]][["log_Fmort"]][, match("fleet1", get_fleets(data))],
     parameters |>
-      dplyr::filter(.data$module_name == "Fleet", .data$label == "log_Fmort") |>
+      dplyr::filter(.data$module_name == "Fleet", .data$fleet == "fleet1", .data$label == "log_Fmort") |>
       dplyr::pull(.data$value)
   )
 
@@ -330,7 +383,7 @@ test_that("Julia backend serializer omits unavailable observed data entries", {
   clear()
 })
 
-test_that("Julia backend serializer rejects unsupported multi-fleet observation inputs", {
+test_that("Julia backend serializer preserves multiple fleets and composition streams", {
   reset_julia_backend_state()
   make_multi_fleet_data <- function(data_type) {
     dplyr::bind_rows(
@@ -344,29 +397,229 @@ test_that("Julia backend serializer rejects unsupported multi-fleet observation 
 
   catch_data <- make_multi_fleet_data("catch")
   catch_parameters <- FIMS::setup_default_parameters(data = catch_data)
-  #' @description Test that the experimental Julia serializer errors on unsupported multiple catch fleets.
-  expect_error(
-    FIMS:::prepare_julia_backend_input(parameters = catch_parameters, data = catch_data),
-    regexp = "currently supports only one catch fleet"
-  )
+  catch_input <- FIMS:::prepare_julia_backend_input(parameters = catch_parameters, data = catch_data)
+  expect_equal(dim(catch_input[["data"]][["observed_catch"]]), c(get_n_years(catch_data), length(get_fleets(catch_data))))
+  expect_equal(dim(catch_input[["parameters"]][["log_Fmort"]]), c(get_n_years(catch_data), length(get_fleets(catch_data))))
 
   index_data <- make_multi_fleet_data("index")
   index_parameters <- FIMS::setup_default_parameters(data = index_data)
-  #' @description Test that the experimental Julia serializer errors on unsupported multiple index fleets.
-  expect_error(
-    FIMS:::prepare_julia_backend_input(parameters = index_parameters, data = index_data),
-    regexp = "currently supports only one index fleet"
-  )
+  index_input <- FIMS:::prepare_julia_backend_input(parameters = index_parameters, data = index_data)
+  expect_equal(dim(index_input[["data"]][["observed_index"]]), c(get_n_years(index_data), length(get_fleets(index_data))))
 
   agecomp_data <- make_multi_fleet_data("age_comp")
   agecomp_parameters <- FIMS::setup_default_parameters(data = agecomp_data)
-  #' @description Test that the experimental Julia serializer errors on unsupported multiple age-composition fleets.
-  expect_error(
-    FIMS:::prepare_julia_backend_input(parameters = agecomp_parameters, data = agecomp_data),
-    regexp = "currently supports only one age-composition fleet"
-  )
+  agecomp_input <- FIMS:::prepare_julia_backend_input(parameters = agecomp_parameters, data = agecomp_data)
+  expect_equal(dim(agecomp_input[["data"]][["observed_age_comp"]]), c(get_n_years(agecomp_data), get_n_ages(agecomp_data), length(get_fleets(agecomp_data))))
 
   clear()
+})
+
+test_that("Julia backend config preserves normal catch and lognormal index likelihoods", {
+  data <- data_big |>
+    dplyr::mutate(
+      uncertainty = dplyr::if_else(
+        .data$type == "catch",
+        paste0(
+          "~ dnorm(mean = catch_expected, sd = ",
+          .data$timing - min(data_big[["timing"]][data_big[["type"]] == "catch"]) + 2,
+          ")"
+        ),
+        as.character(.data$uncertainty)
+      )
+    ) |>
+    FIMS::FIMSFrame()
+  parameters <- FIMS::setup_default_parameters(data = data)
+  config <- FIMS:::as_julia_fims_model_config(parameters = parameters, data = data)
+
+  expect_equal(config[["catch_distribution"]], "dnorm")
+  expect_equal(dim(config[["catch_sigma"]]), c(get_n_years(data), length(get_fleets(data))))
+  catch_fleet <- match("fleet1", get_fleets(data))
+  expect_equal(config[["catch_sigma"]][1, catch_fleet], 2)
+  expect_equal(config[["catch_sigma"]][2, catch_fleet], 3)
+  expect_equal(config[["index_distribution"]], "dlnorm")
+  expect_equal(dim(config[["index_sigma"]]), c(get_n_years(data), length(get_fleets(data))))
+  expect_true(all(config[["index_sigma"]] > 0))
+  expect_true(config[["recruitment_process_active"]])
+
+  lognormal_process_parameters <- parameters |>
+    dplyr::mutate(
+      distribution = dplyr::if_else(
+        .data$module_name == "Recruitment" & .data$label == "log_devs",
+        "Dlnorm",
+        as.character(.data$distribution)
+      )
+    )
+  lognormal_process_config <- FIMS:::as_julia_fims_model_config(
+    parameters = lognormal_process_parameters,
+    data = data
+  )
+  expect_equal(lognormal_process_config[["recruitment_process_distribution"]], "dlnorm")
+
+  unsupported_composition_data <- data_big |>
+    dplyr::mutate(
+      uncertainty = dplyr::if_else(
+        .data$type == "age_comp",
+        "~ dnorm(mean = age_comp_expected, sd = 0.1)",
+        as.character(.data$uncertainty)
+      )
+    ) |>
+    FIMS::FIMSFrame()
+  unsupported_composition_parameters <- FIMS::setup_default_parameters(
+    data = unsupported_composition_data
+  )
+  expect_error(
+    FIMS:::as_julia_fims_model_config(
+      parameters = unsupported_composition_parameters,
+      data = unsupported_composition_data
+    ),
+    regexp = "only.*dmultinom"
+  )
+
+  unsupported_selectivity_parameters <- parameters |>
+    dplyr::mutate(
+      module_type = dplyr::if_else(
+        .data$module_name == "Selectivity",
+        "Logistic3D",
+        .data$module_type
+      )
+    )
+  expect_error(
+    FIMS:::as_julia_fims_model_config(
+      parameters = unsupported_selectivity_parameters,
+      data = data
+    ),
+    regexp = "does not support.*Selectivity"
+  )
+
+  mixed_catch_data <- dplyr::bind_rows(
+    data_big |>
+      dplyr::mutate(
+        uncertainty = dplyr::if_else(
+          .data$type == "catch",
+          "~ dnorm(mean = catch_expected, sd = 0.1)",
+          as.character(.data$uncertainty)
+        )
+      ),
+    data_big |>
+      dplyr::filter(.data$type == "catch", .data$fleet == "fleet1") |>
+      dplyr::mutate(
+        fleet = "fleet2",
+        uncertainty = "~ dlnorm(meanlog = log_catch_expected, sdlog = 0.2)"
+      )
+  ) |>
+    FIMS::FIMSFrame()
+  mixed_catch_parameters <- FIMS::setup_default_parameters(data = mixed_catch_data)
+  mixed_catch_config <- FIMS:::as_julia_fims_model_config(
+    parameters = mixed_catch_parameters,
+    data = mixed_catch_data
+  )
+  mixed_catch_families <- mixed_catch_config[["catch_distribution"]]
+  expect_equal(dim(mixed_catch_families), dim(mixed_catch_config[["catch_sigma"]]))
+  expect_equal(mixed_catch_families[1, match("fleet1", get_fleets(mixed_catch_data))], "dnorm")
+  expect_equal(mixed_catch_families[1, match("fleet2", get_fleets(mixed_catch_data))], "dlnorm")
+
+  no_process_parameters <- parameters |>
+    dplyr::mutate(
+      distribution_type = dplyr::if_else(
+        .data$module_name == "Recruitment" & .data$label == "log_devs",
+        NA_character_,
+        .data$distribution_type
+      ),
+      distribution = dplyr::if_else(
+        .data$module_name == "Recruitment" & .data$label == "log_devs",
+        NA_character_,
+        .data$distribution
+      )
+    )
+  no_process_config <- FIMS:::as_julia_fims_model_config(
+    parameters = no_process_parameters,
+    data = data
+  )
+  expect_false(no_process_config[["recruitment_process_active"]])
+
+  partial_process_parameters <- parameters |>
+    dplyr::group_by(.data$module_name, .data$label) |>
+    dplyr::mutate(
+      distribution_type = dplyr::if_else(
+        .data$module_name == "Recruitment" &
+          .data$label == "log_devs" &
+          dplyr::row_number() == 1L,
+        NA_character_,
+        .data$distribution_type
+      ),
+      distribution = dplyr::if_else(
+        .data$module_name == "Recruitment" &
+          .data$label == "log_devs" &
+          dplyr::row_number() == 1L,
+        NA_character_,
+        .data$distribution
+      )
+    ) |>
+    dplyr::ungroup()
+  expect_error(
+    FIMS:::as_julia_fims_model_config(partial_process_parameters, data),
+    regexp = "distribution for every"
+  )
+
+  log_r_parameters <- parameters |>
+    dplyr::filter(.data$label != "log_devs") |>
+    dplyr::bind_rows(
+      parameters |>
+        dplyr::filter(.data$label == "log_devs") |>
+        dplyr::mutate(label = "log_r")
+    )
+  log_r_config <- FIMS:::as_julia_fims_model_config(log_r_parameters, data)
+  log_r_input <- FIMS:::as_julia_fims_parameters(log_r_parameters, data)
+  expect_equal(log_r_config[["recruitment_process_mode"]], "log_r")
+  expect_equal(length(log_r_input[["log_r"]]), get_n_years(data) - 1L)
+
+  vector_log_sd_parameters <- parameters |>
+    dplyr::filter(.data$label != "log_sd") |>
+    dplyr::bind_rows(
+      parameters |>
+        dplyr::filter(.data$module_name == "Recruitment", .data$label == "log_sd") |>
+        dplyr::slice(rep(1L, get_n_years(data) - 1L)) |>
+        dplyr::mutate(
+          value = log(seq_len(get_n_years(data) - 1L) / 10),
+          timing = seq.int(get_start_year(data) + 1L, get_end_year(data)),
+          estimation_type = "fixed_effects"
+        )
+    )
+  vector_log_sd_config <- FIMS:::as_julia_fims_model_config(
+    vector_log_sd_parameters,
+    data
+  )
+  vector_log_sd_input <- FIMS:::as_julia_fims_parameters(
+    vector_log_sd_parameters,
+    data
+  )
+  log_sd_start <- sum(purrr::map_int(
+    vector_log_sd_input[seq_len(match("log_sd", names(vector_log_sd_input)) - 1L)],
+    length
+  )) + 1L
+  log_sd_indices <- seq.int(
+    log_sd_start,
+    length.out = length(vector_log_sd_input[["log_sd"]])
+  )
+  expect_equal(length(vector_log_sd_input[["log_sd"]]), get_n_years(data) - 1L)
+  expect_true(all(vector_log_sd_config[["fixed_parameter_mask"]][log_sd_indices]))
+  expect_equal(
+    length(vector_log_sd_config[["fixed_parameter_mask"]]),
+    sum(purrr::map_int(vector_log_sd_input, length))
+  )
+
+  invalid_log_sd_parameters <- parameters |>
+    dplyr::filter(.data$label != "log_sd") |>
+    dplyr::bind_rows(
+      parameters |>
+        dplyr::filter(.data$module_name == "Recruitment", .data$label == "log_sd") |>
+        dplyr::slice(rep(1L, 2L)) |>
+        dplyr::mutate(timing = seq.int(get_start_year(data) + 1L, length.out = 2L))
+    )
+  expect_error(
+    FIMS:::as_julia_fims_model_config(invalid_log_sd_parameters, data),
+    regexp = "must contain one value"
+  )
 })
 
 test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bridge", {
@@ -377,15 +630,35 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
   julia_input <- attr(result, "julia_input")
   parameter_lengths <- purrr::map_int(julia_input[["parameters"]], length)
   flattened_parameter_count <- sum(parameter_lengths)
+  n_years <- get_n_years(data)
+  n_ages <- get_n_ages(data)
+  n_fleets <- length(get_fleets(data))
+  n_lengths <- get_n_lengths(data)
   mocked_report <- list(
-   numbers_at_age = matrix(1, nrow = get_n_years(data), ncol = get_n_ages(data)),
-   catch_numbers_at_age = matrix(0.1, nrow = get_n_years(data), ncol = get_n_ages(data)),
-   biomass = rep(1, get_n_years(data)),
-   spawning_biomass = rep(0.5, get_n_years(data)),
-   expected_recruitment = rep(1, get_n_years(data)),
-   catch_expected = rep(1, get_n_years(data)),
-   index_expected = rep(0.5, get_n_years(data)),
-   agecomp_expected = matrix(1 / get_n_ages(data), nrow = get_n_years(data), ncol = get_n_ages(data))
+    numbers_at_age = matrix(1, nrow = n_years, ncol = n_ages),
+    catch_numbers_at_age = matrix(0.1, nrow = n_years, ncol = n_ages),
+    biomass = rep(1, n_years),
+    spawning_biomass = rep(0.5, n_years),
+    expected_recruitment = rep(1, n_years),
+    mortality_F = matrix(0.1, nrow = n_years, ncol = n_ages),
+    mortality_M = matrix(0.2, nrow = n_years, ncol = n_ages),
+    mortality_Z = matrix(0.3, nrow = n_years, ncol = n_ages),
+    proportion_mature_at_age = matrix(0.5, nrow = n_years, ncol = n_ages),
+    sum_selectivity = matrix(1, nrow = n_years, ncol = n_ages),
+    total_catch_numbers = rep(1, n_years),
+    total_catch_weight = rep(1, n_years),
+    catch_expected = rep(1, n_years),
+    index_expected = rep(0.5, n_years),
+    catch_expected_by_fleet = matrix(1, nrow = n_years, ncol = n_fleets),
+    index_expected_by_fleet = matrix(0.5, nrow = n_years, ncol = n_fleets),
+    catch_numbers_by_fleet = matrix(1, nrow = n_years, ncol = n_fleets),
+    index_numbers_by_fleet = matrix(1, nrow = n_years, ncol = n_fleets),
+    catch_weight_at_age_by_fleet = array(0.1, dim = c(n_years, n_ages, n_fleets)),
+    index_weight_at_age_by_fleet = array(0.1, dim = c(n_years, n_ages, n_fleets)),
+    catch_numbers_at_age_by_fleet = array(0.1, dim = c(n_years, n_ages, n_fleets)),
+    index_numbers_at_age_by_fleet = array(0.1, dim = c(n_years, n_ages, n_fleets)),
+    agecomp_expected = array(1 / n_ages, dim = c(n_years, n_ages, n_fleets)),
+    lengthcomp_expected = array(1 / n_lengths, dim = c(n_years, n_lengths, n_fleets))
   )
 
   testthat::local_mocked_bindings(
@@ -420,8 +693,12 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
   expect_equal(FIMS::get_opt(fit)[["convergence"]], 0L)
   #' @description Test that the Julia backend fit bridge exposes the Julia report jnll through get_report().
   expect_equal(FIMS::get_report(fit)[["jnll"]], 12.5)
-  #' @description Test that Julia backend fits produce estimate rows for the serialized catch data stream.
-  expect_true("catch_expected" %in% FIMS::get_estimates(fit)[["label"]])
+  #' @description Test that Julia backend reports include the mortality and fleet-derived quantities used by FIMS summaries.
+  expect_true(all(c("mortality_F", "mortality_M", "mortality_Z", "total_catch_numbers") %in% names(FIMS::get_report(fit))))
+  #' @description Test that Julia backend reports preserve both recruitment process parameterizations.
+  expect_true(all(c("log_recruit_dev", "log_r") %in% names(FIMS::get_report(fit))))
+  #' @description Test that Julia backend fits produce estimate rows for catch and mortality quantities.
+  expect_true(all(c("catch_expected", "mortality_F") %in% FIMS::get_estimates(fit)[["label"]]))
   #' @description Test that Julia backend fits support backend-neutral glance summaries.
   expect_equal(generics::glance(fit)[["marginal_nll"]], 12.5)
 
