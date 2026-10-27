@@ -263,8 +263,8 @@ end
       :lengths_by_fleet => [10.0 20.0; 20.0 30.0; 0.0 0.0],
       :n_lengths_by_fleet => [2, 2],
       :observed_length_comp => cat(
-        [20.0 40.0 -999.0; 22.0 38.0 -999.0],
-        [-999.0 30.0 50.0; -999.0 34.0 46.0],
+        [20.0 40.0 0.0; 22.0 38.0 0.0],
+        [0.0 30.0 50.0; 0.0 34.0 46.0],
         dims = 3,
       ),
     ),
@@ -281,6 +281,14 @@ end
   @test all(fleet_specific_conversion[:, 3, 1] .== 0)
   @test all(fleet_specific_conversion[:, 1, 2] .== 0)
   @test isfinite(fleet_specific_result["nll"])
+  changed_length_comp = copy(fleet_specific_data[:observed_length_comp])
+  changed_length_comp[1, 1, 1] += 10
+  changed_composition_result = evaluate_model(
+    vonb_parameters,
+    merge(fleet_specific_data, Dict(:observed_length_comp => changed_length_comp)),
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  @test changed_composition_result["nll"] != fleet_specific_result["nll"]
   @test isfinite(vonb_result["nll"])
   delta_sd = delta_method_result["report"]["sd_length_at_age"]
   @test all(isfinite, delta_sd)

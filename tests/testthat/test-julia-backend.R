@@ -549,7 +549,15 @@ test_that("Julia backend serializes fleet-specific VonBertalanffy length bins", 
       fleet_bin_indices
     )
     expect_true(any(observed_length_comp[, fleet_bin_indices, fleet_index] != -999))
-    expect_true(all(observed_length_comp[, absent_bin_indices, fleet_index] == -999))
+    fleet_observation_years <- unique(raw_data$timing[
+      raw_data$type == "length_comp" &
+        raw_data$fleet == fleet_names[[fleet_index]]
+    ])
+    sampled_year_indices <- fleet_observation_years -
+      FIMS:::get_start_year(data) + 1L
+    expect_true(all(
+      observed_length_comp[sampled_year_indices, absent_bin_indices, fleet_index] == 0
+    ))
   }
 })
 

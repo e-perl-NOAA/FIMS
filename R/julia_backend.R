@@ -188,6 +188,14 @@ as_julia_fims_data <- function(data, parameters) {
         model_length_comp(data, fleets[[fleet_index]])
       }
       stream_data[, , fleet_index][positions] <- observed
+      if (data_type == "length_comp" && is_vonb_growth) {
+        fleet_bin_indices <- match(length_bins_by_fleet[[fleet_index]], lengths)
+        structural_zero_bins <- setdiff(seq_len(n_bins), fleet_bin_indices)
+        observed_years <- unique(positions[, 1])
+        if (length(structural_zero_bins) > 0L) {
+          stream_data[observed_years, structural_zero_bins, fleet_index] <- 0
+        }
+      }
     }
     stream_data
   }
