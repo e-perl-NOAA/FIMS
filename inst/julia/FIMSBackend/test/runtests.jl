@@ -224,6 +224,52 @@ end
   @test all(delta_sd .> 0)
   @test delta_sd != vonb_result["report"]["sd_length_at_age"]
   @test isfinite(delta_method_result["nll"])
+  reference_log_lengths = [log(275.0), log(725.0), log(0.18)]
+  mean_length_at_age = function (log_lengths, age)
+    mean_young = exp(log_lengths[1])
+    mean_old = exp(log_lengths[2])
+    coefficient = exp(log_lengths[3])
+    numerator = 1 - exp(-coefficient * (age - 1.0))
+    denominator = 1 - exp(-coefficient * (3.0 - 1.0))
+    mean_young + (mean_old - mean_young) * numerator / denominator
+  end
+  log_length_at_age = (log_lengths, age) -> log(mean_length_at_age(log_lengths, age))
+  correlation(value) = 2 / (1 + exp(-value)) - 1
+  covariance_young_old = correlation(0.2) * 12.0 * 20.0
+  covariance_young_coefficient = correlation(-0.3) * 12.0 * 0.03
+  covariance_old_coefficient = correlation(0.1) * 20.0 * 0.03
+  variance_young = 12.0^2
+  variance_old = 20.0^2
+  variance_coefficient = 0.03^2
+  growth_covariance = [
+    variance_young covariance_young_old covariance_young_coefficient
+    covariance_young_old variance_old covariance_old_coefficient
+    covariance_young_coefficient covariance_old_coefficient variance_coefficient
+  ]
+  function finite_difference_gradient(age)
+    gradient = zeros(3)
+    for parameter_index in 1:3
+      offset = zeros(3)
+      offset[parameter_index] = 1e-5
+      gradient[parameter_index] =
+        (
+          log_length_at_age(reference_log_lengths .+ offset, age) -
+          log_length_at_age(reference_log_lengths .- offset, age)
+        ) / 2e-5
+    end
+    gradient
+  end
+  expected_delta_sd = [
+    mean_length_at_age(reference_log_lengths, age) *
+    sqrt(max(
+      sum(
+        finite_difference_gradient(age) .*
+        (growth_covariance * finite_difference_gradient(age))
+      ),
+      0.0,
+    )) for age in data[:ages]
+  ]
+  @test delta_sd[1, :] ≈ expected_delta_sd atol = 1e-5
   @test_throws ArgumentError evaluate_model(
     ComponentArray(
       merge(
