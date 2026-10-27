@@ -356,25 +356,94 @@ function build_growth_products(params, data_dict, model_config)
   age_to_length_conversion = nothing
   if data_dict[:n_lengths] > 0
     lengths = data_dict[:lengths]
-    observation_edges = growth_observation_edges(lengths)
-    size_edges = growth_population_size_edges(observation_edges)
-    rebin_weights = growth_rebin_weights(size_edges, observation_edges)
-    age_to_length_conversion = zeros(
-      promote_type(eltype(mean_length), eltype(sd_length)),
-      n_ages,
-      length(lengths),
-    )
-    for age_index in 1:n_ages
-      sd = max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
-      population_probabilities = growth_size_bin_probabilities(
-        mean_length[age_index],
-        sd,
-        size_edges,
+    has_fleet_lengths = haskey(data_dict, :lengths_by_fleet)
+    has_fleet_length_counts = haskey(data_dict, :n_lengths_by_fleet)
+    has_fleet_lengths == has_fleet_length_counts ||
+      throw(ArgumentError("Fleet-specific length bins and their counts must be provided together."))
+    has_fleet_length_bins = has_fleet_lengths && has_fleet_length_counts
+    if has_fleet_length_bins
+      fleet_lengths = Matrix(data_dict[:lengths_by_fleet])
+      fleet_length_counts = Int.(data_dict[:n_lengths_by_fleet])
+      n_fleets = length(data_dict[:fleets])
+      size(fleet_lengths) == (length(lengths), n_fleets) ||
+        throw(ArgumentError("Fleet-specific length bins must match the global length and fleet dimensions."))
+      length(fleet_length_counts) == n_fleets ||
+        throw(ArgumentError("Fleet-specific length-bin counts must match the number of fleets."))
+      all((fleet_length_counts .>= 0) .& (fleet_length_counts .<= length(lengths))) ||
+        throw(ArgumentError("Fleet-specific length-bin counts are outside the global length-bin range."))
+      for fleet_index in 1:n_fleets
+        n_fleet_lengths = fleet_length_counts[fleet_index]
+        n_fleet_lengths == 0 && continue
+        fleet_bins = fleet_lengths[1:n_fleet_lengths, fleet_index]
+        all(isfinite, fleet_bins) && issorted(fleet_bins) && allunique(fleet_bins) ||
+          throw(ArgumentError("Each fleet's length bins must be finite, sorted, and unique."))
+        all(bin -> bin in lengths, fleet_bins) ||
+          throw(ArgumentError("Fleet-specific length bins must be present in the global length-bin vector."))
+      end
+      shared_length_bins = all(1:n_fleets) do fleet_index
+        n_fleet_lengths = fleet_length_counts[fleet_index]
+        n_fleet_lengths == length(lengths) &&
+          fleet_lengths[1:n_fleet_lengths, fleet_index] == lengths
+      end
+    else
+      shared_length_bins = true
+    end
+
+    if shared_length_bins
+      observation_edges = growth_observation_edges(lengths)
+      size_edges = growth_population_size_edges(observation_edges)
+      rebin_weights = growth_rebin_weights(size_edges, observation_edges)
+      age_to_length_conversion = zeros(
+        promote_type(eltype(mean_length), eltype(sd_length)),
+        n_ages,
+        length(lengths),
       )
-      row = rebin_weights * population_probabilities
-      row .+= oftype(sd, 1e-12)
-      row ./= sum(row)
-      age_to_length_conversion[age_index, :] .= row
+      for age_index in 1:n_ages
+        sd = max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
+        population_probabilities = growth_size_bin_probabilities(
+          mean_length[age_index],
+          sd,
+          size_edges,
+        )
+        row = rebin_weights * population_probabilities
+        row .+= oftype(sd, 1e-12)
+        row ./= sum(row)
+        age_to_length_conversion[age_index, :] .= row
+      end
+    else
+      age_to_length_conversion = zeros(
+        promote_type(eltype(mean_length), eltype(sd_length)),
+        n_ages,
+        length(lengths),
+        length(data_dict[:fleets]),
+      )
+      for fleet_index in eachindex(data_dict[:fleets])
+        n_fleet_lengths = fleet_length_counts[fleet_index]
+        n_fleet_lengths == 0 && continue
+        fleet_bins = fleet_lengths[1:n_fleet_lengths, fleet_index]
+        global_indices = Int[]
+        for bin in fleet_bins
+          global_index = findfirst(==(bin), lengths)
+          isnothing(global_index) &&
+            throw(ArgumentError("Fleet-specific length bins must be present in the global length-bin vector."))
+          push!(global_indices, global_index)
+        end
+        observation_edges = growth_observation_edges(fleet_bins)
+        size_edges = growth_population_size_edges(observation_edges)
+        rebin_weights = growth_rebin_weights(size_edges, observation_edges)
+        for age_index in 1:n_ages
+          sd = max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
+          population_probabilities = growth_size_bin_probabilities(
+            mean_length[age_index],
+            sd,
+            size_edges,
+          )
+          row = rebin_weights * population_probabilities
+          row .+= oftype(sd, 1e-12)
+          row ./= sum(row)
+          age_to_length_conversion[age_index, global_indices, fleet_index] .= row
+        end
+      end
     end
   end
   (
@@ -709,8 +778,10 @@ function evaluate_model(parameters_vector, data_dict, model_config)
         age_comp_expected[year, :, fleet_index] .= numbers_at_age[year, :] ./ total_numbers
       end
       if !isnothing(growth_products.age_to_length_conversion)
-        length_numbers =
-          transpose(growth_products.age_to_length_conversion) * numbers_at_age[year, :]
+        conversion = growth_products.age_to_length_conversion
+        fleet_conversion = ndims(conversion) == 3 ?
+          view(conversion, :, :, fleet_index) : conversion
+        length_numbers = transpose(fleet_conversion) * numbers_at_age[year, :]
         total_length_numbers = sum(length_numbers)
         if total_length_numbers > 0
           length_comp_expected[year, :, fleet_index] .= length_numbers ./ total_length_numbers

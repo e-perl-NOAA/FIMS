@@ -492,6 +492,67 @@ test_that("Julia backend serializes VonBertalanffy growth parameters and masks",
   )
 })
 
+test_that("Julia backend serializes fleet-specific VonBertalanffy length bins", {
+  fleet_names <- FIMS:::get_fleets(FIMS::FIMSFrame(data_big))
+  skip_if(length(fleet_names) < 2L)
+  data <- data_big |>
+    dplyr::mutate(
+      length = dplyr::if_else(
+        .data$type == "length_comp" & .data$fleet == fleet_names[[2]],
+        .data$length + 1,
+        .data$length
+      )
+    ) |>
+    FIMS::FIMSFrame()
+  default_parameters <- FIMS::setup_default_parameters(data = data)
+  parameters <- dplyr::bind_rows(
+    default_parameters |>
+      dplyr::filter(.data$module_name != "Growth"),
+    FIMS::setup_default_Growth(data, module_type = "VonBertalanffySchnute")
+  )
+
+  julia_data <- FIMS:::as_julia_fims_data(data, parameters)
+  raw_data <- FIMS:::get_data(data)
+  expected_bins <- lapply(fleet_names, function(fleet) {
+    sort(unique(raw_data$length[
+      raw_data$type == "length_comp" & raw_data$fleet == fleet
+    ]))
+  })
+
+  expect_equal(
+    julia_data[["n_lengths_by_fleet"]],
+    unname(lengths(expected_bins))
+  )
+  expect_equal(
+    julia_data[["lengths_by_fleet"]],
+    unname(vapply(
+      expected_bins,
+      function(bins) {
+        c(bins, rep(0, julia_data[["n_lengths"]] - length(bins)))
+      },
+      numeric(julia_data[["n_lengths"]])
+    ))
+  )
+  observed_length_comp <- julia_data[["observed_length_comp"]]
+  expect_equal(
+    dim(observed_length_comp),
+    c(
+      FIMS:::get_n_years(data),
+      julia_data[["n_lengths"]],
+      length(fleet_names)
+    )
+  )
+  for (fleet_index in seq_along(fleet_names)) {
+    fleet_bin_indices <- match(expected_bins[[fleet_index]], julia_data[["lengths"]])
+    absent_bin_indices <- setdiff(
+      seq_len(julia_data[["n_lengths"]]),
+      fleet_bin_indices
+    )
+    expect_true(any(observed_length_comp[, fleet_bin_indices, fleet_index] != -999))
+    expect_true(all(observed_length_comp[, absent_bin_indices, fleet_index] == -999))
+  }
+})
+
 test_that("Julia backend serializes VonBertalanffy delta-method variability", {
   data <- data_big |>
     dplyr::filter(.data$fleet == "fleet1") |>

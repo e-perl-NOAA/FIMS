@@ -131,32 +131,20 @@ as_julia_fims_data <- function(data, parameters) {
     unique() |>
     stats::na.omit()
   is_vonb_growth <- "VonBertalanffySchnute" %in% growth_types
+  has_length_comp <- any(raw_data$type == "length_comp")
+  length_bins_by_fleet <- NULL
   lengths <- if (is_vonb_growth && any(raw_data$type == "length_comp")) {
     sort(unique(raw_data$length[raw_data$type == "length_comp"]))
   } else {
     get_lengths(data)
   }
   n_lengths <- length(lengths)
-  if (is_vonb_growth && any(raw_data$type == "length_comp")) {
-    length_bins_by_fleet <- raw_data |>
-      dplyr::filter(.data$type == "length_comp") |>
-      dplyr::group_by(.data$fleet) |>
-      dplyr::summarise(
-        bins = list(sort(unique(.data$length))),
-        .groups = "drop"
-      ) |>
-      dplyr::pull(.data$bins)
-    if (length(length_bins_by_fleet) > 1L &&
-      !all(vapply(
-        length_bins_by_fleet[-1],
-        identical,
-        logical(1),
-        length_bins_by_fleet[[1]]
-      ))) {
-      cli::cli_abort(
-        "Julia backend currently requires matching length-composition bins across fleets for VonBertalanffySchnute growth."
-      )
-    }
+  if (is_vonb_growth && has_length_comp) {
+    length_bins_by_fleet <- lapply(fleets, function(fleet) {
+      sort(unique(raw_data$length[
+        raw_data$type == "length_comp" & raw_data$fleet == fleet
+      ]))
+    })
   }
 
   year_index <- function(year) as.integer(year - get_start_year(data) + 1L)
@@ -263,6 +251,20 @@ as_julia_fims_data <- function(data, parameters) {
     maturity_at_age = matrix(rep(maturity_by_age, times = n_years), nrow = n_years, byrow = TRUE),
     proportion_female = proportion_female
   )
+
+  if (is_vonb_growth && has_length_comp) {
+    n_lengths_by_fleet <- unname(purrr::map_int(length_bins_by_fleet, length))
+    lengths_by_fleet <- matrix(0, nrow = n_lengths, ncol = length(fleets))
+    for (fleet_index in seq_along(fleets)) {
+      n_fleet_lengths <- n_lengths_by_fleet[[fleet_index]]
+      if (n_fleet_lengths > 0L) {
+        lengths_by_fleet[seq_len(n_fleet_lengths), fleet_index] <-
+          length_bins_by_fleet[[fleet_index]]
+      }
+    }
+    julia_data[["lengths_by_fleet"]] <- lengths_by_fleet
+    julia_data[["n_lengths_by_fleet"]] <- as.integer(n_lengths_by_fleet)
+  }
 
   if (any(julia_data[["fleet_has_catch"]])) {
     observed_catch <- matrix(-999, nrow = n_years, ncol = length(fleets))

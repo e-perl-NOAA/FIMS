@@ -255,6 +255,32 @@ end
     expected_conversion[age_index, :] ./= sum(expected_conversion[age_index, :])
   end
   @test vonb_result["report"]["age_to_length_conversion"] ≈ expected_conversion
+  fleet_specific_data = merge(
+    data,
+    Dict(
+      :n_lengths => 3,
+      :lengths => [10.0, 20.0, 30.0],
+      :lengths_by_fleet => [10.0 20.0; 20.0 30.0; 0.0 0.0],
+      :n_lengths_by_fleet => [2, 2],
+      :observed_length_comp => cat(
+        [20.0 40.0 -999.0; 22.0 38.0 -999.0],
+        [-999.0 30.0 50.0; -999.0 34.0 46.0],
+        dims = 3,
+      ),
+    ),
+  )
+  fleet_specific_result = evaluate_model(
+    vonb_parameters,
+    fleet_specific_data,
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  fleet_specific_conversion =
+    fleet_specific_result["report"]["age_to_length_conversion"]
+  @test size(fleet_specific_conversion) == (3, 3, 2)
+  @test all(isapprox.(sum(fleet_specific_conversion, dims = 2), 1.0))
+  @test all(fleet_specific_conversion[:, 3, 1] .== 0)
+  @test all(fleet_specific_conversion[:, 1, 2] .== 0)
+  @test isfinite(fleet_specific_result["nll"])
   @test isfinite(vonb_result["nll"])
   delta_sd = delta_method_result["report"]["sd_length_at_age"]
   @test all(isfinite, delta_sd)
