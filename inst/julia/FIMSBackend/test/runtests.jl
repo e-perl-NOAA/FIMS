@@ -56,7 +56,7 @@ using ComponentArrays: ComponentArray
 end
 
 @testset "multi-fleet catch, index, age, and length streams" begin
-  parameters = ComponentArray((
+  parameter_values = (
     inflection_point = [2.0, 2.0],
     slope = [1.0, 1.0],
     inflection_point_asc = [2.0, 2.0],
@@ -71,7 +71,14 @@ end
     log_M = fill(log(0.2), 2, 3),
     log_Fmort = [log(0.1) -200.0; log(0.1) -200.0],
     log_q = [0.0, log(2.0)],
-  ))
+  )
+  parameters = ComponentArray(parameter_values)
+  maturity_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (maturity_inflection_point = 2.0, maturity_slope = 1.0),
+    ),
+  )
   data = Dict(
     :fleets => ["fish", "survey"],
     :fleet_has_catch => [true, false],
@@ -111,6 +118,7 @@ end
 
   result = evaluate_model(parameters, data, config)
   report = result["report"]
+  maturity_result = evaluate_model(maturity_parameters, data, config)
   no_process_result = evaluate_model(
     parameters,
     data,
@@ -146,6 +154,10 @@ end
   )
 
   @test isfinite(result["nll"])
+  expected_maturity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
+  @test maturity_result["report"]["proportion_mature_at_age"] ≈
+    repeat(reshape(expected_maturity, 1, :), 2, 1)
+  @test maturity_result["nll"] != result["nll"]
   @test normal_prior_result["nll"] - result["nll"] ≈
     0.5 * log(2π) + log(3.0) + (1.0 - 1.5)^2 / (2 * 3.0^2)
   @test normal_prior_result["report"]["parameter_prior_nll"] ≈

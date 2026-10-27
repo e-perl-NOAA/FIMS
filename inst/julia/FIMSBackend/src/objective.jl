@@ -78,11 +78,27 @@ function build_recruitment(params, model_config)
 end
 
 function build_population_model(params, data_dict)
+  has_maturity_inflection = has_component(params, :maturity_inflection_point)
+  has_maturity_slope = has_component(params, :maturity_slope)
+  has_maturity_inflection == has_maturity_slope ||
+    throw(ArgumentError("Maturity inflection point and slope must be provided together."))
+  maturity_at_age = if has_maturity_inflection
+    maturity_by_age = [
+      one(params.maturity_slope) /
+      (
+        one(params.maturity_slope) +
+        exp(-params.maturity_slope * (age - params.maturity_inflection_point))
+      ) for age in data_dict[:ages]
+    ]
+    repeat(reshape(maturity_by_age, 1, :), data_dict[:n_years], 1)
+  else
+    Matrix(data_dict[:maturity_at_age])
+  end
   T = promote_type(
     eltype(collect(params.log_init_naa)),
     eltype(data_dict[:ages]),
     eltype(data_dict[:weights_at_age]),
-    eltype(data_dict[:maturity_at_age]),
+    eltype(maturity_at_age),
     eltype(collect(params.log_Fmort)),
   )
   n_fleets = size(params.log_Fmort, 2)
@@ -96,7 +112,7 @@ function build_population_model(params, data_dict)
   PopulationModel(
     ages = collect(data_dict[:ages]),
     weights_at_age = Matrix(data_dict[:weights_at_age]),
-    maturity_at_age = Matrix(data_dict[:maturity_at_age]),
+    maturity_at_age = Matrix{T}(maturity_at_age),
     proportion_female = T.(proportion_female),
     numbers_at_age = numbers_at_age,
     catch_numbers_at_age = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
@@ -462,7 +478,7 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       "mortality_F" => population.mortality_F,
       "mortality_M" => population.mortality_M,
       "mortality_Z" => population.mortality_Z,
-      "proportion_mature_at_age" => data_dict[:maturity_at_age],
+      "proportion_mature_at_age" => population.maturity_at_age,
       "sum_selectivity" => dropdims(sum(fleet_selectivity, dims = 3), dims = 3),
       "catch_expected" => population.catch_expected,
       "index_expected" => population.index_expected,

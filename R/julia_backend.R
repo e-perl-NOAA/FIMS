@@ -287,6 +287,8 @@ as_julia_fims_parameters <- function(parameters, data) {
     dplyr::filter(.data$module_name == "Recruitment")
   population_parameters <- parameters |>
     dplyr::filter(.data$module_name == "Population")
+  maturity_parameters <- parameters |>
+    dplyr::filter(.data$module_name == "Maturity")
 
   values_for <- function(parameter_data, label, default = numeric()) {
     rows <- parameter_data |>
@@ -385,7 +387,13 @@ as_julia_fims_parameters <- function(parameters, data) {
     log_init_naa = values_for(population_parameters, "log_init_naa", rep(log(1e6), n_ages)),
     log_M = parameter_matrix(population_parameters, "log_M", log(0.2), by_age = TRUE),
     log_Fmort = log_fmort,
-    log_q = log_q
+    log_q = log_q,
+    maturity_inflection_point = values_for(
+      maturity_parameters,
+      "inflection_point",
+      0
+    )[[1]],
+    maturity_slope = values_for(maturity_parameters, "slope", 1)[[1]]
   )
 }
 
@@ -813,6 +821,10 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
       logical(1)
     )
   }
+  maturity_parameter_mask <- function(label, type) {
+    values <- estimate_mask(rows_for("Maturity", label), type)
+    if (length(values) == 0) FALSE else values[[1]]
+  }
   recruitment_parameter_mask <- function(label, type, default = FALSE) {
     values <- estimate_mask(rows_for("Recruitment", label), type)
     if (length(values) == 0) default else if (label == "log_sd") values else values[[1]]
@@ -871,7 +883,9 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
       estimate_mask(log_init_rows, type),
       as.vector(matrix_estimate_mask(log_m_rows, type, by_age = TRUE)),
       as.vector(fleet_parameter_matrix_mask("log_Fmort", type)),
-      fleet_vector_mask("log_q", type)
+      fleet_vector_mask("log_q", type),
+      maturity_parameter_mask("inflection_point", type),
+      maturity_parameter_mask("slope", type)
     )
   }
   fixed_parameter_mask <- parameter_mask("fixed_effects")

@@ -414,6 +414,46 @@ test_that("Julia backend serializer preserves multiple fleets and composition st
   clear()
 })
 
+test_that("Julia backend serializes maturity parameters and estimation masks", {
+  data <- FIMS::FIMSFrame(data_big)
+  parameters <- FIMS::setup_default_parameters(data = data) |>
+    dplyr::mutate(
+      estimation_type = dplyr::if_else(
+        .data$module_name == "Maturity",
+        "fixed_effects",
+        .data$estimation_type
+      )
+    )
+  julia_parameters <- FIMS:::as_julia_fims_parameters(parameters, data)
+  julia_config <- FIMS:::as_julia_fims_model_config(parameters, data)
+  parameter_names <- names(julia_parameters)
+  inflection_start <- sum(purrr::map_int(
+    julia_parameters[seq_len(match("maturity_inflection_point", parameter_names) - 1L)],
+    length
+  )) + 1L
+  slope_start <- sum(purrr::map_int(
+    julia_parameters[seq_len(match("maturity_slope", parameter_names) - 1L)],
+    length
+  )) + 1L
+
+  expect_equal(
+    julia_parameters[["maturity_inflection_point"]],
+    parameters |>
+      dplyr::filter(.data$module_name == "Maturity", .data$label == "inflection_point") |>
+      dplyr::pull(.data$value) |>
+      dplyr::first()
+  )
+  expect_equal(
+    julia_parameters[["maturity_slope"]],
+    parameters |>
+      dplyr::filter(.data$module_name == "Maturity", .data$label == "slope") |>
+      dplyr::pull(.data$value) |>
+      dplyr::first()
+  )
+  expect_true(julia_config[["fixed_parameter_mask"]][inflection_start])
+  expect_true(julia_config[["fixed_parameter_mask"]][slope_start])
+})
+
 test_that("Julia backend config preserves normal catch and lognormal index likelihoods", {
   data <- data_big |>
     dplyr::mutate(
