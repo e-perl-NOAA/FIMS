@@ -463,7 +463,25 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
     growth_log_length_weight_a = "length_weight_a",
     growth_log_length_weight_b = "length_weight_b",
     growth_log_length_sd_at_young = "length_at_age_sd_at_reference_ages",
-    growth_log_length_sd_at_old = "length_at_age_sd_at_reference_ages"
+    growth_log_length_sd_at_old = "length_at_age_sd_at_reference_ages",
+    growth_log_sd_mean_length_young = "log_sd_mean_length_young",
+    growth_log_sd_mean_length_old = "log_sd_mean_length_old",
+    growth_log_sd_growth_coefficient = "log_sd_growth_coefficient",
+    growth_mean_length_young_mean_length_old_logit_corr =
+      "mean_length_young_mean_length_old_logit_corr",
+    growth_mean_length_young_growth_coefficient_logit_corr =
+      "mean_length_young_growth_coefficient_logit_corr",
+    growth_mean_length_old_growth_coefficient_logit_corr =
+      "mean_length_old_growth_coefficient_logit_corr"
+  )
+  growth_components_on_natural_scale <- c(
+    "growth_log_mean_length_young",
+    "growth_log_mean_length_old",
+    "growth_log_coefficient",
+    "growth_log_length_weight_a",
+    "growth_log_length_weight_b",
+    "growth_log_length_sd_at_young",
+    "growth_log_length_sd_at_old"
   )
   component_labels <- c(
     stats::setNames(
@@ -504,14 +522,14 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
       } else {
         numeric()
       }
-      if (startsWith(component_name, "growth_log_")) exp(values) else values
+      if (component_name %in% growth_components_on_natural_scale) exp(values) else values
     }), use.names = FALSE)
     se_values <- unlist(lapply(component_names, function(component_name) {
       if (is.null(standard_errors[[component_name]])) {
         return(rep(NA_real_, length(estimates[[component_name]])))
       }
       values <- as_julia_backend_numeric(standard_errors[[component_name]])
-      if (startsWith(component_name, "growth_log_")) {
+      if (component_name %in% growth_components_on_natural_scale) {
         values <- exp(as_julia_backend_numeric(estimates[[component_name]])) * values
       }
       values

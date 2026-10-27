@@ -456,11 +456,47 @@ as_julia_fims_parameters <- function(parameters, data) {
       }
       values[[1]]
     }
-    length_sd <- growth_values("length_at_age_sd_at_reference_ages", c(3, 7))
-    if (length(length_sd) != 2L || any(!is.finite(length_sd)) || any(length_sd <= 0)) {
+    delta_method_labels <- c(
+      "log_sd_mean_length_young",
+      "log_sd_mean_length_old",
+      "log_sd_growth_coefficient",
+      "mean_length_young_mean_length_old_logit_corr",
+      "mean_length_young_growth_coefficient_logit_corr",
+      "mean_length_old_growth_coefficient_logit_corr"
+    )
+    delta_method_rows <- growth_parameters |>
+      dplyr::filter(.data$label %in% delta_method_labels)
+    has_delta_method <- nrow(delta_method_rows) > 0L
+    has_interpolation_sd <- any(
+      growth_parameters[["label"]] == "length_at_age_sd_at_reference_ages"
+    )
+    if (has_delta_method && has_interpolation_sd) {
       cli::cli_abort(
-        "Julia backend requires exactly two positive reference-age length SD values for VonBertalanffySchnute growth."
+        "Provide either reference-age SD values or delta-method parameters for VonBertalanffySchnute growth, but not both."
       )
+    }
+    if (has_delta_method) {
+      delta_method_values <- lapply(delta_method_labels, \(label) {
+        growth_scalar(label, NA_real_)
+      })
+      if (any(!is.finite(vapply(delta_method_values, identity, numeric(1))))) {
+        cli::cli_abort(
+          "VonBertalanffySchnute delta-method parameters must each have one finite value."
+        )
+      }
+      delta_method_sds <- exp(unlist(delta_method_values[seq_len(3L)]))
+      if (any(!is.finite(delta_method_sds)) || any(delta_method_sds <= 0)) {
+        cli::cli_abort(
+          "VonBertalanffySchnute delta-method standard deviations must be positive and finite on the natural scale."
+        )
+      }
+    } else {
+      length_sd <- growth_values("length_at_age_sd_at_reference_ages", c(3, 7))
+      if (length(length_sd) != 2L || any(!is.finite(length_sd)) || any(length_sd <= 0)) {
+        cli::cli_abort(
+          "Julia backend requires exactly two positive reference-age length SD values for VonBertalanffySchnute growth."
+        )
+      }
     }
     scalar_values <- c(
       growth_scalar("mean_length_young", 275),
@@ -472,10 +508,9 @@ as_julia_fims_parameters <- function(parameters, data) {
       growth_scalar("length_weight_b", 3)
     )
     positive_values <- scalar_values[c(1L, 2L, 3L, 6L, 7L)]
-    if (any(positive_values <= 0) || any(!is.finite(length_sd)) ||
-      any(length_sd <= 0)) {
+    if (any(positive_values <= 0)) {
       cli::cli_abort(
-        "Julia backend requires positive VonBertalanffySchnute lengths, growth coefficient, length-weight parameters, and length SD values."
+        "Julia backend requires positive VonBertalanffySchnute lengths, growth coefficient, and length-weight parameters."
       )
     }
     if (scalar_values[[5]] <= scalar_values[[4]]) {
@@ -490,10 +525,26 @@ as_julia_fims_parameters <- function(parameters, data) {
       growth_reference_age_young = growth_scalar("reference_age_for_length_young", 0),
       growth_reference_age_old = growth_scalar("reference_age_for_length_old", max(get_ages(data))),
       growth_log_length_weight_a = log(growth_scalar("length_weight_a", 2.5e-11)),
-      growth_log_length_weight_b = log(growth_scalar("length_weight_b", 3)),
-      growth_log_length_sd_at_young = log(length_sd[[1]]),
-      growth_log_length_sd_at_old = log(length_sd[[2]])
+      growth_log_length_weight_b = log(growth_scalar("length_weight_b", 3))
     ))
+    if (has_delta_method) {
+      julia_parameters <- c(julia_parameters, list(
+        growth_log_sd_mean_length_young = growth_scalar("log_sd_mean_length_young", NA_real_),
+        growth_log_sd_mean_length_old = growth_scalar("log_sd_mean_length_old", NA_real_),
+        growth_log_sd_growth_coefficient = growth_scalar("log_sd_growth_coefficient", NA_real_),
+        growth_mean_length_young_mean_length_old_logit_corr =
+          growth_scalar("mean_length_young_mean_length_old_logit_corr", NA_real_),
+        growth_mean_length_young_growth_coefficient_logit_corr =
+          growth_scalar("mean_length_young_growth_coefficient_logit_corr", NA_real_),
+        growth_mean_length_old_growth_coefficient_logit_corr =
+          growth_scalar("mean_length_old_growth_coefficient_logit_corr", NA_real_)
+      ))
+    } else {
+      julia_parameters <- c(julia_parameters, list(
+        growth_log_length_sd_at_young = log(length_sd[[1]]),
+        growth_log_length_sd_at_old = log(length_sd[[2]])
+      ))
+    }
   }
   julia_parameters
 }
@@ -846,19 +897,12 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
       "reference_age_for_length_young",
       "reference_age_for_length_old",
       "length_weight_a",
-      "length_weight_b",
-      "length_at_age_sd_at_reference_ages"
+      "length_weight_b"
     )
     missing_growth_labels <- setdiff(required_growth_labels, growth_parameters[["label"]])
     if (length(missing_growth_labels) > 0L) {
       cli::cli_abort(
         "VonBertalanffySchnute growth is missing parameters: {toString(missing_growth_labels)}."
-      )
-    }
-    if (nrow(growth_sd_rows) != 2L || any(!is.finite(growth_sd_rows[["value"]])) ||
-      any(growth_sd_rows[["value"]] <= 0)) {
-      cli::cli_abort(
-        "Julia backend requires exactly two positive reference-age length SD values for VonBertalanffySchnute growth."
       )
     }
     delta_method_labels <- c(
@@ -869,9 +913,28 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
       "mean_length_young_growth_coefficient_logit_corr",
       "mean_length_old_growth_coefficient_logit_corr"
     )
-    if (any(growth_parameters[["label"]] %in% delta_method_labels)) {
+    delta_method_rows <- growth_parameters |>
+      dplyr::filter(.data$label %in% delta_method_labels)
+    has_interpolation_sd <- nrow(growth_sd_rows) > 0L
+    has_delta_method <- nrow(delta_method_rows) > 0L
+    if (has_interpolation_sd == has_delta_method) {
       cli::cli_abort(
-        "Julia backend currently supports the reference-age interpolation variability path for VonBertalanffySchnute growth, not delta-method variability."
+        "VonBertalanffySchnute growth requires either two reference-age SD values or all six delta-method parameters, but not both."
+      )
+    }
+    if (has_interpolation_sd &&
+      (nrow(growth_sd_rows) != 2L || any(!is.finite(growth_sd_rows[["value"]])) ||
+        any(growth_sd_rows[["value"]] <= 0))) {
+      cli::cli_abort(
+        "Julia backend requires exactly two positive reference-age length SD values for VonBertalanffySchnute growth."
+      )
+    }
+    if (has_delta_method &&
+      (!setequal(delta_method_rows[["label"]], delta_method_labels) ||
+        anyDuplicated(delta_method_rows[["label"]]) ||
+        any(!is.finite(delta_method_rows[["value"]])))) {
+      cli::cli_abort(
+        "VonBertalanffySchnute delta-method variability requires one finite value for each of the six uncertainty parameters."
       )
     }
   }
@@ -1052,7 +1115,29 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
         growth_parameter_mask("reference_age_for_length_old", type),
         growth_parameter_mask("length_weight_a", type),
         growth_parameter_mask("length_weight_b", type),
-        growth_parameter_mask("length_at_age_sd_at_reference_ages", type)
+        if (any(growth_parameters[["label"]] %in% c(
+          "log_sd_mean_length_young",
+          "log_sd_mean_length_old",
+          "log_sd_growth_coefficient",
+          "mean_length_young_mean_length_old_logit_corr",
+          "mean_length_young_growth_coefficient_logit_corr",
+          "mean_length_old_growth_coefficient_logit_corr"
+        ))) {
+          unlist(lapply(
+            c(
+              "log_sd_mean_length_young",
+              "log_sd_mean_length_old",
+              "log_sd_growth_coefficient",
+              "mean_length_young_mean_length_old_logit_corr",
+              "mean_length_young_growth_coefficient_logit_corr",
+              "mean_length_old_growth_coefficient_logit_corr"
+            ),
+            growth_parameter_mask,
+            type = type
+          ), use.names = FALSE)
+        } else {
+          growth_parameter_mask("length_at_age_sd_at_reference_ages", type)
+        }
       )
     }
     result

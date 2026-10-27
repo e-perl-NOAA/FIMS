@@ -96,6 +96,122 @@ function growth_length_at_age(params, age)
   mean_length_young + (mean_length_old - mean_length_young) * numerator / safe_denominator
 end
 
+function growth_delta_covariance(params)
+  component_names = (
+    :growth_log_sd_mean_length_young,
+    :growth_log_sd_mean_length_old,
+    :growth_log_sd_growth_coefficient,
+    :growth_mean_length_young_mean_length_old_logit_corr,
+    :growth_mean_length_young_growth_coefficient_logit_corr,
+    :growth_mean_length_old_growth_coefficient_logit_corr,
+  )
+  all(has_component(params, name) for name in component_names) ||
+    throw(ArgumentError("All six VonBertalanffySchnute delta-method parameters are required."))
+
+  sd_young = exp(params.growth_log_sd_mean_length_young)
+  sd_old = exp(params.growth_log_sd_mean_length_old)
+  sd_coefficient = exp(params.growth_log_sd_growth_coefficient)
+  correlation(value) = 2 / (one(value) + exp(-value)) - one(value)
+  covariance_young_old =
+    correlation(params.growth_mean_length_young_mean_length_old_logit_corr) *
+    sd_young * sd_old
+  covariance_young_coefficient =
+    correlation(params.growth_mean_length_young_growth_coefficient_logit_corr) *
+    sd_young * sd_coefficient
+  covariance_old_coefficient =
+    correlation(params.growth_mean_length_old_growth_coefficient_logit_corr) *
+    sd_old * sd_coefficient
+  variance_young = sd_young^2
+  variance_old = sd_old^2
+  variance_coefficient = sd_coefficient^2
+
+  covariance_young_old^2 <= variance_young * variance_old ||
+    throw(ArgumentError("Growth covariance between mean_length_young and mean_length_old is inconsistent with the supplied variances."))
+  covariance_young_coefficient^2 <= variance_young * variance_coefficient ||
+    throw(ArgumentError("Growth covariance between mean_length_young and growth_coefficient is inconsistent with the supplied variances."))
+  covariance_old_coefficient^2 <= variance_old * variance_coefficient ||
+    throw(ArgumentError("Growth covariance between mean_length_old and growth_coefficient is inconsistent with the supplied variances."))
+
+  determinant =
+    variance_young *
+    (variance_old * variance_coefficient - covariance_old_coefficient^2) -
+    covariance_young_old *
+    (covariance_young_old * variance_coefficient -
+     covariance_young_coefficient * covariance_old_coefficient) +
+    covariance_young_coefficient *
+    (covariance_young_old * covariance_old_coefficient -
+     covariance_young_coefficient * variance_old)
+  determinant >= zero(determinant) ||
+    throw(ArgumentError("Growth parameter covariance matrix must be positive semi-definite."))
+
+  (
+    variance_young = variance_young,
+    covariance_young_old = covariance_young_old,
+    covariance_young_coefficient = covariance_young_coefficient,
+    variance_old = variance_old,
+    covariance_old_coefficient = covariance_old_coefficient,
+    variance_coefficient = variance_coefficient,
+  )
+end
+
+function growth_log_length_gradient(params, age)
+  mean_length_young = exp(params.growth_log_mean_length_young)
+  mean_length_old = exp(params.growth_log_mean_length_old)
+  growth_coefficient = exp(params.growth_log_coefficient)
+  reference_age_young = params.growth_reference_age_young
+  reference_age_old = params.growth_reference_age_old
+  mean_length = growth_length_at_age(params, age)
+  safe_mean_length = max(mean_length, oftype(mean_length, 1e-8))
+
+  if reference_age_young > 0 && age < reference_age_young
+    ratio = max(age, zero(age)) / reference_age_young
+    return (
+      d_log_length_d_log_young = ratio * mean_length_young / safe_mean_length,
+      d_log_length_d_log_old = zero(safe_mean_length),
+      d_log_length_d_log_coefficient = zero(safe_mean_length),
+    )
+  end
+
+  age_delta_young = age - reference_age_young
+  age_delta_old = reference_age_old - reference_age_young
+  exp_numerator = exp(-growth_coefficient * age_delta_young)
+  exp_denominator = exp(-growth_coefficient * age_delta_old)
+  numerator = one(exp_numerator) - exp_numerator
+  denominator = one(exp_denominator) - exp_denominator
+  safe_denominator = max(abs(denominator), oftype(denominator, 1e-8))
+  ratio = numerator / safe_denominator
+  d_length_d_young = one(ratio) - ratio
+  d_length_d_old = ratio
+  d_numerator_d_coefficient = age_delta_young * exp_numerator
+  d_denominator_d_coefficient = age_delta_old * exp_denominator
+  d_ratio_d_coefficient =
+    (d_numerator_d_coefficient * safe_denominator -
+     numerator * d_denominator_d_coefficient) / safe_denominator^2
+  d_length_d_coefficient =
+    (mean_length_old - mean_length_young) * d_ratio_d_coefficient
+
+  (
+    d_log_length_d_log_young =
+      d_length_d_young * mean_length_young / safe_mean_length,
+    d_log_length_d_log_old = d_length_d_old * mean_length_old / safe_mean_length,
+    d_log_length_d_log_coefficient =
+      d_length_d_coefficient * growth_coefficient / safe_mean_length,
+  )
+end
+
+function growth_log_length_variance(params, age, covariance)
+  gradient = growth_log_length_gradient(params, age)
+  gradient.d_log_length_d_log_young^2 * covariance.variance_young +
+  2 * gradient.d_log_length_d_log_young * gradient.d_log_length_d_log_old *
+  covariance.covariance_young_old +
+  2 * gradient.d_log_length_d_log_young * gradient.d_log_length_d_log_coefficient *
+  covariance.covariance_young_coefficient +
+  gradient.d_log_length_d_log_old^2 * covariance.variance_old +
+  2 * gradient.d_log_length_d_log_old * gradient.d_log_length_d_log_coefficient *
+  covariance.covariance_old_coefficient +
+  gradient.d_log_length_d_log_coefficient^2 * covariance.variance_coefficient
+end
+
 function build_growth_products(params, data_dict, model_config)
   growth_type = string(get(model_config, :growth_model_type, "EWAA"))
   if growth_type != "VonBertalanffySchnute"
@@ -109,6 +225,26 @@ function build_growth_products(params, data_dict, model_config)
 
   has_component(params, :growth_log_mean_length_young) ||
     throw(ArgumentError("VonBertalanffySchnute growth parameters are missing."))
+  interpolation_components = (
+    :growth_log_length_sd_at_young,
+    :growth_log_length_sd_at_old,
+  )
+  delta_components = (
+    :growth_log_sd_mean_length_young,
+    :growth_log_sd_mean_length_old,
+    :growth_log_sd_growth_coefficient,
+    :growth_mean_length_young_mean_length_old_logit_corr,
+    :growth_mean_length_young_growth_coefficient_logit_corr,
+    :growth_mean_length_old_growth_coefficient_logit_corr,
+  )
+  has_interpolation_sd = all(has_component(params, name) for name in interpolation_components)
+  has_any_delta_component = any(has_component(params, name) for name in delta_components)
+  has_delta_method = all(has_component(params, name) for name in delta_components)
+  has_any_delta_component == has_delta_method ||
+    throw(ArgumentError("All six VonBertalanffySchnute delta-method parameters are required."))
+  has_interpolation_sd != has_delta_method ||
+    throw(ArgumentError("Provide either reference-age SD values or all delta-method parameters for VonBertalanffySchnute growth, but not both."))
+  covariance = has_delta_method ? growth_delta_covariance(params) : nothing
   reference_age_young = params.growth_reference_age_young
   reference_age_old = params.growth_reference_age_old
   reference_age_old > reference_age_young ||
@@ -116,25 +252,34 @@ function build_growth_products(params, data_dict, model_config)
 
   length_weight_a = exp(params.growth_log_length_weight_a)
   length_weight_b = exp(params.growth_log_length_weight_b)
-  length_sd_young = exp(params.growth_log_length_sd_at_young)
-  length_sd_old = exp(params.growth_log_length_sd_at_old)
+  length_sd_young = has_interpolation_sd ? exp(params.growth_log_length_sd_at_young) : nothing
+  length_sd_old = has_interpolation_sd ? exp(params.growth_log_length_sd_at_old) : nothing
   n_years = data_dict[:n_years]
   n_ages = data_dict[:n_ages]
   age_values = data_dict[:ages]
   mean_length = [growth_length_at_age(params, age) for age in age_values]
   reference_length_young = growth_length_at_age(params, reference_age_young)
   reference_length_old = growth_length_at_age(params, reference_age_old)
-  length_delta = max(
-    abs(reference_length_old - reference_length_young),
-    oftype(reference_length_young, 1e-8),
-  )
-  length_sd_slope = (length_sd_old - length_sd_young) / length_delta
-  sd_length = [
-    max(
-      length_sd_young + length_sd_slope * (length - reference_length_young),
-      oftype(length, 1e-8),
-    ) for length in mean_length
-  ]
+  sd_length = if has_delta_method
+    [
+      max(
+        length * sqrt(max(growth_log_length_variance(params, age, covariance), zero(length))),
+        oftype(length, 1e-8),
+      ) for (age, length) in zip(age_values, mean_length)
+    ]
+  else
+    length_delta = max(
+      abs(reference_length_old - reference_length_young),
+      oftype(reference_length_young, 1e-8),
+    )
+    length_sd_slope = (length_sd_old - length_sd_young) / length_delta
+    [
+      max(
+        length_sd_young + length_sd_slope * (length - reference_length_young),
+        oftype(length, 1e-8),
+      ) for length in mean_length
+    ]
+  end
   weights_at_age = repeat(
     reshape(length_weight_a .* mean_length .^ length_weight_b, 1, n_ages),
     n_years,

@@ -496,6 +496,73 @@ test_that("Julia backend serializes VonBertalanffy growth parameters and masks",
   )
 })
 
+test_that("Julia backend serializes VonBertalanffy delta-method variability", {
+  data <- data_big |>
+    dplyr::filter(.data$fleet == "fleet1") |>
+    FIMS::FIMSFrame()
+  default_parameters <- FIMS::setup_default_parameters(data = data)
+  growth_parameters <- FIMS::setup_default_Growth(
+    data,
+    module_type = "VonBertalanffySchnute"
+  ) |>
+    dplyr::filter(.data$label != "length_at_age_sd_at_reference_ages")
+  delta_method_labels <- c(
+    "log_sd_mean_length_young",
+    "log_sd_mean_length_old",
+    "log_sd_growth_coefficient",
+    "mean_length_young_mean_length_old_logit_corr",
+    "mean_length_young_growth_coefficient_logit_corr",
+    "mean_length_old_growth_coefficient_logit_corr"
+  )
+  delta_method_values <- c(log(0.1), log(0.1), log(0.02), 0.1, -0.2, 0.3)
+  delta_method_rows <- growth_parameters[rep(1L, length(delta_method_labels)), ]
+  delta_method_rows[["label"]] <- delta_method_labels
+  delta_method_rows[["value"]] <- delta_method_values
+  delta_method_rows[["estimation_type"]] <- c("fixed_effects", rep("constant", 5L))
+  if ("age" %in% names(delta_method_rows)) {
+    delta_method_rows[["age"]] <- NA_real_
+  }
+  parameters <- dplyr::bind_rows(
+    default_parameters |>
+      dplyr::filter(.data$module_name != "Growth"),
+    growth_parameters,
+    delta_method_rows
+  )
+
+  julia_parameters <- FIMS:::as_julia_fims_parameters(parameters, data)
+  julia_config <- FIMS:::as_julia_fims_model_config(parameters, data)
+  expect_equal(
+    julia_parameters[["growth_log_sd_mean_length_young"]],
+    log(0.1)
+  )
+  expect_equal(
+    julia_parameters[["growth_mean_length_young_growth_coefficient_logit_corr"]],
+    -0.2
+  )
+  expect_false("growth_log_length_sd_at_young" %in% names(julia_parameters))
+  expect_equal(
+    length(julia_config[["fixed_parameter_mask"]]),
+    sum(purrr::map_int(julia_parameters, length))
+  )
+  delta_sd_component_index <- match(
+    "growth_log_sd_mean_length_young",
+    names(julia_parameters)
+  )
+  delta_sd_index <- sum(purrr::map_int(
+    julia_parameters[seq_len(delta_sd_component_index - 1L)],
+    length
+  )) + 1L
+  expect_true(julia_config[["fixed_parameter_mask"]][delta_sd_index])
+
+  flat_parameter <- FIMS:::flatten_julia_parameter_rows(
+    delta_method_rows[1, , drop = FALSE],
+    estimates = list(growth_log_sd_mean_length_young = log(0.1)),
+    standard_errors = list(growth_log_sd_mean_length_young = 0.2)
+  )
+  expect_equal(flat_parameter[["estimated"]], log(0.1))
+  expect_equal(flat_parameter[["uncertainty"]], 0.2)
+})
+
 test_that("Julia backend config preserves normal catch and lognormal index likelihoods", {
   data <- data_big |>
     dplyr::mutate(

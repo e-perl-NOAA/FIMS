@@ -90,6 +90,26 @@ end
       ),
     ),
   )
+  delta_method_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (
+        growth_log_mean_length_young = log(275.0),
+        growth_log_mean_length_old = log(725.0),
+        growth_log_coefficient = log(0.18),
+        growth_reference_age_young = 1.0,
+        growth_reference_age_old = 3.0,
+        growth_log_length_weight_a = log(2.5e-11),
+        growth_log_length_weight_b = log(3.0),
+        growth_log_sd_mean_length_young = log(12.0),
+        growth_log_sd_mean_length_old = log(20.0),
+        growth_log_sd_growth_coefficient = log(0.03),
+        growth_mean_length_young_mean_length_old_logit_corr = 0.2,
+        growth_mean_length_young_growth_coefficient_logit_corr = -0.3,
+        growth_mean_length_old_growth_coefficient_logit_corr = 0.1,
+      ),
+    ),
+  )
   maturity_parameters = ComponentArray(
     merge(
       parameter_values,
@@ -137,6 +157,11 @@ end
   report = result["report"]
   vonb_result = evaluate_model(
     vonb_parameters,
+    data,
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  delta_method_result = evaluate_model(
+    delta_method_parameters,
     data,
     merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
   )
@@ -194,6 +219,59 @@ end
     isapprox.(sum(vonb_result["report"]["age_to_length_conversion"], dims = 2), 1.0)
   )
   @test isfinite(vonb_result["nll"])
+  delta_sd = delta_method_result["report"]["sd_length_at_age"]
+  @test all(isfinite, delta_sd)
+  @test all(delta_sd .> 0)
+  @test delta_sd != vonb_result["report"]["sd_length_at_age"]
+  @test isfinite(delta_method_result["nll"])
+  @test_throws ArgumentError evaluate_model(
+    ComponentArray(
+      merge(
+        parameter_values,
+        (
+          growth_log_mean_length_young = log(275.0),
+          growth_log_mean_length_old = log(725.0),
+          growth_log_coefficient = log(0.18),
+          growth_reference_age_young = 1.0,
+          growth_reference_age_old = 3.0,
+          growth_log_length_weight_a = log(2.5e-11),
+          growth_log_length_weight_b = log(3.0),
+          growth_log_sd_mean_length_young = log(12.0),
+        ),
+      ),
+    ),
+    data,
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  @test isfinite(
+    derivative(log(12.0)) do log_sd_young
+      differentiated_parameters = ComponentArray(
+        merge(
+          parameter_values,
+          (
+            growth_log_mean_length_young = log(275.0),
+            growth_log_mean_length_old = log(725.0),
+            growth_log_coefficient = log(0.18),
+            growth_reference_age_young = 1.0,
+            growth_reference_age_old = 3.0,
+            growth_log_length_weight_a = log(2.5e-11),
+            growth_log_length_weight_b = log(3.0),
+            growth_log_sd_mean_length_young = log_sd_young,
+            growth_log_sd_mean_length_old = log(20.0),
+            growth_log_sd_growth_coefficient = log(0.03),
+            growth_mean_length_young_mean_length_old_logit_corr = 0.2,
+            growth_mean_length_young_growth_coefficient_logit_corr = -0.3,
+            growth_mean_length_old_growth_coefficient_logit_corr = 0.1,
+          ),
+        ),
+      )
+      evaluate_nll(
+        differentiated_parameters,
+        data,
+        merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+      )
+    end,
+  )
   vonb_config = merge(config, Dict(:growth_model_type => "VonBertalanffySchnute"))
   @test isfinite(
     derivative(log(275.0)) do log_mean_length_young
