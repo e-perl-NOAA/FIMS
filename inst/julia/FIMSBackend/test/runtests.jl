@@ -2,6 +2,7 @@ using FIMSBackend
 using Test
 using ComponentArrays: ComponentArray
 using ForwardDiff: derivative
+using SpecialFunctions: erf
 
 @testset "spawning biomass per recruit" begin
   natural_mortality = [0.1, 0.2, 0.3]
@@ -218,6 +219,42 @@ end
   @test all(
     isapprox.(sum(vonb_result["report"]["age_to_length_conversion"], dims = 2), 1.0)
   )
+  observed_length_edges = FIMSBackend.growth_observation_edges(data[:lengths])
+  @test observed_length_edges == [5.0, 15.0, 25.0]
+  @test FIMSBackend.growth_population_size_edges(observed_length_edges) ==
+    collect(5.0:26.0)
+  size_edges = collect(5.0:26.0)
+  fleet_edges = [5.0, 15.0, 26.0]
+  expected_conversion = zeros(3, 2)
+  for age_index in 1:3
+    mean_length = vonb_result["report"]["mean_length_at_age"][1, age_index]
+    sd_length = vonb_result["report"]["sd_length_at_age"][1, age_index]
+    cdf(edge) = 0.5 * (1 + erf((edge - mean_length) / (sd_length * sqrt(2))))
+    size_probabilities = zeros(length(size_edges) - 1)
+    size_probabilities[1] = cdf(size_edges[2])
+    for bin_index in 2:(length(size_probabilities) - 1)
+      size_probabilities[bin_index] =
+        cdf(size_edges[bin_index + 1]) - cdf(size_edges[bin_index])
+    end
+    size_probabilities[end] = cdf(2 * mean_length - size_edges[end - 1])
+    size_probabilities .+= 1e-12
+    size_probabilities ./= sum(size_probabilities)
+    for length_index in 1:2
+      for size_index in eachindex(size_probabilities)
+        overlap = max(
+          0.0,
+          min(fleet_edges[length_index + 1], size_edges[size_index + 1]) -
+          max(fleet_edges[length_index], size_edges[size_index]),
+        )
+        expected_conversion[age_index, length_index] +=
+          size_probabilities[size_index] * overlap /
+          (size_edges[size_index + 1] - size_edges[size_index])
+      end
+    end
+    expected_conversion[age_index, :] .+= 1e-12
+    expected_conversion[age_index, :] ./= sum(expected_conversion[age_index, :])
+  end
+  @test vonb_result["report"]["age_to_length_conversion"] ≈ expected_conversion
   @test isfinite(vonb_result["nll"])
   delta_sd = delta_method_result["report"]["sd_length_at_age"]
   @test all(isfinite, delta_sd)

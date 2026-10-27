@@ -212,6 +212,74 @@ function growth_log_length_variance(params, age, covariance)
   gradient.d_log_length_d_log_coefficient^2 * covariance.variance_coefficient
 end
 
+function growth_observation_edges(lengths)
+  length(lengths) >= 2 ||
+    throw(ArgumentError("Growth-derived length conversion requires at least two length-bin centers."))
+  all(diff(lengths) .> 0) ||
+    throw(ArgumentError("Growth-derived length-bin centers must be strictly increasing."))
+
+  edges = Vector{eltype(lengths)}(undef, length(lengths) + 1)
+  edges[1] = lengths[1] - (lengths[2] - lengths[1]) / 2
+  for index in 1:(length(lengths) - 1)
+    edges[index + 1] = (lengths[index] + lengths[index + 1]) / 2
+  end
+  edges[end] = lengths[end] + (lengths[end] - lengths[end - 1]) / 2
+  edges
+end
+
+function growth_population_size_edges(length_edges)
+  lower_edge = first(length_edges)
+  upper_edge = last(length_edges)
+  regular_upper_edge = lower_edge
+  span = upper_edge - lower_edge
+  tolerance = 1e-12 * max(span, one(span))
+  regular_bin_count = 0
+  while regular_upper_edge < upper_edge - tolerance
+    regular_bin_count += 1
+    regular_upper_edge = lower_edge + regular_bin_count * one(lower_edge)
+  end
+  edges = [lower_edge + index * one(lower_edge) for index in 0:regular_bin_count]
+  push!(edges, regular_upper_edge + one(lower_edge))
+  edges
+end
+
+function growth_size_bin_probabilities(mean_length, sd_length, size_edges)
+  n_bins = length(size_edges) - 1
+  n_bins > 0 ||
+    throw(ArgumentError("Growth-derived size grid must contain at least one bin."))
+  n_bins == 1 && return [one(mean_length)]
+
+  cdf(edge) =
+    (one(mean_length) + erf((edge - mean_length) / (sd_length * sqrt(oftype(sd_length, 2))))) / 2
+  probabilities = Vector{typeof(mean_length + sd_length)}(undef, n_bins)
+  probabilities[1] = cdf(size_edges[2])
+  for index in 2:(n_bins - 1)
+    probabilities[index] = cdf(size_edges[index + 1]) - cdf(size_edges[index])
+  end
+  probabilities[end] = cdf(2 * mean_length - size_edges[end - 1])
+  probabilities .+= oftype(mean_length, 1e-12)
+  probabilities ./ sum(probabilities)
+end
+
+function growth_rebin_weights(source_edges, destination_edges)
+  expanded_edges = copy(destination_edges)
+  expanded_edges[1] = min(first(expanded_edges), first(source_edges))
+  expanded_edges[end] = max(last(expanded_edges), last(source_edges))
+  weights = zeros(Float64, length(expanded_edges) - 1, length(source_edges) - 1)
+  for destination_index in 1:(length(expanded_edges) - 1)
+    for source_index in 1:(length(source_edges) - 1)
+      overlap = max(
+        0.0,
+        min(expanded_edges[destination_index + 1], source_edges[source_index + 1]) -
+        max(expanded_edges[destination_index], source_edges[source_index]),
+      )
+      weights[destination_index, source_index] =
+        overlap / (source_edges[source_index + 1] - source_edges[source_index])
+    end
+  end
+  weights
+end
+
 function build_growth_products(params, data_dict, model_config)
   growth_type = string(get(model_config, :growth_model_type, "EWAA"))
   if growth_type != "VonBertalanffySchnute"
@@ -288,9 +356,9 @@ function build_growth_products(params, data_dict, model_config)
   age_to_length_conversion = nothing
   if data_dict[:n_lengths] > 0
     lengths = data_dict[:lengths]
-    length_edges = [
-      (lengths[index] + lengths[index + 1]) / 2 for index in 1:(length(lengths) - 1)
-    ]
+    observation_edges = growth_observation_edges(lengths)
+    size_edges = growth_population_size_edges(observation_edges)
+    rebin_weights = growth_rebin_weights(size_edges, observation_edges)
     age_to_length_conversion = zeros(
       promote_type(eltype(mean_length), eltype(sd_length)),
       n_ages,
@@ -298,21 +366,15 @@ function build_growth_products(params, data_dict, model_config)
     )
     for age_index in 1:n_ages
       sd = max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
-      cdf(edge) =
-        (one(sd) + erf((edge - mean_length[age_index]) / (sd * sqrt(oftype(sd, 2))))) / 2
-      row = view(age_to_length_conversion, age_index, :)
-      if length(lengths) == 1
-        row[1] = one(sd)
-      else
-        row[1] = cdf(length_edges[1])
-        for length_index in 2:(length(lengths) - 1)
-          row[length_index] =
-            cdf(length_edges[length_index]) - cdf(length_edges[length_index - 1])
-        end
-        row[end] = one(sd) - cdf(length_edges[end])
-      end
+      population_probabilities = growth_size_bin_probabilities(
+        mean_length[age_index],
+        sd,
+        size_edges,
+      )
+      row = rebin_weights * population_probabilities
       row .+= oftype(sd, 1e-12)
       row ./= sum(row)
+      age_to_length_conversion[age_index, :] .= row
     end
   end
   (
