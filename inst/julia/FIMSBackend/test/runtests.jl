@@ -1,6 +1,7 @@
 using FIMSBackend
 using Test
 using ComponentArrays: ComponentArray
+using ForwardDiff: derivative
 
 @testset "spawning biomass per recruit" begin
   natural_mortality = [0.1, 0.2, 0.3]
@@ -73,6 +74,22 @@ end
     log_q = [0.0, log(2.0)],
   )
   parameters = ComponentArray(parameter_values)
+  vonb_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (
+        growth_log_mean_length_young = log(275.0),
+        growth_log_mean_length_old = log(725.0),
+        growth_log_coefficient = log(0.18),
+        growth_reference_age_young = 1.0,
+        growth_reference_age_old = 3.0,
+        growth_log_length_weight_a = log(2.5e-11),
+        growth_log_length_weight_b = log(3.0),
+        growth_log_length_sd_at_young = log(28.0),
+        growth_log_length_sd_at_old = log(73.0),
+      ),
+    ),
+  )
   maturity_parameters = ComponentArray(
     merge(
       parameter_values,
@@ -118,6 +135,11 @@ end
 
   result = evaluate_model(parameters, data, config)
   report = result["report"]
+  vonb_result = evaluate_model(
+    vonb_parameters,
+    data,
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
   maturity_result = evaluate_model(maturity_parameters, data, config)
   no_process_result = evaluate_model(
     parameters,
@@ -158,6 +180,42 @@ end
   @test maturity_result["report"]["proportion_mature_at_age"] ≈
     repeat(reshape(expected_maturity, 1, :), 2, 1)
   @test maturity_result["nll"] != result["nll"]
+  expected_lengths = [
+    275.0 +
+    (725.0 - 275.0) *
+    (1.0 - exp(-0.18 * (age - 1.0))) /
+    (1.0 - exp(-0.18 * (3.0 - 1.0))) for age in data[:ages]
+  ]
+  @test vonb_result["report"]["mean_length_at_age"] ≈
+    repeat(reshape(expected_lengths, 1, :), 2, 1)
+  @test vonb_result["report"]["weights_at_age"] ≈
+    repeat(reshape(2.5e-11 .* expected_lengths .^ 3.0, 1, :), 2, 1)
+  @test all(
+    isapprox.(sum(vonb_result["report"]["age_to_length_conversion"], dims = 2), 1.0)
+  )
+  @test isfinite(vonb_result["nll"])
+  vonb_config = merge(config, Dict(:growth_model_type => "VonBertalanffySchnute"))
+  @test isfinite(
+    derivative(log(275.0)) do log_mean_length_young
+      differentiated_parameters = ComponentArray(
+        merge(
+          parameter_values,
+          (
+            growth_log_mean_length_young = log_mean_length_young,
+            growth_log_mean_length_old = log(725.0),
+            growth_log_coefficient = log(0.18),
+            growth_reference_age_young = 1.0,
+            growth_reference_age_old = 3.0,
+            growth_log_length_weight_a = log(2.5e-11),
+            growth_log_length_weight_b = log(3.0),
+            growth_log_length_sd_at_young = log(28.0),
+            growth_log_length_sd_at_old = log(73.0),
+          ),
+        ),
+      )
+      evaluate_nll(differentiated_parameters, data, vonb_config)
+    end,
+  )
   @test normal_prior_result["nll"] - result["nll"] ≈
     0.5 * log(2π) + log(3.0) + (1.0 - 1.5)^2 / (2 * 3.0^2)
   @test normal_prior_result["report"]["parameter_prior_nll"] ≈

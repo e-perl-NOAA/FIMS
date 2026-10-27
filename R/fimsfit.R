@@ -411,6 +411,22 @@ build_julia_backend_report <- function(julia_input, fit_result) {
     mortality_M = list(as.numeric(t(as.matrix(report[["mortality_M"]])))),
     mortality_Z = list(as.numeric(t(as.matrix(report[["mortality_Z"]])))),
     proportion_mature_at_age = list(as.numeric(t(as.matrix(report[["proportion_mature_at_age"]])))),
+    weight_at_age = list(as.numeric(t(as.matrix(report[["weights_at_age"]])))),
+    mean_length_at_age = if (is.null(report[["mean_length_at_age"]])) {
+      NULL
+    } else {
+      list(as.numeric(t(as.matrix(report[["mean_length_at_age"]]))))
+    },
+    sd_length_at_age = if (is.null(report[["sd_length_at_age"]])) {
+      NULL
+    } else {
+      list(as.numeric(t(as.matrix(report[["sd_length_at_age"]]))))
+    },
+    age_to_length_conversion = if (is.null(report[["age_to_length_conversion"]])) {
+      NULL
+    } else {
+      list(as.array(report[["age_to_length_conversion"]]))
+    },
     sum_selectivity = list(as.numeric(t(as.matrix(report[["sum_selectivity"]])))),
     log_recruit_dev = list(as_julia_backend_numeric(parameters[["log_devs"]])),
     log_r = list(as_julia_backend_numeric(parameters[["log_r"]])),
@@ -438,28 +454,79 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
     return(tibble::tibble())
   }
 
-  mapped_labels <- intersect(names(estimates), unique(parameter_info[["label"]]))
-  if (length(mapped_labels) == 0) {
+  growth_component_map <- c(
+    growth_log_mean_length_young = "mean_length_young",
+    growth_log_mean_length_old = "mean_length_old",
+    growth_log_coefficient = "growth_coefficient",
+    growth_reference_age_young = "reference_age_for_length_young",
+    growth_reference_age_old = "reference_age_for_length_old",
+    growth_log_length_weight_a = "length_weight_a",
+    growth_log_length_weight_b = "length_weight_b",
+    growth_log_length_sd_at_young = "length_at_age_sd_at_reference_ages",
+    growth_log_length_sd_at_old = "length_at_age_sd_at_reference_ages"
+  )
+  component_labels <- c(
+    stats::setNames(
+      setdiff(names(estimates), names(growth_component_map)),
+      setdiff(names(estimates), names(growth_component_map))
+    ),
+    growth_component_map
+  )
+  component_labels <- component_labels[
+    component_labels %in% unique(parameter_info[["label"]])
+  ]
+  mapped_labels <- unique(unname(component_labels))
+  if (length(mapped_labels) == 0L) {
     return(tibble::tibble())
   }
 
   purrr::map_dfr(mapped_labels, function(label_name) {
     rows <- parameter_info |>
       dplyr::filter(.data$label == .env$label_name)
-
-    estimate_values <- if (label_name == "log_M" && is.matrix(estimates[[label_name]])) {
-      as.numeric(t(estimates[[label_name]]))
-    } else {
-      as_julia_backend_numeric(estimates[[label_name]])
+    if (identical(label_name, "length_at_age_sd_at_reference_ages")) {
+      rows <- rows |>
+        dplyr::arrange(.data$age)
     }
-    se_values <- if (!is.null(standard_errors[[label_name]])) {
-      if (label_name == "log_M" && is.matrix(standard_errors[[label_name]])) {
-        as.numeric(t(standard_errors[[label_name]]))
+    component_names <- names(component_labels)[component_labels == label_name]
+    if (identical(label_name, "length_at_age_sd_at_reference_ages") &&
+      all(c(
+        "growth_log_length_sd_at_young",
+        "growth_log_length_sd_at_old"
+      ) %in% component_names)) {
+      component_names <- c(
+        "growth_log_length_sd_at_young",
+        "growth_log_length_sd_at_old"
+      )
+    }
+    estimate_values <- unlist(lapply(component_names, function(component_name) {
+      values <- if (component_name %in% names(estimates)) {
+        as_julia_backend_numeric(estimates[[component_name]])
       } else {
-        as_julia_backend_numeric(standard_errors[[label_name]])
+        numeric()
       }
-    } else {
-      rep(NA_real_, length(estimate_values))
+      if (startsWith(component_name, "growth_log_")) exp(values) else values
+    }), use.names = FALSE)
+    se_values <- unlist(lapply(component_names, function(component_name) {
+      if (is.null(standard_errors[[component_name]])) {
+        return(rep(NA_real_, length(estimates[[component_name]])))
+      }
+      values <- as_julia_backend_numeric(standard_errors[[component_name]])
+      if (startsWith(component_name, "growth_log_")) {
+        values <- exp(as_julia_backend_numeric(estimates[[component_name]])) * values
+      }
+      values
+    }), use.names = FALSE)
+    if (identical(label_name, "log_M") && length(component_names) == 1L &&
+      is.matrix(estimates[[component_names[[1]]]])) {
+      estimate_values <- as.numeric(t(estimates[[component_names[[1]]]]))
+      se_values <- if (!is.null(standard_errors[[component_names[[1]]]])) {
+        as.numeric(t(standard_errors[[component_names[[1]]]]))
+      } else {
+        rep(NA_real_, length(estimate_values))
+      }
+    }
+    if (length(se_values) == 0L) {
+      se_values <- rep(NA_real_, length(estimate_values))
     }
 
     if (nrow(rows) == 0 || length(estimate_values) != nrow(rows)) {
@@ -629,6 +696,10 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
       matrix_values = matrix(report[["proportion_mature_at_age"]][[1]], nrow = data[["n_years"]], byrow = TRUE)
     ),
     make_julia_matrix_estimate_rows(
+      label = "weight_at_age",
+      matrix_values = matrix(report[["weight_at_age"]][[1]], nrow = data[["n_years"]], byrow = TRUE)
+    ),
+    make_julia_matrix_estimate_rows(
       label = "sum_selectivity",
       matrix_values = matrix(report[["sum_selectivity"]][[1]], nrow = data[["n_years"]], byrow = TRUE)
     ),
@@ -641,6 +712,14 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
       vector_values = report[["total_catch_weight"]][[1]]
     )
   )
+  for (growth_label in c("mean_length_at_age", "sd_length_at_age")) {
+    if (!is.null(report[[growth_label]])) {
+      output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+        label = growth_label,
+        matrix_values = matrix(report[[growth_label]][[1]], nrow = data[["n_years"]], byrow = TRUE)
+      )
+    }
+  }
 
   fleet_names <- data[["fleets"]]
   for (fleet_index in seq_along(fleet_names)) {

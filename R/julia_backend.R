@@ -124,8 +124,40 @@ as_julia_fims_data <- function(data, parameters) {
   ages <- get_ages(data)
   fleets <- get_fleets(data)
   fleet_data <- get_data(data)
-  lengths <- get_lengths(data)
   raw_data <- as.data.frame(fleet_data)
+  growth_types <- parameters |>
+    dplyr::filter(.data$module_name == "Growth") |>
+    dplyr::pull(.data$module_type) |>
+    unique() |>
+    stats::na.omit()
+  is_vonb_growth <- "VonBertalanffySchnute" %in% growth_types
+  lengths <- if (is_vonb_growth && any(raw_data$type == "length_comp")) {
+    sort(unique(raw_data$length[raw_data$type == "length_comp"]))
+  } else {
+    get_lengths(data)
+  }
+  n_lengths <- length(lengths)
+  if (is_vonb_growth && any(raw_data$type == "length_comp")) {
+    length_bins_by_fleet <- raw_data |>
+      dplyr::filter(.data$type == "length_comp") |>
+      dplyr::group_by(.data$fleet) |>
+      dplyr::summarise(
+        bins = list(sort(unique(.data$length))),
+        .groups = "drop"
+      ) |>
+      dplyr::pull(.data$bins)
+    if (length(length_bins_by_fleet) > 1L &&
+      !all(vapply(
+        length_bins_by_fleet[-1],
+        identical,
+        logical(1),
+        length_bins_by_fleet[[1]]
+      ))) {
+      cli::cli_abort(
+        "Julia backend currently requires matching length-composition bins across fleets for VonBertalanffySchnute growth."
+      )
+    }
+  }
 
   year_index <- function(year) as.integer(year - get_start_year(data) + 1L)
   age_index <- function(age) match(age, ages)
@@ -200,7 +232,11 @@ as_julia_fims_data <- function(data, parameters) {
     )
   }
 
-  weights_at_age <- model_weight_at_age(data)
+  weights_at_age <- if (is_vonb_growth) {
+    rep(1, n_years * n_ages)
+  } else {
+    model_weight_at_age(data)
+  }
   weights_at_age <- if (length(weights_at_age) == n_ages) {
     matrix(rep(weights_at_age, times = n_years), nrow = n_years, byrow = TRUE)
   } else if (length(weights_at_age) >= n_years * n_ages) {
@@ -220,7 +256,7 @@ as_julia_fims_data <- function(data, parameters) {
     lengths = lengths,
     fleet_has_catch = vapply(fleets, \(fleet) any(raw_data$type == "catch" & raw_data$fleet == fleet), logical(1)),
     fleet_has_index = vapply(fleets, \(fleet) any(raw_data$type == "index" & raw_data$fleet == fleet), logical(1)),
-    n_lengths = get_n_lengths(data),
+    n_lengths = n_lengths,
     start_year = get_start_year(data),
     end_year = get_end_year(data),
     weights_at_age = weights_at_age,
@@ -259,10 +295,10 @@ as_julia_fims_data <- function(data, parameters) {
   }
 
   if (any(raw_data$type == "length_comp")) {
-    julia_data[["observed_length_comp"]] <- fill_stream("length_comp", get_n_lengths(data))
+    julia_data[["observed_length_comp"]] <- fill_stream("length_comp", n_lengths)
   }
 
-  if (any(raw_data$type == "age_to_length_conversion")) {
+  if (!is_vonb_growth && any(raw_data$type == "age_to_length_conversion")) {
     julia_data[["age_to_length_conversion"]] <- matrix(
       model_age_to_length_conversion(data),
       nrow = n_ages,
@@ -289,6 +325,12 @@ as_julia_fims_parameters <- function(parameters, data) {
     dplyr::filter(.data$module_name == "Population")
   maturity_parameters <- parameters |>
     dplyr::filter(.data$module_name == "Maturity")
+  growth_parameters <- parameters |>
+    dplyr::filter(.data$module_name == "Growth")
+  growth_type <- growth_parameters |>
+    dplyr::pull(.data$module_type) |>
+    unique() |>
+    stats::na.omit()
 
   values_for <- function(parameter_data, label, default = numeric()) {
     rows <- parameter_data |>
@@ -372,7 +414,7 @@ as_julia_fims_parameters <- function(parameters, data) {
       {\(x) if (length(x) == 0) "Logistic" else x[[1]]}()
   }
 
-  list(
+  julia_parameters <- list(
     inflection_point = inflection_point,
     slope = slope,
     inflection_point_asc = inflection_point_asc,
@@ -395,6 +437,65 @@ as_julia_fims_parameters <- function(parameters, data) {
     )[[1]],
     maturity_slope = values_for(maturity_parameters, "slope", 1)[[1]]
   )
+  if ("VonBertalanffySchnute" %in% growth_type) {
+    growth_values <- function(label, default) {
+      rows <- growth_parameters |>
+        dplyr::filter(.data$label == .env$label) |>
+        dplyr::arrange(dplyr::across(dplyr::any_of(c("timing", "age"))))
+      if (nrow(rows) == 0L) {
+        return(default)
+      }
+      rows[["value"]]
+    }
+    growth_scalar <- function(label, default) {
+      values <- growth_values(label, default)
+      if (length(values) != 1L || !is.finite(values[[1]])) {
+        cli::cli_abort(
+          "Julia backend requires one finite value for VonBertalanffySchnute parameter {.val {label}}."
+        )
+      }
+      values[[1]]
+    }
+    length_sd <- growth_values("length_at_age_sd_at_reference_ages", c(3, 7))
+    if (length(length_sd) != 2L || any(!is.finite(length_sd)) || any(length_sd <= 0)) {
+      cli::cli_abort(
+        "Julia backend requires exactly two positive reference-age length SD values for VonBertalanffySchnute growth."
+      )
+    }
+    scalar_values <- c(
+      growth_scalar("mean_length_young", 275),
+      growth_scalar("mean_length_old", 725),
+      growth_scalar("growth_coefficient", 0.18),
+      growth_scalar("reference_age_for_length_young", 0),
+      growth_scalar("reference_age_for_length_old", max(get_ages(data))),
+      growth_scalar("length_weight_a", 2.5e-11),
+      growth_scalar("length_weight_b", 3)
+    )
+    positive_values <- scalar_values[c(1L, 2L, 3L, 6L, 7L)]
+    if (any(positive_values <= 0) || any(!is.finite(length_sd)) ||
+      any(length_sd <= 0)) {
+      cli::cli_abort(
+        "Julia backend requires positive VonBertalanffySchnute lengths, growth coefficient, length-weight parameters, and length SD values."
+      )
+    }
+    if (scalar_values[[5]] <= scalar_values[[4]]) {
+      cli::cli_abort(
+        "VonBertalanffySchnute reference_age_for_length_old must exceed reference_age_for_length_young."
+      )
+    }
+    julia_parameters <- c(julia_parameters, list(
+      growth_log_mean_length_young = log(growth_scalar("mean_length_young", 275)),
+      growth_log_mean_length_old = log(growth_scalar("mean_length_old", 725)),
+      growth_log_coefficient = log(growth_scalar("growth_coefficient", 0.18)),
+      growth_reference_age_young = growth_scalar("reference_age_for_length_young", 0),
+      growth_reference_age_old = growth_scalar("reference_age_for_length_old", max(get_ages(data))),
+      growth_log_length_weight_a = log(growth_scalar("length_weight_a", 2.5e-11)),
+      growth_log_length_weight_b = log(growth_scalar("length_weight_b", 3)),
+      growth_log_length_sd_at_young = log(length_sd[[1]]),
+      growth_log_length_sd_at_old = log(length_sd[[2]])
+    ))
+  }
+  julia_parameters
 }
 
 #' Assign prepared Julia input into the Julia session
@@ -708,7 +809,7 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
   supported_module_types <- list(
     Selectivity = c("Logistic", "DoubleLogistic"),
     Maturity = "Logistic",
-    Growth = "EWAA"
+    Growth = c("EWAA", "VonBertalanffySchnute")
   )
   for (module_name in names(supported_module_types)) {
     module_types <- parameters |>
@@ -720,6 +821,57 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
     if (length(unsupported_types) > 0L) {
       cli::cli_abort(
         "Julia backend does not support {.val {module_name}} module type {.val {unsupported_types}}."
+      )
+    }
+  }
+  growth_types <- parameters |>
+    dplyr::filter(.data$module_name == "Growth") |>
+    dplyr::pull(.data$module_type) |>
+    unique() |>
+    stats::na.omit()
+  if (length(growth_types) > 1L) {
+    cli::cli_abort("Julia backend requires one Growth module type per model.")
+  }
+  growth_type <- if (length(growth_types) == 0L) "EWAA" else growth_types[[1]]
+  growth_parameters <- parameters |>
+    dplyr::filter(.data$module_name == "Growth")
+  growth_sd_rows <- growth_parameters |>
+    dplyr::filter(.data$label == "length_at_age_sd_at_reference_ages") |>
+    dplyr::arrange(.data$age)
+  if (growth_type == "VonBertalanffySchnute") {
+    required_growth_labels <- c(
+      "mean_length_young",
+      "mean_length_old",
+      "growth_coefficient",
+      "reference_age_for_length_young",
+      "reference_age_for_length_old",
+      "length_weight_a",
+      "length_weight_b",
+      "length_at_age_sd_at_reference_ages"
+    )
+    missing_growth_labels <- setdiff(required_growth_labels, growth_parameters[["label"]])
+    if (length(missing_growth_labels) > 0L) {
+      cli::cli_abort(
+        "VonBertalanffySchnute growth is missing parameters: {toString(missing_growth_labels)}."
+      )
+    }
+    if (nrow(growth_sd_rows) != 2L || any(!is.finite(growth_sd_rows[["value"]])) ||
+      any(growth_sd_rows[["value"]] <= 0)) {
+      cli::cli_abort(
+        "Julia backend requires exactly two positive reference-age length SD values for VonBertalanffySchnute growth."
+      )
+    }
+    delta_method_labels <- c(
+      "log_sd_mean_length_young",
+      "log_sd_mean_length_old",
+      "log_sd_growth_coefficient",
+      "mean_length_young_mean_length_old_logit_corr",
+      "mean_length_young_growth_coefficient_logit_corr",
+      "mean_length_old_growth_coefficient_logit_corr"
+    )
+    if (any(growth_parameters[["label"]] %in% delta_method_labels)) {
+      cli::cli_abort(
+        "Julia backend currently supports the reference-age interpolation variability path for VonBertalanffySchnute growth, not delta-method variability."
       )
     }
   }
@@ -825,6 +977,9 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
     values <- estimate_mask(rows_for("Maturity", label), type)
     if (length(values) == 0) FALSE else values[[1]]
   }
+  growth_parameter_mask <- function(label, type) {
+    estimate_mask(rows_for("Growth", label), type)
+  }
   recruitment_parameter_mask <- function(label, type, default = FALSE) {
     values <- estimate_mask(rows_for("Recruitment", label), type)
     if (length(values) == 0) default else if (label == "log_sd") values else values[[1]]
@@ -868,7 +1023,7 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
     )
   }
   parameter_mask <- function(type) {
-    c(
+    result <- c(
       selectivity_masks("inflection_point", type),
       selectivity_masks("slope", type),
       selectivity_masks("inflection_point_asc", type),
@@ -887,6 +1042,20 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
       maturity_parameter_mask("inflection_point", type),
       maturity_parameter_mask("slope", type)
     )
+    if (growth_type == "VonBertalanffySchnute") {
+      result <- c(
+        result,
+        growth_parameter_mask("mean_length_young", type),
+        growth_parameter_mask("mean_length_old", type),
+        growth_parameter_mask("growth_coefficient", type),
+        growth_parameter_mask("reference_age_for_length_young", type),
+        growth_parameter_mask("reference_age_for_length_old", type),
+        growth_parameter_mask("length_weight_a", type),
+        growth_parameter_mask("length_weight_b", type),
+        growth_parameter_mask("length_at_age_sd_at_reference_ages", type)
+      )
+    }
+    result
   }
   fixed_parameter_mask <- parameter_mask("fixed_effects")
   random_parameter_mask <- parameter_mask("random_effects")
@@ -904,6 +1073,7 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
       dplyr::pull(.data$module_type) |>
       {\(x) dplyr::coalesce(x, "Logistic")}(),
     recruitment = recruitment_type,
+    growth_model_type = growth_type,
     recruitment_process_active = !is.na(recruitment_process_distribution),
     recruitment_process_mode = recruitment_process_mode,
     recruitment_process_distribution = recruitment_process_distribution,

@@ -2,7 +2,7 @@ using ComponentArrays: ComponentArray
 using .Population: PopulationModel, spawning_biomass_per_recruit, step_population!
 using .Recruitment: BevertonHolt, Ricker
 using .Selectivity: DoubleLogisticSelectivity, LogisticSelectivity
-using SpecialFunctions: loggamma
+using SpecialFunctions: erf, loggamma
 
 normalize_keys(x) = x
 normalize_keys(x::NamedTuple) = Dict(Symbol(key) => normalize_keys(value) for (key, value) in pairs(x))
@@ -77,7 +77,108 @@ function build_recruitment(params, model_config)
   throw(ArgumentError("Unsupported recruitment type: $recruitment_type"))
 end
 
-function build_population_model(params, data_dict)
+function growth_length_at_age(params, age)
+  mean_length_young = exp(params.growth_log_mean_length_young)
+  mean_length_old = exp(params.growth_log_mean_length_old)
+  growth_coefficient = exp(params.growth_log_coefficient)
+  reference_age_young = params.growth_reference_age_young
+  reference_age_old = params.growth_reference_age_old
+  if reference_age_young > 0 && age < reference_age_young
+    return mean_length_young * max(age, zero(age)) / reference_age_young
+  end
+  denominator =
+    one(growth_coefficient) -
+    exp(-growth_coefficient * (reference_age_old - reference_age_young))
+  safe_denominator = max(abs(denominator), oftype(denominator, 1e-8))
+  numerator =
+    one(growth_coefficient) -
+    exp(-growth_coefficient * (age - reference_age_young))
+  mean_length_young + (mean_length_old - mean_length_young) * numerator / safe_denominator
+end
+
+function build_growth_products(params, data_dict, model_config)
+  growth_type = string(get(model_config, :growth_model_type, "EWAA"))
+  if growth_type != "VonBertalanffySchnute"
+    return (
+      weights_at_age = Matrix(data_dict[:weights_at_age]),
+      mean_length_at_age = nothing,
+      sd_length_at_age = nothing,
+      age_to_length_conversion = get(data_dict, :age_to_length_conversion, nothing),
+    )
+  end
+
+  has_component(params, :growth_log_mean_length_young) ||
+    throw(ArgumentError("VonBertalanffySchnute growth parameters are missing."))
+  reference_age_young = params.growth_reference_age_young
+  reference_age_old = params.growth_reference_age_old
+  reference_age_old > reference_age_young ||
+    throw(ArgumentError("Growth reference_age_for_length_old must exceed reference_age_for_length_young."))
+
+  length_weight_a = exp(params.growth_log_length_weight_a)
+  length_weight_b = exp(params.growth_log_length_weight_b)
+  length_sd_young = exp(params.growth_log_length_sd_at_young)
+  length_sd_old = exp(params.growth_log_length_sd_at_old)
+  n_years = data_dict[:n_years]
+  n_ages = data_dict[:n_ages]
+  age_values = data_dict[:ages]
+  mean_length = [growth_length_at_age(params, age) for age in age_values]
+  reference_length_young = growth_length_at_age(params, reference_age_young)
+  reference_length_old = growth_length_at_age(params, reference_age_old)
+  length_delta = max(
+    abs(reference_length_old - reference_length_young),
+    oftype(reference_length_young, 1e-8),
+  )
+  length_sd_slope = (length_sd_old - length_sd_young) / length_delta
+  sd_length = [
+    max(
+      length_sd_young + length_sd_slope * (length - reference_length_young),
+      oftype(length, 1e-8),
+    ) for length in mean_length
+  ]
+  weights_at_age = repeat(
+    reshape(length_weight_a .* mean_length .^ length_weight_b, 1, n_ages),
+    n_years,
+    1,
+  )
+  age_to_length_conversion = nothing
+  if data_dict[:n_lengths] > 0
+    lengths = data_dict[:lengths]
+    length_edges = [
+      (lengths[index] + lengths[index + 1]) / 2 for index in 1:(length(lengths) - 1)
+    ]
+    age_to_length_conversion = zeros(
+      promote_type(eltype(mean_length), eltype(sd_length)),
+      n_ages,
+      length(lengths),
+    )
+    for age_index in 1:n_ages
+      sd = max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
+      cdf(edge) =
+        (one(sd) + erf((edge - mean_length[age_index]) / (sd * sqrt(oftype(sd, 2))))) / 2
+      row = view(age_to_length_conversion, age_index, :)
+      if length(lengths) == 1
+        row[1] = one(sd)
+      else
+        row[1] = cdf(length_edges[1])
+        for length_index in 2:(length(lengths) - 1)
+          row[length_index] =
+            cdf(length_edges[length_index]) - cdf(length_edges[length_index - 1])
+        end
+        row[end] = one(sd) - cdf(length_edges[end])
+      end
+      row .+= oftype(sd, 1e-12)
+      row ./= sum(row)
+    end
+  end
+  (
+    weights_at_age = weights_at_age,
+    mean_length_at_age = repeat(reshape(mean_length, 1, n_ages), n_years, 1),
+    sd_length_at_age = repeat(reshape(sd_length, 1, n_ages), n_years, 1),
+    age_to_length_conversion = age_to_length_conversion,
+  )
+end
+
+function build_population_model(params, data_dict, weights_at_age)
   has_maturity_inflection = has_component(params, :maturity_inflection_point)
   has_maturity_slope = has_component(params, :maturity_slope)
   has_maturity_inflection == has_maturity_slope ||
@@ -97,7 +198,7 @@ function build_population_model(params, data_dict)
   T = promote_type(
     eltype(collect(params.log_init_naa)),
     eltype(data_dict[:ages]),
-    eltype(data_dict[:weights_at_age]),
+    eltype(weights_at_age),
     eltype(maturity_at_age),
     eltype(collect(params.log_Fmort)),
   )
@@ -111,7 +212,7 @@ function build_population_model(params, data_dict)
 
   PopulationModel(
     ages = collect(data_dict[:ages]),
-    weights_at_age = Matrix(data_dict[:weights_at_age]),
+    weights_at_age = Matrix{T}(weights_at_age),
     maturity_at_age = Matrix{T}(maturity_at_age),
     proportion_female = T.(proportion_female),
     numbers_at_age = numbers_at_age,
@@ -331,7 +432,8 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     end
   end
   recruitment = build_recruitment(params, model_config)
-  population = build_population_model(params, data_dict)
+  growth_products = build_growth_products(params, data_dict, model_config)
+  population = build_population_model(params, data_dict, growth_products.weights_at_age)
 
   fishing_mortality = Matrix(params.log_Fmort)
   catchability = exp.(collect(get_component(params, :log_q, zeros(parameter_type, n_fleets))))
@@ -399,9 +501,9 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       if total_numbers > 0
         age_comp_expected[year, :, fleet_index] .= numbers_at_age[year, :] ./ total_numbers
       end
-      if haskey(data_dict, :age_to_length_conversion)
+      if !isnothing(growth_products.age_to_length_conversion)
         length_numbers =
-          transpose(data_dict[:age_to_length_conversion]) * numbers_at_age[year, :]
+          transpose(growth_products.age_to_length_conversion) * numbers_at_age[year, :]
         total_length_numbers = sum(length_numbers)
         if total_length_numbers > 0
           length_comp_expected[year, :, fleet_index] .= length_numbers ./ total_length_numbers
@@ -479,6 +581,10 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       "mortality_M" => population.mortality_M,
       "mortality_Z" => population.mortality_Z,
       "proportion_mature_at_age" => population.maturity_at_age,
+      "weights_at_age" => population.weights_at_age,
+      "mean_length_at_age" => growth_products.mean_length_at_age,
+      "sd_length_at_age" => growth_products.sd_length_at_age,
+      "age_to_length_conversion" => growth_products.age_to_length_conversion,
       "sum_selectivity" => dropdims(sum(fleet_selectivity, dims = 3), dims = 3),
       "catch_expected" => population.catch_expected,
       "index_expected" => population.index_expected,

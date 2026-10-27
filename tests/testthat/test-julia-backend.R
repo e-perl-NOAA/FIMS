@@ -454,6 +454,48 @@ test_that("Julia backend serializes maturity parameters and estimation masks", {
   expect_true(julia_config[["fixed_parameter_mask"]][slope_start])
 })
 
+test_that("Julia backend serializes VonBertalanffy growth parameters and masks", {
+  data <- data_big |>
+    dplyr::filter(.data$fleet == "fleet1") |>
+    FIMS::FIMSFrame()
+  default_parameters <- FIMS::setup_default_parameters(data = data)
+  parameters <- dplyr::bind_rows(
+    default_parameters |>
+      dplyr::filter(.data$module_name != "Growth"),
+    FIMS::setup_default_Growth(data, module_type = "VonBertalanffySchnute") |>
+      dplyr::mutate(
+        estimation_type = dplyr::if_else(
+          .data$label == "mean_length_young",
+          "fixed_effects",
+          .data$estimation_type
+        )
+      )
+  )
+  julia_data <- FIMS:::as_julia_fims_data(data, parameters)
+  julia_parameters <- FIMS:::as_julia_fims_parameters(parameters, data)
+  julia_config <- FIMS:::as_julia_fims_model_config(parameters, data)
+
+  expect_equal(julia_config[["growth_model_type"]], "VonBertalanffySchnute")
+  expect_equal(
+    julia_parameters[["growth_log_mean_length_young"]],
+    log(parameters |>
+      dplyr::filter(.data$module_name == "Growth", .data$label == "mean_length_young") |>
+      dplyr::pull(.data$value))
+  )
+  expect_equal(julia_data[["n_lengths"]], length(julia_data[["lengths"]]))
+  expect_false("age_to_length_conversion" %in% names(julia_data))
+
+  growth_parameter_start <- sum(purrr::map_int(
+    julia_parameters[seq_len(match("growth_log_mean_length_young", names(julia_parameters)) - 1L)],
+    length
+  )) + 1L
+  expect_true(julia_config[["fixed_parameter_mask"]][growth_parameter_start])
+  expect_equal(
+    length(julia_config[["fixed_parameter_mask"]]),
+    sum(purrr::map_int(julia_parameters, length))
+  )
+})
+
 test_that("Julia backend config preserves normal catch and lognormal index likelihoods", {
   data <- data_big |>
     dplyr::mutate(
