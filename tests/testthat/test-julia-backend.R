@@ -487,7 +487,7 @@ test_that("Julia backend serializes AgeSpecific selectivity by fleet and age", {
   }
 
   expect_equal(julia_config[["selectivity_types"]], rep("AgeSpecific", length(fleet_names)))
-  expect_equal(julia_parameters[["logit_sel_at_age"]], expected_values)
+  expect_equal(julia_parameters[["logit_sel_at_age"]], as.numeric(expected_values))
   expect_equal(
     unname(tail(
       julia_config[["fixed_parameter_mask"]],
@@ -528,6 +528,108 @@ test_that("Julia backend serializes AgeSpecific selectivity by fleet and age", {
   expect_equal(
     prior_config[["parameter_prior_indices"]],
     2L + (2L - 1L) * FIMS:::get_n_ages(data)
+  )
+})
+
+test_that("Julia backend serializes scalar and year-specific AgeSpecific layouts", {
+  data <- FIMS::FIMSFrame(data_big)
+  fleet_names <- FIMS:::get_fleets(data)
+  ages <- FIMS:::get_ages(data)
+  years <- FIMS:::get_start_year(data):FIMS:::get_end_year(data)
+  default_parameters <- FIMS::setup_default_parameters(data = data) |>
+    dplyr::filter(.data$module_name != "Selectivity")
+  selectivity_parameters <- purrr::map_dfr(
+    fleet_names,
+    \(fleet) FIMS::setup_default_Selectivity(
+      data,
+      fleet,
+      module_type = "AgeSpecific"
+    )
+  )
+
+  yearly_rows <- purrr::map_dfr(seq_along(years), \(year_index) {
+    selectivity_parameters |>
+      dplyr::filter(.data$fleet == .env$fleet_names[[1]]) |>
+      dplyr::mutate(
+        timing = .env$years[[year_index]],
+        value = .data$value + .env$year_index
+      )
+  })
+  static_rows <- selectivity_parameters |>
+    dplyr::filter(.data$fleet != .env$fleet_names[[1]])
+  yearly_parameters <- dplyr::bind_rows(
+    default_parameters,
+    yearly_rows,
+    static_rows
+  )
+  yearly_input <- FIMS:::as_julia_fims_parameters(yearly_parameters, data)
+  yearly_config <- FIMS:::as_julia_fims_model_config(yearly_parameters, data)
+  yearly_expected <- c(
+    yearly_rows |>
+      dplyr::arrange(.data$timing, .data$age) |>
+      dplyr::pull(.data$value),
+    static_rows |>
+      dplyr::filter(.data$fleet == .env$fleet_names[[2]]) |>
+      dplyr::arrange(.data$age) |>
+      dplyr::pull(.data$value)
+  )
+
+  expect_equal(yearly_input[["logit_sel_at_age"]], yearly_expected)
+  expect_equal(
+    yearly_config[["selectivity_parameter_lengths"]],
+    c(length(ages) * length(years), length(ages))
+  )
+  prior_year <- years[[2]]
+  prior_age <- ages[[2]]
+  yearly_prior <- tibble::tibble(
+    module_name = "Selectivity",
+    fleet = fleet_names[[1]],
+    label = "logit_sel_at_age",
+    timing = prior_year,
+    age = prior_age,
+    distribution = "Dnorm",
+    mean = 0,
+    sd = 1
+  )
+  yearly_prior_config <- FIMS:::as_julia_fims_model_config(
+    yearly_parameters,
+    data,
+    priors = yearly_prior
+  )
+  expect_equal(
+    yearly_prior_config[["parameter_prior_indices"]],
+    (2L - 1L) * length(ages) + 2L
+  )
+
+  scalar_row <- selectivity_parameters |>
+    dplyr::filter(.data$fleet == .env$fleet_names[[1]]) |>
+    dplyr::slice(1L) |>
+    dplyr::mutate(
+      timing = NA_integer_,
+      age = NA_real_,
+      value = 0.25
+    )
+  scalar_parameters <- dplyr::bind_rows(
+    default_parameters,
+    scalar_row,
+    static_rows
+  )
+  scalar_input <- FIMS:::as_julia_fims_parameters(scalar_parameters, data)
+  scalar_config <- FIMS:::as_julia_fims_model_config(scalar_parameters, data)
+
+  expect_equal(
+    scalar_input[["logit_sel_at_age"]],
+    c(
+      0.25,
+      static_rows |>
+        dplyr::filter(.data$fleet == .env$fleet_names[[2]]) |>
+        dplyr::arrange(.data$age) |>
+        dplyr::pull(.data$value)
+    )
+  )
+  expect_equal(
+    scalar_config[["selectivity_parameter_lengths"]],
+    c(1L, length(ages))
   )
 })
 

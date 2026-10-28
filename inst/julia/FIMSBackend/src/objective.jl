@@ -7,13 +7,40 @@ using SpecialFunctions: erf, loggamma
 struct AgeSpecificSelectivity{T <: Real, A <: Real}
   logit_sel_at_age::Vector{T}
   ages::Vector{A}
+  n_years::Int
+  function AgeSpecificSelectivity(
+    logit_sel_at_age::AbstractVector{T},
+    ages::AbstractVector{A},
+    n_years::Integer,
+  ) where {T <: Real, A <: Real}
+    n_years > 0 ||
+      throw(ArgumentError("Age-specific selectivity requires at least one modeled year."))
+    n_values = length(logit_sel_at_age)
+    n_ages = length(ages)
+    n_values in (1, n_ages, n_ages * n_years) ||
+      throw(ArgumentError("Age-specific selectivity parameters must contain one value, one value per age, or one value per age and year."))
+    new{T, A}(collect(logit_sel_at_age), collect(ages), Int(n_years))
+  end
 end
 
-function (selectivity::AgeSpecificSelectivity)(age::Real)
+AgeSpecificSelectivity(logit_sel_at_age::AbstractVector, ages::AbstractVector) =
+  AgeSpecificSelectivity(logit_sel_at_age, ages, 1)
+
+function (selectivity::AgeSpecificSelectivity)(age::Real, year::Integer = 1)
   age_index = findfirst(==(age), selectivity.ages)
   isnothing(age_index) &&
     throw(ArgumentError("Age-specific selectivity received an age outside the modeled range."))
-  logit_value = selectivity.logit_sel_at_age[age_index]
+  n_values = length(selectivity.logit_sel_at_age)
+  parameter_index = if n_values == 1
+    1
+  elseif n_values == length(selectivity.ages)
+    age_index
+  else
+    1 <= year <= selectivity.n_years ||
+      throw(ArgumentError("Age-specific selectivity received a year outside the modeled range."))
+    (year - 1) * length(selectivity.ages) + age_index
+  end
+  logit_value = selectivity.logit_sel_at_age[parameter_index]
   one(logit_value) / (one(logit_value) + exp(-logit_value))
 end
 
@@ -57,7 +84,7 @@ function component_array_from_input(parameters_vector, model_config)
   throw(ArgumentError("Unsupported parameter container for Julia FIMS backend."))
 end
 
-function build_selectivity(params, model_config, fleet_index, ages)
+function build_selectivity(params, model_config, fleet_index, ages, n_years = 1)
   selectivity_types = get(model_config, :selectivity_types, String[])
   isempty(selectivity_types) || length(selectivity_types) >= fleet_index ||
     throw(ArgumentError("selectivity_types must provide one type for each fleet."))
@@ -67,9 +94,25 @@ function build_selectivity(params, model_config, fleet_index, ages)
   if selectivity_type == "AgeSpecific"
     has_component(params, :logit_sel_at_age) ||
       throw(ArgumentError("AgeSpecific selectivity parameters are missing."))
-    size(params.logit_sel_at_age) == (length(ages), length(selectivity_types)) ||
-      throw(ArgumentError("AgeSpecific selectivity parameters must match the age and fleet dimensions."))
-    return AgeSpecificSelectivity(collect(params.logit_sel_at_age[:, fleet_index]), collect(ages))
+    selectivity_parameters = if params.logit_sel_at_age isa AbstractMatrix
+      size(params.logit_sel_at_age) == (length(ages), length(selectivity_types)) ||
+        throw(ArgumentError("AgeSpecific selectivity parameters must match the age and fleet dimensions."))
+      collect(params.logit_sel_at_age[:, fleet_index])
+    else
+      parameter_lengths = get(model_config, :selectivity_parameter_lengths, Int[])
+      parameter_offsets = get(model_config, :selectivity_parameter_offsets, Int[])
+      length(parameter_lengths) >= fleet_index && length(parameter_offsets) >= fleet_index ||
+        throw(ArgumentError("AgeSpecific selectivity parameter offsets and lengths must provide one entry per fleet."))
+      parameter_length = parameter_lengths[fleet_index]
+      parameter_offset = parameter_offsets[fleet_index]
+      parameter_length > 0 ||
+        throw(ArgumentError("AgeSpecific selectivity parameters are missing for this fleet."))
+      parameter_offset >= 1 &&
+        parameter_offset + parameter_length - 1 <= length(params.logit_sel_at_age) ||
+        throw(ArgumentError("AgeSpecific selectivity parameter bounds are outside the parameter vector."))
+      collect(params.logit_sel_at_age[parameter_offset:(parameter_offset + parameter_length - 1)])
+    end
+    return AgeSpecificSelectivity(selectivity_parameters, collect(ages), n_years)
   elseif selectivity_type == "DoubleLogistic"
     return DoubleLogisticSelectivity(
       params.inflection_point_asc[fleet_index],
@@ -721,9 +764,21 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     n_fleets,
   )
   for fleet_index in 1:n_fleets
-    selectivity = build_selectivity(params, model_config, fleet_index, data_dict[:ages])
+    selectivity = build_selectivity(
+      params,
+      model_config,
+      fleet_index,
+      data_dict[:ages],
+      data_dict[:n_years],
+    )
     for year in 1:data_dict[:n_years], age in 1:data_dict[:n_ages]
-      fleet_selectivity[year, age, fleet_index] = selectivity(data_dict[:ages][age])
+      age_value = data_dict[:ages][age]
+      selectivity_value = if selectivity isa AgeSpecificSelectivity
+        selectivity(age_value, year)
+      else
+        selectivity(age_value)
+      end
+      fleet_selectivity[year, age, fleet_index] = selectivity_value
     end
   end
   recruitment = build_recruitment(params, model_config)

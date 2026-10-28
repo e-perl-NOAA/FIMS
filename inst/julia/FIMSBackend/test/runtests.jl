@@ -26,6 +26,26 @@ using SpecialFunctions: erf
   ) ≈ 0.25
 end
 
+@testset "age-specific selectivity supports scalar and year-specific parameters" begin
+  ages = [1.0, 2.0]
+  scalar = FIMSBackend.AgeSpecificSelectivity([0.0], ages, 2)
+  @test [scalar(age, year) for year in 1:2 for age in ages] ≈ fill(0.5, 4)
+
+  yearly = FIMSBackend.AgeSpecificSelectivity(
+    [log(1 / 3), log(3), log(3), log(1 / 3)],
+    ages,
+    2,
+  )
+  @test [yearly(age, 1) for age in ages] ≈ [0.25, 0.75]
+  @test [yearly(age, 2) for age in ages] ≈ [0.75, 0.25]
+  @test_throws ArgumentError yearly(1.0, 3)
+  @test_throws ArgumentError FIMSBackend.AgeSpecificSelectivity(
+    [0.0, 1.0, 2.0],
+    ages,
+    2,
+  )
+end
+
 @testset "spawning biomass per recruit" begin
   natural_mortality = [0.1, 0.2, 0.3]
   weights_at_age = repeat(reshape([2.0, 4.0, 8.0], 1, 3), 2, 1)
@@ -206,6 +226,36 @@ end
     data,
     merge(config, Dict(:selectivity_types => ["AgeSpecific", "AgeSpecific"])),
   )
+  year_specific_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (
+        logit_sel_at_age = [
+          log(1 / 3),
+          0.0,
+          log(3),
+          log(3),
+          0.0,
+          log(1 / 3),
+          log(3),
+          log(1 / 3),
+          0.0,
+        ],
+      ),
+    ),
+  )
+  year_specific_result = evaluate_model(
+    year_specific_parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :selectivity_types => ["AgeSpecific", "AgeSpecific"],
+        :selectivity_parameter_offsets => [1, 7],
+        :selectivity_parameter_lengths => [6, 3],
+      ),
+    ),
+  )
   no_process_result = evaluate_model(
     parameters,
     data,
@@ -246,6 +296,8 @@ end
     repeat(reshape(expected_maturity, 1, :), 2, 1)
   @test maturity_result["nll"] != result["nll"]
   @test age_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
+  @test year_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
+  @test year_specific_result["report"]["sum_selectivity"][2, :] ≈ [1.5, 0.75, 0.75]
   expected_lengths = [
     275.0 +
     (725.0 - 275.0) *

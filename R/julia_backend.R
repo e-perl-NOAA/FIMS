@@ -316,6 +316,54 @@ as_julia_fims_data <- function(data, parameters) {
   julia_data
 }
 
+#' Arrange and validate AgeSpecific selectivity parameters for one fleet
+#'
+#' @param parameters Parameter tibble.
+#' @param fleet Fleet name.
+#' @param data A `FIMSFrame` object.
+#' @return Rows ordered by the age-specific parameter vector layout.
+#' @noRd
+julia_age_specific_parameter_rows <- function(parameters, fleet, data) {
+  rows <- parameters |>
+    dplyr::filter(
+      .data$module_name == "Selectivity",
+      .data$module_type == "AgeSpecific",
+      .data$fleet == .env$fleet,
+      .data$label == "logit_sel_at_age"
+    )
+  if (nrow(rows) == 0L) {
+    return(rows)
+  }
+
+  ages <- get_ages(data)
+  years <- get_start_year(data):get_end_year(data)
+  age_indices <- match(rows[["age"]], ages)
+  year_indices <- rows[["timing"]] - get_start_year(data) + 1L
+  scalar_layout <- nrow(rows) == 1L &&
+    is.na(rows[["age"]][[1]]) &&
+    is.na(rows[["timing"]][[1]])
+  age_layout <- nrow(rows) == length(ages) &&
+    all(is.na(rows[["timing"]])) &&
+    !anyNA(age_indices) &&
+    !anyDuplicated(age_indices) &&
+    setequal(age_indices, seq_along(ages))
+  year_layout <- nrow(rows) == length(ages) * length(years) &&
+    all(!is.na(year_indices) & year_indices %in% seq_along(years)) &&
+    all(!is.na(age_indices)) &&
+    !anyDuplicated(paste(year_indices, age_indices, sep = "::")) &&
+    nrow(dplyr::distinct(rows, .data$timing, .data$age)) ==
+      length(ages) * length(years)
+
+  if (!scalar_layout && !age_layout && !year_layout) {
+    cli::cli_abort(
+      "Julia AgeSpecific selectivity requires one unindexed value, one value per modeled age, or one value per modeled age and year."
+    )
+  }
+
+  rows |>
+    dplyr::arrange(.data$timing, .data$age)
+}
+
 #' Convert the current parameter tibble to a Julia-friendly list
 #'
 #' @param parameters Parameter tibble.
@@ -561,34 +609,14 @@ as_julia_fims_parameters <- function(parameters, data) {
     }
   }
   if (has_age_specific_selectivity) {
-    logit_sel_at_age <- matrix(0, nrow = n_ages, ncol = length(fleets))
-    for (fleet_index in seq_along(fleets)) {
-      if (!any(
-        selectivity_types$fleet == fleets[[fleet_index]] &
-          selectivity_types$module_type == "AgeSpecific",
-        na.rm = TRUE
-      )) {
-        next
-      }
-
-      age_selectivity_parameters <- parameters |>
-        dplyr::filter(
-          .data$module_name == "Selectivity",
-          .data$module_type == "AgeSpecific",
-          .data$fleet == .env$fleets[[fleet_index]],
-          .data$label == "logit_sel_at_age"
-        ) |>
-        dplyr::arrange(.data$age)
-      age_indices <- match(age_selectivity_parameters[["age"]], get_ages(data))
-      if (nrow(age_selectivity_parameters) != n_ages ||
-        anyNA(age_indices) || anyDuplicated(age_indices)) {
-        cli::cli_abort(
-          "Julia backend requires one {.val logit_sel_at_age} parameter for every modeled age and AgeSpecific fleet."
-        )
-      }
-      logit_sel_at_age[age_indices, fleet_index] <-
-        age_selectivity_parameters[["value"]]
-    }
+    age_selectivity_rows <- lapply(
+      fleets,
+      \(fleet) julia_age_specific_parameter_rows(parameters, fleet, data)
+    )
+    logit_sel_at_age <- unlist(
+      lapply(age_selectivity_rows, \(rows) rows[["value"]]),
+      use.names = FALSE
+    )
     julia_parameters <- c(julia_parameters, list(
       logit_sel_at_age = logit_sel_at_age
     ))
@@ -708,6 +736,12 @@ as_julia_fims_priors <- function(priors, parameters, data) {
   n_years <- get_n_years(data)
   start_year <- get_start_year(data)
   ages <- get_ages(data)
+  age_selectivity_rows <- lapply(
+    fleet_names,
+    \(fleet) julia_age_specific_parameter_rows(parameters, fleet, data)
+  )
+  age_selectivity_lengths <- vapply(age_selectivity_rows, nrow, integer(1))
+  age_selectivity_offsets <- cumsum(c(0L, head(age_selectivity_lengths, -1L)))
 
   parameter_row_matches <- function(rows, target) {
     matches <- rep(TRUE, nrow(rows))
@@ -744,14 +778,15 @@ as_julia_fims_priors <- function(priors, parameters, data) {
           cli::cli_abort("Julia cannot apply a prior to Selectivity parameter {.val {label}}.")
         }
         if (label == "logit_sel_at_age") {
-          age_index <- match(target[["age"]][[1]], ages)
-          if (is.na(age_index)) {
+          selectivity_rows <- age_selectivity_rows[[fleet_index]]
+          parameter_position <- parameter_row_matches(selectivity_rows, target)
+          if (length(parameter_position) != 1L) {
             cli::cli_abort(
-              "A prior on Selectivity {.val logit_sel_at_age} requires a modeled {.field age}."
+              "A prior on Selectivity {.val logit_sel_at_age} must identify exactly one scalar parameter row."
             )
           }
-          component_indices[[prior_index]] <- age_index +
-            (fleet_index - 1L) * length(ages)
+          component_indices[[prior_index]] <-
+            age_selectivity_offsets[[fleet_index]] + parameter_position
         } else {
           component_indices[[prior_index]] <- fleet_index
         }
@@ -1064,6 +1099,12 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
     rows |>
       dplyr::arrange(dplyr::across(dplyr::any_of(c("timing", "age"))))
   }
+  age_selectivity_rows <- lapply(
+    fleet_names,
+    \(fleet) julia_age_specific_parameter_rows(parameters, fleet, data)
+  )
+  age_selectivity_lengths <- vapply(age_selectivity_rows, nrow, integer(1))
+  age_selectivity_offsets <- cumsum(c(1L, head(age_selectivity_lengths, -1L)))
   estimate_mask <- function(rows, type = "fixed_effects") {
     if (nrow(rows) == 0) {
       return(logical())
@@ -1097,27 +1138,10 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
     )
   }
   selectivity_age_mask <- function(type) {
-    result <- matrix(FALSE, nrow = length(ages), ncol = length(fleet_names))
-    for (fleet_index in seq_along(fleet_names)) {
-      rows <- rows_for(
-        "Selectivity",
-        "logit_sel_at_age",
-        fleet_names[[fleet_index]]
-      )
-      if (nrow(rows) == 0L) {
-        next
-      }
-
-      age_indices <- match(rows[["age"]], ages)
-      if (nrow(rows) != length(ages) || anyNA(age_indices) ||
-        anyDuplicated(age_indices)) {
-        cli::cli_abort(
-          "Julia backend requires one {.val logit_sel_at_age} parameter for every modeled age and AgeSpecific fleet."
-        )
-      }
-      result[age_indices, fleet_index] <- estimate_mask(rows, type)
-    }
-    result
+    unlist(
+      lapply(age_selectivity_rows, estimate_mask, type = type),
+      use.names = FALSE
+    )
   }
   maturity_parameter_mask <- function(label, type) {
     values <- estimate_mask(rows_for("Maturity", label), type)
@@ -1256,6 +1280,8 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
     catch_sigma = catch_likelihood[["sigma"]],
     index_distribution = index_likelihood[["family"]],
     index_sigma = index_likelihood[["sigma"]],
+    selectivity_parameter_offsets = age_selectivity_offsets,
+    selectivity_parameter_lengths = age_selectivity_lengths,
     recruitment_deviation_sd = 1,
     recruitment_has_random_devs = any(estimate_mask(log_dev_rows, "random_effects")),
     parameter_names = names(as_julia_fims_parameters(parameters = parameters, data = data)),

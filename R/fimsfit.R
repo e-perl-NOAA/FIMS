@@ -504,6 +504,14 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
     if (identical(label_name, "length_at_age_sd_at_reference_ages")) {
       rows <- rows |>
         dplyr::arrange(.data$age)
+    } else if (identical(label_name, "logit_sel_at_age")) {
+      fleet_order <- unique(rows[["fleet"]])
+      rows <- rows |>
+        dplyr::arrange(
+          match(.data$fleet, .env$fleet_order),
+          .data$timing,
+          .data$age
+        )
     }
     component_names <- names(component_labels)[component_labels == label_name]
     if (identical(label_name, "length_at_age_sd_at_reference_ages") &&
