@@ -2,14 +2,14 @@
   "vignettes/RD-re-sparsity.Rmd": {
     "title": "Random Effects Sparsity",
     "summary": "Investigates the performance and optimization time of simple random effects paramaterized as a dense vs. sparse matrix",
-    "level": "power-user",
+    "level": "contributor",
     "page": "https://noaa-fims.github.io/FIMS/articles/RD-re-sparsity.html",
     "source": "vignettes/RD-re-sparsity.Rmd"
   },
   "vignettes/adding-new-module.Rmd": {
     "title": "Adding a New C++ Module",
     "summary": "Instructions for adding a new C++ module to FIMS",
-    "level": "power-user",
+    "level": "contributor",
     "page": "https://noaa-fims.github.io/FIMS/articles/adding-new-module.html",
     "source": "vignettes/adding-new-module.Rmd"
   },
@@ -44,14 +44,14 @@
   "vignettes/fims-logging.Rmd": {
     "title": "Introducing the FIMS Logging System",
     "summary": "How to use logging for FIMS development",
-    "level": "power-user",
+    "level": "contributor",
     "page": "https://noaa-fims.github.io/FIMS/articles/fims-logging.html",
     "source": "vignettes/fims-logging.Rmd"
   },
   "vignettes/fims-path-maturity.Rmd": {
     "title": "FIMS Path: Maturity",
     "summary": "Describes the hierarchical structure of FIMS by describing the linkages from R to C++ using maturity as an example",
-    "level": "power-user",
+    "level": "contributor",
     "page": "https://noaa-fims.github.io/FIMS/articles/fims-path-maturity.html",
     "source": "vignettes/fims-path-maturity.Rmd"
   },
@@ -65,14 +65,14 @@
   "vignettes/training-intro-cpp.Rmd": {
     "title": "Intro to C++",
     "summary": "Intro training to C++ for FIMS development",
-    "level": "power-user",
+    "level": "contributor",
     "page": "https://noaa-fims.github.io/FIMS/articles/training-intro-cpp.html",
     "source": "vignettes/training-intro-cpp.Rmd"
   },
   "vignettes/training-intro-rcpp.Rmd": {
     "title": "Intro to Rcpp",
     "summary": "Intro training to Rcpp for FIMS development",
-    "level": "power-user",
+    "level": "contributor",
     "page": "https://noaa-fims.github.io/FIMS/articles/training-intro-rcpp.html",
     "source": "vignettes/training-intro-rcpp.Rmd"
   }
