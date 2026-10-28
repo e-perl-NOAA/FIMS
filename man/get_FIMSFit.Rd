@@ -83,10 +83,10 @@ get_model_output(x)
 \code{\link[=get_input]{get_input()}} returns the list that was used to fit the FIMS model, which
 is the returned object from \code{\link[=setup_default_parameters]{setup_default_parameters()}}.
 
-\code{\link[=get_report]{get_report()}} returns the TMB report, where anything that is flagged as
-reportable in the C++ code is returned.
+\code{\link[=get_report]{get_report()}} returns the report produced by the selected backend, including
+the \code{nll_components} objective decomposition when the backend supports it.
 
-\code{\link[=get_obj]{get_obj()}} returns the output from \code{\link[TMB:MakeADFun]{TMB::MakeADFun()}}.
+\code{\link[=get_obj]{get_obj()}} returns the backend objective stored in the fit.
 
 \code{\link[=get_opt]{get_opt()}} returns the output from \code{\link[=nlminb]{nlminb()}}, which is the minimizer used
 in \code{\link[=fit_fims]{fit_fims()}}.
@@ -99,7 +99,8 @@ stored during fitting. Unlike calling \code{get_obj(x)[["gr"]](get_opt(x)[["par"
 this function is safe to call after \code{\link[=clear]{clear()}} because it reads
 from a stored R vector rather than the compiled C++ objective function.
 
-\code{\link[=get_sdreport]{get_sdreport()}} returns the list from \code{\link[TMB:sdreport]{TMB::sdreport()}}.
+\code{\link[=get_sdreport]{get_sdreport()}} returns the backend's uncertainty report, or an empty list
+when uncertainty reporting was disabled or not retained.
 
 \code{\link[=get_estimates]{get_estimates()}} returns a tibble of parameter values and their
 uncertainties from a fitted model. The \code{year_i} column is a position that

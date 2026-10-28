@@ -1,6 +1,6 @@
 using ComponentArrays: ComponentArray, getaxes
 using ForwardDiff: gradient, hessian
-using LinearAlgebra: Symmetric, cholesky, diag, inv, logdet, pinv
+using LinearAlgebra: Symmetric, cholesky, diag, inv, isposdef, logdet, pinv
 using Optim: LBFGS, OnceDifferentiable, converged, iterations, minimum, minimizer, optimize
 
 _primal_float(value::ForwardDiff.Dual) = _primal_float(ForwardDiff.value(value))
@@ -62,6 +62,45 @@ function _numerical_gradient(objective, x)
   result
 end
 
+function _numerical_hessian(objective, x)
+  hessian_matrix = Matrix{Float64}(undef, length(x), length(x))
+  steps = eps(Float64)^(1 / 4) .* max.(abs.(x), 1.0)
+  objective_value = Float64(objective(x))
+  for row in eachindex(x)
+    upper = copy(x)
+    lower = copy(x)
+    upper[row] += steps[row]
+    lower[row] -= steps[row]
+    hessian_matrix[row, row] =
+      (Float64(objective(upper)) - 2 * objective_value + Float64(objective(lower))) /
+      steps[row]^2
+    for column in 1:(row - 1)
+      upper_upper = copy(x)
+      upper_lower = copy(x)
+      lower_upper = copy(x)
+      lower_lower = copy(x)
+      upper_upper[row] += steps[row]
+      upper_upper[column] += steps[column]
+      upper_lower[row] += steps[row]
+      upper_lower[column] -= steps[column]
+      lower_upper[row] -= steps[row]
+      lower_upper[column] += steps[column]
+      lower_lower[row] -= steps[row]
+      lower_lower[column] -= steps[column]
+      value =
+        (
+          Float64(objective(upper_upper)) -
+          Float64(objective(upper_lower)) -
+          Float64(objective(lower_upper)) +
+          Float64(objective(lower_lower))
+        ) / (4 * steps[row] * steps[column])
+      hessian_matrix[row, column] = value
+      hessian_matrix[column, row] = value
+    end
+  end
+  hessian_matrix
+end
+
 function _positive_definite_logdet(hessian_matrix)
   factorization = try
     cholesky(Symmetric(hessian_matrix))
@@ -69,6 +108,111 @@ function _positive_definite_logdet(hessian_matrix)
     throw(ArgumentError("Random-effect Hessian is not positive definite: $(sprint(showerror, error))"))
   end
   logdet(factorization)
+end
+
+function _report_standard_errors(
+  parameters,
+  parameter_layout,
+  data_dict,
+  config,
+  covariance,
+)
+  report = evaluate_model(_named_component_array(parameters, parameter_layout), data_dict, config)["report"]
+  report_standard_error_fields = Set([
+    "agecomp_expected",
+    "agecomp_proportion",
+    "biomass",
+    "catch_expected_by_fleet",
+    "catch_numbers_by_fleet",
+    "catch_numbers_at_age_by_fleet",
+    "catch_numbers_at_length_by_fleet",
+    "catch_weight_by_fleet",
+    "catch_weight_at_age_by_fleet",
+    "expected_recruitment",
+    "index_expected_by_fleet",
+    "index_numbers_by_fleet",
+    "index_numbers_at_age_by_fleet",
+    "index_numbers_at_length_by_fleet",
+    "index_weight_by_fleet",
+    "index_weight_at_age_by_fleet",
+    "lengthcomp_expected",
+    "lengthcomp_proportion",
+    "log_catch_expected_by_fleet",
+    "log_index_expected_by_fleet",
+    "mortality_F",
+    "mortality_M",
+    "mortality_Z",
+    "numbers_at_age",
+    "proportion_mature_at_age",
+    "spawning_biomass",
+    "spawning_biomass_ratio",
+    "sum_selectivity",
+    "total_catch_numbers",
+    "total_catch_weight",
+    "unfished_biomass",
+    "unfished_numbers_at_age",
+    "unfished_spawning_biomass",
+  ])
+  report_names = sort!(
+    String[
+      name for (name, value) in report if
+      name in report_standard_error_fields &&
+      (value isa Real || (value isa AbstractArray && eltype(value) <: Real))
+    ],
+  )
+  isempty(report_names) && return Dict{String, Any}()
+
+  report_lengths = map(report_names) do name
+    value = report[name]
+    value isa Real ? 1 : length(value)
+  end
+  flatten_reports = parameters -> begin
+    evaluated_report =
+      evaluate_model(_named_component_array(parameters, parameter_layout), data_dict, config)["report"]
+    vcat(
+      (
+        evaluated_report[name] isa Real ?
+        [evaluated_report[name]] :
+        vec(evaluated_report[name])
+        for name in report_names
+      )...,
+    )
+  end
+  report_jacobian = ForwardDiff.jacobian(flatten_reports, parameters)
+  weighted_jacobian = report_jacobian * covariance
+  report_variances = vec(sum(weighted_jacobian .* report_jacobian, dims = 2))
+  report_standard_errors = map(report_variances) do variance
+    isfinite(variance) && variance >= 0 ? sqrt(variance) : NaN
+  end
+
+  output = Dict{String, Any}()
+  report_values = Float64[]
+  report_value_names = String[]
+  offset = 1
+  for (name, length) in zip(report_names, report_lengths)
+    value = report[name]
+    standard_errors = report_standard_errors[offset:(offset + length - 1)]
+    output[name] = value isa Real ? only(standard_errors) : reshape(standard_errors, size(value))
+    values = value isa Real ? [value] : vec(value)
+    append!(report_values, values)
+    if length == 1
+      push!(report_value_names, name)
+    else
+      append!(report_value_names, ["$name[$index]" for index in 1:length])
+    end
+    offset += length
+  end
+  report_covariance =
+    Bool(get(config, :compute_report_covariance, false)) ?
+    report_jacobian * covariance * report_jacobian' :
+    nothing
+  (
+    standard_errors = output,
+    standard_errors_flat = report_standard_errors,
+    values = report_values,
+    value_names = report_value_names,
+    covariance = report_covariance,
+  )
 end
 
 function fit_model(init_params, data_dict, config = Dict())
@@ -165,21 +309,66 @@ function fit_model(init_params, data_dict, config = Dict())
   evaluated_model = evaluate_model(estimate_components, data_dict, objective_config)
 
   joint_hessian = hessian(joint_objective, xhat)
-  free_indices = vcat(fixed_indices, random_indices)
-  free_hessian = Symmetric(joint_hessian[free_indices, free_indices])
-  free_covariance = try
-    inv(free_hessian)
-  catch
-    pinv(Matrix(free_hessian))
+  compute_standard_errors = Bool(get(objective_config, :compute_standard_errors, true))
+  fixed_hessian = if isempty(fixed_indices)
+    zeros(Float64, 0, 0)
+  elseif isempty(random_indices)
+    Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
+  elseif compute_standard_errors
+    _numerical_hessian(marginal_objective, fixed_hat)
+  else
+    Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   end
+  fixed_covariance = try
+    inv(Symmetric(fixed_hessian))
+  catch
+    pinv(fixed_hessian)
+  end
+  conditional_random_covariance = if isempty(random_indices)
+    zeros(Float64, 0, 0)
+  else
+    random_hessian = Symmetric(joint_hessian[random_indices, random_indices])
+    try
+      inv(random_hessian)
+    catch
+      pinv(Matrix(random_hessian))
+    end
+  end
+  random_fixed_sensitivity =
+    isempty(random_indices) || isempty(fixed_indices) ?
+    zeros(Float64, length(random_indices), length(fixed_indices)) :
+    -conditional_random_covariance * joint_hessian[random_indices, fixed_indices]
+  random_covariance =
+    conditional_random_covariance +
+    random_fixed_sensitivity * fixed_covariance * random_fixed_sensitivity'
   covariance = zeros(Float64, length(x0), length(x0))
-  covariance[free_indices, free_indices] .= free_covariance
+  covariance[fixed_indices, fixed_indices] .= fixed_covariance
+  covariance[random_indices, random_indices] .= random_covariance
+  if !isempty(fixed_indices) && !isempty(random_indices)
+    covariance[random_indices, fixed_indices] .= random_fixed_sensitivity * fixed_covariance
+    covariance[fixed_indices, random_indices] .=
+      covariance[random_indices, fixed_indices]'
+  end
   variances = fill(NaN, length(x0))
-  variances[free_indices] .= diag(free_covariance)
+  variances[fixed_indices] .= diag(fixed_covariance)
+  variances[random_indices] .= diag(random_covariance)
   standard_errors = map(variances) do variance
     isfinite(variance) && variance >= 0 ? sqrt(variance) : NaN
   end
+  if !compute_standard_errors
+    fill!(standard_errors, NaN)
+  end
   se_components = _named_component_array(standard_errors, parameter_layout)
+  report_uncertainty =
+    compute_standard_errors ?
+    _report_standard_errors(xhat, parameter_layout, data_dict, objective_config, covariance) :
+    (
+      standard_errors = Dict{String, Any}(),
+      standard_errors_flat = Float64[],
+      values = Float64[],
+      value_names = String[],
+      covariance = nothing,
+    )
 
   fit_gradient = zeros(Float64, length(x0))
   if !isempty(fixed_indices)
@@ -206,7 +395,14 @@ function fit_model(init_params, data_dict, config = Dict())
     "iterations" => isnothing(outer_result) ? conditional_result.iterations : iterations(outer_result),
     "gradient" => fit_gradient,
     "report" => evaluated_model["report"],
+    "report_standard_errors" => report_uncertainty.standard_errors,
+    "report_standard_errors_flat" => report_uncertainty.standard_errors_flat,
+    "report_values" => report_uncertainty.values,
+    "report_value_names" => report_uncertainty.value_names,
+    "report_covariance" => report_uncertainty.covariance,
+    "pd_hessian" => isempty(fixed_indices) || isposdef(Symmetric(fixed_hessian)),
     "hessian" => joint_hessian,
+    "fixed_hessian" => fixed_hessian,
     "covariance" => covariance,
     "standard_errors" => _result_dict(se_components),
   )

@@ -350,6 +350,8 @@ function build_growth_products(params, data_dict, model_config)
       mean_length_at_age = nothing,
       sd_length_at_age = nothing,
       age_to_length_conversion = get(data_dict, :age_to_length_conversion, nothing),
+      growth_derived_mean_WAA = nothing,
+      age_to_length_conversion_derived_used = falses(length(data_dict[:fleets])),
     )
   end
 
@@ -508,11 +510,52 @@ function build_growth_products(params, data_dict, model_config)
       end
     end
   end
+  growth_derived_mean_WAA = if isnothing(age_to_length_conversion)
+    nothing
+  else
+    n_fleets = length(data_dict[:fleets])
+    fleet_length_counts = get(
+      data_dict,
+      :n_lengths_by_fleet,
+      fill(data_dict[:n_lengths], n_fleets),
+    )
+    mean_weights = zeros(
+      promote_type(eltype(mean_length), eltype(age_to_length_conversion)),
+      n_years,
+      n_ages,
+      n_fleets,
+    )
+    for fleet_index in 1:n_fleets
+      fleet_length_counts[fleet_index] == 0 && continue
+      fleet_conversion = ndims(age_to_length_conversion) == 3 ?
+        view(age_to_length_conversion, :, :, fleet_index) : age_to_length_conversion
+      for year in 1:n_years, age_index in 1:n_ages
+        mean_weights[year, age_index, fleet_index] = sum(
+          fleet_conversion[age_index, length_index] *
+          length_weight_a * data_dict[:lengths][length_index]^length_weight_b for
+          length_index in eachindex(data_dict[:lengths])
+        )
+      end
+    end
+    mean_weights
+  end
+  age_to_length_conversion_derived_used = if isnothing(growth_derived_mean_WAA)
+    falses(length(data_dict[:fleets]))
+  else
+    fleet_length_counts = get(
+      data_dict,
+      :n_lengths_by_fleet,
+      fill(data_dict[:n_lengths], length(data_dict[:fleets])),
+    )
+    BitVector(fleet_length_counts .> 0)
+  end
   (
     weights_at_age = weights_at_age,
     mean_length_at_age = repeat(reshape(mean_length, 1, n_ages), n_years, 1),
     sd_length_at_age = repeat(reshape(sd_length, 1, n_ages), n_years, 1),
     age_to_length_conversion = age_to_length_conversion,
+    growth_derived_mean_WAA = growth_derived_mean_WAA,
+    age_to_length_conversion_derived_used = age_to_length_conversion_derived_used,
   )
 end
 
@@ -533,15 +576,19 @@ function build_population_model(params, data_dict, weights_at_age)
   else
     Matrix(data_dict[:maturity_at_age])
   end
+  population_weights_at_age =
+    extend_terminal_year(weights_at_age, data_dict[:n_years], "weights_at_age")
+  population_maturity_at_age =
+    extend_terminal_year(maturity_at_age, data_dict[:n_years], "maturity_at_age")
   T = promote_type(
     eltype(collect(params.log_init_naa)),
     eltype(data_dict[:ages]),
-    eltype(weights_at_age),
-    eltype(maturity_at_age),
+    eltype(population_weights_at_age),
+    eltype(population_maturity_at_age),
     eltype(collect(params.log_Fmort)),
   )
   n_fleets = size(params.log_Fmort, 2)
-  numbers_at_age = Matrix{T}(undef, data_dict[:n_years], data_dict[:n_ages])
+  numbers_at_age = Matrix{T}(undef, data_dict[:n_years] + 1, data_dict[:n_ages])
   numbers_at_age .= zero(T)
   numbers_at_age[1, :] .= exp.(collect(params.log_init_naa))
   proportion_female = collect(get(data_dict, :proportion_female, ones(T, data_dict[:n_ages])))
@@ -550,14 +597,14 @@ function build_population_model(params, data_dict, weights_at_age)
 
   PopulationModel(
     ages = collect(data_dict[:ages]),
-    weights_at_age = Matrix{T}(weights_at_age),
-    maturity_at_age = Matrix{T}(maturity_at_age),
+    weights_at_age = Matrix{T}(population_weights_at_age),
+    maturity_at_age = Matrix{T}(population_maturity_at_age),
     proportion_female = T.(proportion_female),
     numbers_at_age = numbers_at_age,
     catch_numbers_at_age = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
-    biomass = zeros(T, data_dict[:n_years]),
-    spawning_biomass = zeros(T, data_dict[:n_years]),
-    expected_recruitment = zeros(T, data_dict[:n_years]),
+    biomass = zeros(T, data_dict[:n_years] + 1),
+    spawning_biomass = zeros(T, data_dict[:n_years] + 1),
+    expected_recruitment = zeros(T, data_dict[:n_years] + 1),
     mortality_F = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
     mortality_M = exp.(reshape(collect(params.log_M), data_dict[:n_years], data_dict[:n_ages])),
     mortality_Z = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
@@ -568,6 +615,13 @@ function build_population_model(params, data_dict, weights_at_age)
     catch_expected_by_fleet = zeros(T, data_dict[:n_years], n_fleets),
     index_expected_by_fleet = zeros(T, data_dict[:n_years], n_fleets),
   )
+end
+
+function extend_terminal_year(values::AbstractMatrix, n_years, field_name)
+  size(values, 1) == n_years + 1 && return values
+  size(values, 1) == n_years ||
+    throw(DimensionMismatch("$field_name must have one row per modeled year, with an optional terminal row."))
+  vcat(values, values[end:end, :])
 end
 
 sigma_element_type(sigma::Number) = typeof(sigma)
@@ -637,7 +691,7 @@ function lognormal_random_effect_nll(observed, expected, sigma)
   normal_nll(log.(observed), expected, sigma)
 end
 
-function parameter_prior_nll(params, model_config)
+function parameter_prior_nll_components(params, model_config)
   components = get(model_config, :parameter_prior_components, String[])
   indices = get(model_config, :parameter_prior_indices, Int[])
   distributions = get(model_config, :parameter_prior_distributions, String[])
@@ -651,7 +705,7 @@ function parameter_prior_nll(params, model_config)
     standard_deviations,
   )) || throw(DimensionMismatch("Parameter prior fields must have matching lengths."))
 
-  total = zero(eltype(collect(params)))
+  nll_components = eltype(collect(params))[]
   for prior_index in 1:n_priors
     component_name = Symbol(components[prior_index])
     component = get_component(params, component_name, nothing)
@@ -669,20 +723,28 @@ function parameter_prior_nll(params, model_config)
 
     distribution = lowercase(string(distributions[prior_index]))
     if distribution == "dnorm"
-      total +=
+      push!(nll_components,
         0.5 * log(2π) + log(standard_deviation) +
-        ((value - mean)^2) / (2 * standard_deviation^2)
+        ((value - mean)^2) / (2 * standard_deviation^2))
     elseif distribution == "dlnorm"
       if !isfinite(value) || value <= 0
-        total += oftype(total, Inf)
+        push!(nll_components, oftype(value, Inf))
       else
-        total +=
+        push!(nll_components,
           0.5 * log(2π) + log(standard_deviation) + log(value) +
-          ((log(value) - mean)^2) / (2 * standard_deviation^2)
+          ((log(value) - mean)^2) / (2 * standard_deviation^2))
       end
     else
       throw(ArgumentError("Unsupported parameter prior distribution: $distribution"))
     end
+  end
+  nll_components
+end
+
+function parameter_prior_nll(params, model_config)
+  total = zero(eltype(collect(params)))
+  for component in parameter_prior_nll_components(params, model_config)
+    total += component
   end
   total
 end
@@ -815,68 +877,101 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     ),
   )
 
-  total_nll = zero(parameter_type)
+  catch_nll_by_fleet = fill(zero(parameter_type), n_fleets)
+  index_nll_by_fleet = fill(zero(parameter_type), n_fleets)
+  fleet_likelihood_value(value, fleet_index) =
+    value isa AbstractMatrix ? view(value, :, fleet_index) : value
 
   if haskey(data_dict, :observed_catch) && !isempty(data_dict[:observed_catch])
     sigma_catch = get(model_config, :catch_sigma, parameter_type(0.1))
     catch_family = get(model_config, :catch_distribution, "dlnorm")
-    total_nll += data_likelihood_nll(
-      data_dict[:observed_catch],
-      population.catch_expected_by_fleet,
-      sigma_catch,
-      catch_family,
-    )
+    for fleet_index in 1:n_fleets
+      catch_nll_by_fleet[fleet_index] = data_likelihood_nll(
+        view(data_dict[:observed_catch], :, fleet_index),
+        view(population.catch_expected_by_fleet, :, fleet_index),
+        fleet_likelihood_value(sigma_catch, fleet_index),
+        fleet_likelihood_value(catch_family, fleet_index),
+      )
+    end
   end
 
   if haskey(data_dict, :observed_index) && !isempty(data_dict[:observed_index])
     sigma_index = get(model_config, :index_sigma, parameter_type(0.1))
     index_family = get(model_config, :index_distribution, "dlnorm")
-    total_nll += data_likelihood_nll(
-      data_dict[:observed_index],
-      population.index_expected_by_fleet,
-      sigma_index,
-      index_family,
-    )
+    for fleet_index in 1:n_fleets
+      index_nll_by_fleet[fleet_index] = data_likelihood_nll(
+        view(data_dict[:observed_index], :, fleet_index),
+        view(population.index_expected_by_fleet, :, fleet_index),
+        fleet_likelihood_value(sigma_index, fleet_index),
+        fleet_likelihood_value(index_family, fleet_index),
+      )
+    end
   end
 
   age_comp_expected = zeros(parameter_type, data_dict[:n_years], data_dict[:n_ages], n_fleets)
+  age_comp_proportion = zeros(parameter_type, data_dict[:n_years], data_dict[:n_ages], n_fleets)
   length_comp_expected = zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
+  length_comp_proportion = zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
+  age_comp_nll_by_fleet = fill(zero(parameter_type), n_fleets)
+  length_comp_nll_by_fleet = fill(zero(parameter_type), n_fleets)
   fleet_has_catch = get(data_dict, :fleet_has_catch, trues(n_fleets))
+  observed_age_comp = get(data_dict, :observed_age_comp, nothing)
+  observed_length_comp = get(data_dict, :observed_length_comp, nothing)
   for fleet_index in 1:n_fleets
+    has_observed_age_comp = !isnothing(observed_age_comp) &&
+      any(value -> isfinite(value) && value != -999, view(observed_age_comp, :, :, fleet_index))
+    has_observed_length_comp = !isnothing(observed_length_comp) &&
+      any(value -> isfinite(value) && value != -999, view(observed_length_comp, :, :, fleet_index))
     numbers_at_age = fleet_has_catch[fleet_index] ?
       view(population.catch_numbers_at_age_by_fleet, :, :, fleet_index) :
       view(population.index_numbers_at_age_by_fleet, :, :, fleet_index)
     for year in 1:data_dict[:n_years]
       total_numbers = sum(view(numbers_at_age, year, :))
       if total_numbers > 0
-        age_comp_expected[year, :, fleet_index] .= numbers_at_age[year, :] ./ total_numbers
+        age_comp_proportion[year, :, fleet_index] .= numbers_at_age[year, :] ./ total_numbers
+      end
+      if !has_observed_age_comp
+        age_comp_expected[year, :, fleet_index] .= numbers_at_age[year, :]
+      else
+        observed_row = view(observed_age_comp, year, :, fleet_index)
+        sample_size = sum(value for value in observed_row if isfinite(value) && value != -999)
+        age_comp_expected[year, :, fleet_index] .=
+          age_comp_proportion[year, :, fleet_index] .* sample_size
       end
       if !isnothing(growth_products.age_to_length_conversion)
         conversion = growth_products.age_to_length_conversion
         fleet_conversion = ndims(conversion) == 3 ?
           view(conversion, :, :, fleet_index) : conversion
-        length_numbers = transpose(fleet_conversion) * numbers_at_age[year, :]
+        length_numbers = transpose(fleet_conversion) * age_comp_proportion[year, :, fleet_index]
         total_length_numbers = sum(length_numbers)
         if total_length_numbers > 0
-          length_comp_expected[year, :, fleet_index] .= length_numbers ./ total_length_numbers
+          length_comp_proportion[year, :, fleet_index] .= length_numbers ./ total_length_numbers
+        end
+        if !has_observed_length_comp
+          length_comp_expected[year, :, fleet_index] .= length_comp_proportion[year, :, fleet_index]
+        else
+          observed_row = view(observed_length_comp, year, :, fleet_index)
+          sample_size = sum(value for value in observed_row if isfinite(value) && value != -999)
+          length_comp_expected[year, :, fleet_index] .=
+            length_comp_proportion[year, :, fleet_index] .* sample_size
         end
       end
     end
   end
 
-  if haskey(data_dict, :observed_age_comp) && !isempty(data_dict[:observed_age_comp])
+  if !isnothing(observed_age_comp) && !isempty(observed_age_comp)
     for fleet_index in 1:n_fleets
-      total_nll += multinomial_nll(
-        Matrix(data_dict[:observed_age_comp][:, :, fleet_index]),
+      age_comp_nll_by_fleet[fleet_index] = multinomial_nll(
+        Matrix(observed_age_comp[:, :, fleet_index]),
         Matrix(age_comp_expected[:, :, fleet_index]),
       )
     end
   end
 
-  if haskey(data_dict, :observed_length_comp) && !isempty(data_dict[:observed_length_comp])
+  if !isnothing(observed_length_comp) && !isempty(observed_length_comp)
     for fleet_index in 1:n_fleets
-      total_nll += multinomial_nll(
-        Matrix(data_dict[:observed_length_comp][:, :, fleet_index]),
+      length_comp_nll_by_fleet[fleet_index] = multinomial_nll(
+        Matrix(observed_length_comp[:, :, fleet_index]),
         Matrix(length_comp_expected[:, :, fleet_index]),
       )
     end
@@ -884,32 +979,109 @@ function evaluate_model(parameters_vector, data_dict, model_config)
 
   catch_numbers_at_age_by_fleet = population.catch_numbers_at_age_by_fleet
   index_numbers_at_age_by_fleet = population.index_numbers_at_age_by_fleet
+  modeled_weights_at_age =
+    view(population.weights_at_age, 1:data_dict[:n_years], :)
   catch_weight_at_age_by_fleet =
-    catch_numbers_at_age_by_fleet .* reshape(data_dict[:weights_at_age], data_dict[:n_years], data_dict[:n_ages], 1)
+    catch_numbers_at_age_by_fleet .* reshape(modeled_weights_at_age, data_dict[:n_years], data_dict[:n_ages], 1)
   index_weight_at_age_by_fleet =
-    index_numbers_at_age_by_fleet .* reshape(data_dict[:weights_at_age], data_dict[:n_years], data_dict[:n_ages], 1)
+    index_numbers_at_age_by_fleet .* reshape(modeled_weights_at_age, data_dict[:n_years], data_dict[:n_ages], 1)
   catch_numbers_by_fleet = dropdims(sum(catch_numbers_at_age_by_fleet, dims = 2), dims = 2)
   index_numbers_by_fleet = dropdims(sum(index_numbers_at_age_by_fleet, dims = 2), dims = 2)
-
+  catch_weight_by_fleet = dropdims(sum(catch_weight_at_age_by_fleet, dims = 2), dims = 2)
+  index_weight_by_fleet = dropdims(sum(index_weight_at_age_by_fleet, dims = 2), dims = 2)
+  catch_numbers_at_length_by_fleet =
+    zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
+  index_numbers_at_length_by_fleet =
+    zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
+  if !isnothing(growth_products.age_to_length_conversion)
+    conversion = growth_products.age_to_length_conversion
+    for fleet_index in 1:n_fleets, year in 1:data_dict[:n_years]
+      fleet_conversion = ndims(conversion) == 3 ?
+        view(conversion, :, :, fleet_index) : conversion
+      catch_numbers_at_length_by_fleet[year, :, fleet_index] .=
+        transpose(fleet_conversion) * view(catch_numbers_at_age_by_fleet, year, :, fleet_index)
+      index_numbers_at_length_by_fleet[year, :, fleet_index] .=
+        transpose(fleet_conversion) * view(index_numbers_at_age_by_fleet, year, :, fleet_index)
+    end
+  end
+  unfished_numbers_at_age =
+    zeros(parameter_type, data_dict[:n_years] + 1, data_dict[:n_ages])
+  log_unfished_recruitment =
+    params.log_rzero isa Number ? params.log_rzero : first(params.log_rzero)
+  unfished_recruitment = exp(log_unfished_recruitment)
+  unfished_numbers_at_age[1, 1] = unfished_recruitment
+  for age in 2:(data_dict[:n_ages] - 1)
+    unfished_numbers_at_age[1, age] =
+      unfished_numbers_at_age[1, age - 1] *
+      exp(-population.mortality_M[1, age - 1])
+  end
+  if data_dict[:n_ages] > 1
+    previous_age = data_dict[:n_ages] - 1
+    plus_age = data_dict[:n_ages]
+    survivors =
+      unfished_numbers_at_age[1, previous_age] *
+      exp(-population.mortality_M[1, previous_age])
+    unfished_numbers_at_age[1, plus_age] =
+      survivors / (one(parameter_type) - exp(-population.mortality_M[1, plus_age]))
+  end
+  for year in 2:(data_dict[:n_years] + 1)
+    mortality_year = year - 1
+    unfished_numbers_at_age[year, 1] = unfished_recruitment
+    for age in 2:(data_dict[:n_ages] - 1)
+      previous_age = age - 1
+      unfished_numbers_at_age[year, age] =
+        unfished_numbers_at_age[year - 1, previous_age] *
+        exp(-population.mortality_M[mortality_year, previous_age])
+    end
+    if data_dict[:n_ages] > 1
+      previous_age = data_dict[:n_ages] - 1
+      plus_age = data_dict[:n_ages]
+      survivors =
+        unfished_numbers_at_age[year - 1, previous_age] *
+        exp(-population.mortality_M[mortality_year, previous_age])
+      unfished_numbers_at_age[year, plus_age] =
+        survivors + unfished_numbers_at_age[year - 1, plus_age] *
+        exp(-population.mortality_M[mortality_year, plus_age])
+    end
+  end
+  unfished_biomass =
+    vec(sum(unfished_numbers_at_age .* population.weights_at_age, dims = 2))
+  unfished_spawning_biomass = vec(sum(
+    unfished_numbers_at_age .* population.weights_at_age .* population.maturity_at_age .*
+    reshape(population.proportion_female, 1, data_dict[:n_ages]),
+    dims = 2,
+  ))
+  spawning_biomass_ratio = population.spawning_biomass ./ first(unfished_spawning_biomass)
+  log_index_expected_by_fleet = log.(population.index_expected_by_fleet)
+  log_catch_expected_by_fleet = log.(population.catch_expected_by_fleet)
   has_recruitment_process_values =
     recruitment_mode == "log_r" ? has_component(params, :log_r) : has_component(params, :log_devs)
+  process_nll_value = zero(parameter_type)
   if get(model_config, :recruitment_process_active, false) && has_recruitment_process_values
     process_family = lowercase(string(get(model_config, :recruitment_process_distribution, "dnorm")))
     process_family in ("dnorm", "dlnorm") ||
       throw(ArgumentError("Unsupported recruitment process distribution: $process_family"))
     process_nll = process_family == "dlnorm" ? lognormal_random_effect_nll : normal_nll
-    recruit_sd =
-      has_component(params, :log_sd) ?
-      exp.(params.log_sd) :
+    recruit_sd = if has_component(params, :log_sd)
+      log_sd = params.log_sd
+      if log_sd isa Number
+        exp(log_sd)
+      elseif length(log_sd) == 1
+        exp(first(log_sd))
+      else
+        exp.(log_sd)
+      end
+    else
       get(model_config, :recruitment_deviation_sd, one(eltype(recruit_devs)))
+    end
     if recruitment_mode == "log_r"
       expected_log_recruitment = [
         log(recruitment(population.spawning_biomass[year], phi_0)) for
         year in 1:(data_dict[:n_years] - 1)
       ]
-      total_nll += process_nll(params.log_r, expected_log_recruitment, recruit_sd)
+      process_nll_value += process_nll(params.log_r, expected_log_recruitment, recruit_sd)
     else
-      total_nll += process_nll(
+      process_nll_value += process_nll(
         params.log_devs,
         zeros(parameter_type, length(params.log_devs)),
         recruit_sd,
@@ -917,13 +1089,65 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     end
   end
 
-  prior_nll_value = parameter_prior_nll(params, model_config)
-  total_nll += prior_nll_value
+  prior_nll_components = parameter_prior_nll_components(params, model_config)
+  prior_nll_value = sum(prior_nll_components; init = zero(parameter_type))
+  nll_components = copy(prior_nll_components)
+  if get(model_config, :recruitment_process_active, false) && has_recruitment_process_values
+    push!(nll_components, process_nll_value)
+  end
+  fleet_has_catch = get(
+    data_dict,
+    :fleet_has_catch,
+    haskey(data_dict, :observed_catch) ? [
+      any(value -> isfinite(value) && value != -999, view(data_dict[:observed_catch], :, fleet_index)) for
+      fleet_index in 1:n_fleets
+    ] : falses(n_fleets),
+  )
+  fleet_has_index = get(
+    data_dict,
+    :fleet_has_index,
+    haskey(data_dict, :observed_index) ? [
+      any(value -> isfinite(value) && value != -999, view(data_dict[:observed_index], :, fleet_index)) for
+      fleet_index in 1:n_fleets
+    ] : falses(n_fleets),
+  )
+  fleet_has_age_comp = get(
+    data_dict,
+    :fleet_has_age_comp,
+    isnothing(observed_age_comp) ? falses(n_fleets) : [
+      any(value -> isfinite(value) && value != -999, view(observed_age_comp, :, :, fleet_index)) for
+      fleet_index in 1:n_fleets
+    ],
+  )
+  fleet_has_length_comp = get(
+    data_dict,
+    :fleet_has_length_comp,
+    isnothing(observed_length_comp) ? falses(n_fleets) : [
+      any(value -> isfinite(value) && value != -999, view(observed_length_comp, :, :, fleet_index)) for
+      fleet_index in 1:n_fleets
+    ],
+  )
+  for fleet_index in 1:n_fleets
+    if haskey(data_dict, :observed_catch) && fleet_has_catch[fleet_index]
+      push!(nll_components, catch_nll_by_fleet[fleet_index])
+    end
+    if haskey(data_dict, :observed_index) && fleet_has_index[fleet_index]
+      push!(nll_components, index_nll_by_fleet[fleet_index])
+    end
+    if fleet_has_age_comp[fleet_index]
+      push!(nll_components, age_comp_nll_by_fleet[fleet_index])
+    end
+    if fleet_has_length_comp[fleet_index]
+      push!(nll_components, length_comp_nll_by_fleet[fleet_index])
+    end
+  end
+  total_nll = sum(nll_components; init = zero(parameter_type))
 
   Dict(
     "nll" => total_nll,
     "report" => Dict(
       "parameter_prior_nll" => prior_nll_value,
+      "nll_components" => nll_components,
       "numbers_at_age" => population.numbers_at_age,
       "catch_numbers_at_age" => population.catch_numbers_at_age,
       "biomass" => population.biomass,
@@ -933,10 +1157,19 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       "mortality_M" => population.mortality_M,
       "mortality_Z" => population.mortality_Z,
       "proportion_mature_at_age" => population.maturity_at_age,
+      "unfished_numbers_at_age" => unfished_numbers_at_age,
+      "unfished_biomass" => unfished_biomass,
+      "unfished_spawning_biomass" => unfished_spawning_biomass,
+      "spawning_biomass_ratio" => spawning_biomass_ratio,
       "weights_at_age" => population.weights_at_age,
       "mean_length_at_age" => growth_products.mean_length_at_age,
       "sd_length_at_age" => growth_products.sd_length_at_age,
+      "growth_derived_mean_WAA_by_fleet" => growth_products.growth_derived_mean_WAA,
       "age_to_length_conversion" => growth_products.age_to_length_conversion,
+      "age_to_length_conversion_fixed" => get(data_dict, :age_to_length_conversion, nothing),
+      "age_to_length_conversion_derived_used" =>
+        growth_products.age_to_length_conversion_derived_used,
+      "age_to_length_conversion_derived" => nothing,
       "sum_selectivity" => dropdims(sum(fleet_selectivity, dims = 3), dims = 3),
       "catch_expected" => population.catch_expected,
       "index_expected" => population.index_expected,
@@ -946,12 +1179,20 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       "index_expected_by_fleet" => population.index_expected_by_fleet,
       "catch_numbers_by_fleet" => catch_numbers_by_fleet,
       "index_numbers_by_fleet" => index_numbers_by_fleet,
+      "catch_weight_by_fleet" => catch_weight_by_fleet,
+      "index_weight_by_fleet" => index_weight_by_fleet,
       "catch_weight_at_age_by_fleet" => catch_weight_at_age_by_fleet,
       "index_weight_at_age_by_fleet" => index_weight_at_age_by_fleet,
       "catch_numbers_at_age_by_fleet" => catch_numbers_at_age_by_fleet,
       "index_numbers_at_age_by_fleet" => index_numbers_at_age_by_fleet,
+      "catch_numbers_at_length_by_fleet" => catch_numbers_at_length_by_fleet,
+      "index_numbers_at_length_by_fleet" => index_numbers_at_length_by_fleet,
       "agecomp_expected" => age_comp_expected,
+      "agecomp_proportion" => age_comp_proportion,
       "lengthcomp_expected" => length_comp_expected,
+      "lengthcomp_proportion" => length_comp_proportion,
+      "log_index_expected_by_fleet" => log_index_expected_by_fleet,
+      "log_catch_expected_by_fleet" => log_catch_expected_by_fleet,
       "jnll" => total_nll,
     ),
   )

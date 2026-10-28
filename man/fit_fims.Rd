@@ -19,12 +19,13 @@ fit_fims(
 \arguments{
 \item{input}{Input list as returned by \code{\link[=initialize_fims]{initialize_fims()}}.}
 
-\item{get_sd}{A boolean specifying if the \code{\link[TMB:sdreport]{TMB::sdreport()}} should be
-calculated?}
+\item{get_sd}{A boolean specifying whether parameter and derived-quantity
+standard errors should be calculated.}
 
 \item{save_sd}{A logical, with the default \code{TRUE}, indicating whether the
-sdreport is returned in the output. If \code{FALSE}, the slot for the report
-will be empty.}
+uncertainty report is retained in the output. If \code{FALSE}, the
+\code{sdreport} slot will be empty. For Julia fits, uncertainty values in
+\code{estimates} are retained.}
 
 \item{number_of_loops}{A positive integer specifying the number of
 iterations of the optimizer that will be performed to improve the
@@ -45,12 +46,12 @@ object as an RDS object. Defaults to 'fit.RDS', and a value of NULL
 indicates not to save it. If specified, it must end in .RDS. The file is
 written to folder given by \code{input[["path"]]}. Not yet implemented.}
 
-\item{getReportCovariance}{A logical passed to \code{\link[TMB:sdreport]{TMB::sdreport()}}, with the
-default \code{FALSE}. Standard errors of all parameters and derived quantities
-are calculated either way. If \code{TRUE}, the full covariance matrix of the
-derived quantities is also calculated and stored as \code{cov} in the
-\code{sdreport}; it grows with the square of the number of derived quantities
-and can use several GB of memory. If \code{FALSE}, \code{cov} is \code{NA}.}
+\item{getReportCovariance}{A logical, with the default \code{FALSE}. Standard
+errors of all parameters and derived quantities are calculated either way. If
+\code{TRUE}, the full covariance matrix of the derived quantities is also
+calculated and stored as \code{cov} in the \code{sdreport}; it grows with the
+square of the number of derived quantities and can use several GB of memory. If
+\code{FALSE}, \code{cov} is \code{NA}.}
 }
 \value{
 An object of class \code{FIMSFit} is returned, where the structure is the same

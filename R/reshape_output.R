@@ -243,9 +243,9 @@ reshape_json_estimates <- function(model_output) {
     dplyr::mutate(value = unlist(.data$value), uncertainty = unlist(.data$uncertainty))
 
   population_ages <- read_list[["populations"]] |>
-    tidyr::unnest_longer(age, indices_to = "age_i") |>
+    tidyr::unnest_longer(dplyr::all_of("age"), indices_to = "age_i") |>
     # TODO: think about how to join based on population when more than one
-    dplyr::select(age, age_i)
+    dplyr::select(dplyr::all_of(c("age", "age_i")))
   # Process the population data
   population_information <- read_list[["populations"]] |>
     tidyr::pivot_longer(

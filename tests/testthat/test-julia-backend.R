@@ -1091,6 +1091,21 @@ test_that("Julia backend config preserves normal catch and lognormal index likel
   expect_equal(log_r_config[["recruitment_process_mode"]], "log_r")
   expect_equal(length(log_r_input[["log_r"]]), get_n_years(data) - 1L)
 
+  scalar_log_sd_parameters <- parameters |>
+    dplyr::filter(.data$label != "log_sd") |>
+    dplyr::bind_rows(
+      parameters |>
+        dplyr::filter(.data$module_name == "Recruitment", .data$label == "log_sd") |>
+        dplyr::slice(1L) |>
+        dplyr::mutate(value = log(0.1), estimation_type = "fixed_effects")
+    )
+  scalar_log_sd_input <- FIMS:::as_julia_fims_parameters(
+    scalar_log_sd_parameters,
+    data
+  )
+  expect_length(scalar_log_sd_input[["log_sd"]], 1L)
+  expect_equal(scalar_log_sd_input[["log_sd"]], log(0.1))
+
   vector_log_sd_parameters <- parameters |>
     dplyr::filter(.data$label != "log_sd") |>
     dplyr::bind_rows(
@@ -1150,20 +1165,35 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
   parameter_lengths <- purrr::map_int(julia_input[["parameters"]], length)
   flattened_parameter_count <- sum(parameter_lengths)
   n_years <- get_n_years(data)
+  n_report_years <- n_years + 1L
   n_ages <- get_n_ages(data)
   n_fleets <- length(get_fleets(data))
   n_lengths <- get_n_lengths(data)
+  weights_at_age <- julia_input[["data"]][["weights_at_age"]]
+  if (NROW(weights_at_age) == n_years) {
+    weights_at_age <- rbind(weights_at_age, weights_at_age[n_years, , drop = FALSE])
+  }
+  unfished_numbers_at_age <- matrix(
+    seq_len(n_report_years * n_ages),
+    nrow = n_report_years,
+    ncol = n_ages,
+    byrow = TRUE
+  )
   mocked_report <- list(
-    numbers_at_age = matrix(1, nrow = n_years, ncol = n_ages),
+    numbers_at_age = matrix(1, nrow = n_report_years, ncol = n_ages),
     catch_numbers_at_age = matrix(0.1, nrow = n_years, ncol = n_ages),
-    biomass = rep(1, n_years),
-    spawning_biomass = rep(0.5, n_years),
-    expected_recruitment = rep(1, n_years),
+    biomass = rep(1, n_report_years),
+    spawning_biomass = rep(0.5, n_report_years),
+    expected_recruitment = rep(1, n_report_years),
+    unfished_numbers_at_age = unfished_numbers_at_age,
+    unfished_biomass = rep(2, n_report_years),
+    unfished_spawning_biomass = rep(1, n_report_years),
+    spawning_biomass_ratio = rep(0.5, n_report_years),
     mortality_F = matrix(0.1, nrow = n_years, ncol = n_ages),
     mortality_M = matrix(0.2, nrow = n_years, ncol = n_ages),
     mortality_Z = matrix(0.3, nrow = n_years, ncol = n_ages),
-    proportion_mature_at_age = matrix(0.5, nrow = n_years, ncol = n_ages),
-    weights_at_age = julia_input[["data"]][["weights_at_age"]],
+    proportion_mature_at_age = matrix(0.5, nrow = n_report_years, ncol = n_ages),
+    weights_at_age = weights_at_age,
     sum_selectivity = matrix(1, nrow = n_years, ncol = n_ages),
     total_catch_numbers = rep(1, n_years),
     total_catch_weight = rep(1, n_years),
@@ -1178,19 +1208,62 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
     catch_numbers_at_age_by_fleet = array(0.1, dim = c(n_years, n_ages, n_fleets)),
     index_numbers_at_age_by_fleet = array(0.1, dim = c(n_years, n_ages, n_fleets)),
     agecomp_expected = array(1 / n_ages, dim = c(n_years, n_ages, n_fleets)),
-    lengthcomp_expected = array(1 / n_lengths, dim = c(n_years, n_lengths, n_fleets))
+    lengthcomp_expected = array(1 / n_lengths, dim = c(n_years, n_lengths, n_fleets)),
+    nll_components = c(2.5, 10),
+    growth_derived_mean_WAA_by_fleet = array(
+      seq_len(n_years * n_ages * n_fleets),
+      dim = c(n_years, n_ages, n_fleets)
+    ),
+    age_to_length_conversion_derived_used = c(1, rep(0, n_fleets - 1L))
   )
 
   testthat::local_mocked_bindings(
    initialize_julia_backend = function(...) TRUE,
    assign_julia_backend_input = function(...) invisible(TRUE),
-   fit_julia_backend_model = function(...) {
+   fit_julia_backend_model = function(julia_input, model_config) {
+     compute_standard_errors <- isTRUE(model_config[["compute_standard_errors"]])
      list(
        estimates = julia_input[["parameters"]],
        standard_errors = purrr::imap(
          julia_input[["parameters"]],
-         \(value, name) rep(0.1, length(value))
+         \(value, name) rep(if (compute_standard_errors) 0.1 else NA_real_, length(value))
        ),
+       report_standard_errors = if (compute_standard_errors) {
+         list(
+           biomass = rep(0.25, n_report_years),
+           mortality_F = matrix(seq_len(n_years * n_ages), nrow = n_years),
+           unfished_numbers_at_age = matrix(
+             0.3,
+             nrow = n_report_years,
+             ncol = n_ages
+           ),
+           unfished_biomass = rep(0.35, n_report_years),
+           unfished_spawning_biomass = rep(0.4, n_report_years),
+           spawning_biomass_ratio = rep(0.45, n_report_years),
+           catch_expected_by_fleet = matrix(
+             seq_len(n_years * n_fleets),
+             nrow = n_years,
+             ncol = n_fleets
+           )
+         )
+       } else {
+         list()
+       },
+       report_standard_errors_flat = if (compute_standard_errors) {
+         rep(0.25, 2L)
+       } else {
+         numeric()
+       },
+       report_values = c(1, 2),
+       report_value_names = c("mock_report_1", "mock_report_2"),
+       report_covariance = if (isTRUE(model_config[["compute_report_covariance"]])) {
+         diag(2L)
+       } else {
+         NULL
+       },
+       covariance = diag(0.01, flattened_parameter_count),
+       fixed_parameters = rep(0, sum(model_config[["fixed_parameter_mask"]])),
+       pd_hessian = TRUE,
        gradient = rep(0, flattened_parameter_count),
        hessian = diag(flattened_parameter_count),
        nll = 12.5,
@@ -1218,14 +1291,131 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
   expect_equal(FIMS::get_opt(fit)[["convergence"]], 0L)
   #' @description Test that the Julia backend fit bridge exposes the Julia report jnll through get_report().
   expect_equal(FIMS::get_report(fit)[["jnll"]], 12.5)
+  expect_equal(FIMS::get_report(fit)[["nll_components"]], c(2.5, 10))
   #' @description Test that Julia backend reports include the mortality and fleet-derived quantities used by FIMS summaries.
   expect_true(all(c("mortality_F", "mortality_M", "mortality_Z", "total_catch_numbers") %in% names(FIMS::get_report(fit))))
   #' @description Test that Julia backend reports preserve both recruitment process parameterizations.
   expect_true(all(c("log_recruit_dev", "log_r") %in% names(FIMS::get_report(fit))))
+  expect_length(FIMS::get_report(fit)[["catch_expected"]], n_fleets)
+  expect_equal(
+    FIMS::get_report(fit)[["catch_expected"]][[1]],
+    rep(1, n_years)
+  )
+  expect_equal(
+    FIMS::get_report(fit)[["catch_numbers_at_age"]][[1]],
+    rep(0.1, n_years * n_ages)
+  )
+  expect_equal(
+    FIMS::get_report(fit)[["index_numbers_at_age"]][[2]],
+    rep(0.1, n_years * n_ages)
+  )
+  expect_equal(
+    FIMS::get_report(fit)[["agecomp_expected"]][[2]],
+    rep(1 / n_ages, n_years * n_ages)
+  )
+  expect_equal(
+    FIMS::get_report(fit)[["growth_derived_mean_WAA"]][[1]],
+    as.numeric(t(matrix(
+      seq_len(n_years * n_ages),
+      nrow = n_years,
+      ncol = n_ages
+    )))
+  )
+  expect_length(
+    FIMS::get_report(fit)[["growth_derived_mean_WAA"]][[2]],
+    0L
+  )
+  expect_equal(FIMS::get_report(fit)[["age_to_length_conversion_derived_used"]][[1]], 1)
+  expect_equal(FIMS::get_report(fit)[["age_to_length_conversion_derived_used"]][[2]], 0)
+  expect_true(all(vapply(
+    FIMS::get_report(fit)[["age_to_length_conversion_derived"]],
+    length,
+    integer(1)
+  ) == 0L))
   #' @description Test that Julia backend fits produce estimate rows for catch and mortality quantities.
   expect_true(all(c("catch_expected", "mortality_F") %in% FIMS::get_estimates(fit)[["label"]]))
+  expect_true(all(c(
+    "unfished_numbers_at_age",
+    "unfished_biomass",
+    "unfished_spawning_biomass",
+    "spawning_biomass_ratio"
+  ) %in% FIMS::get_estimates(fit)[["label"]]))
+  expect_equal(
+    FIMS::get_estimates(fit) |>
+      dplyr::filter(.data$label == "biomass") |>
+      dplyr::pull(.data$uncertainty),
+    rep(0.25, n_report_years)
+  )
+  expect_length(
+    FIMS::get_report(fit)[["spawning_biomass"]][[1]],
+    n_report_years
+  )
+  expect_equal(
+    FIMS::get_report(fit)[["unfished_numbers_at_age"]][[1]],
+    as.numeric(t(unfished_numbers_at_age))
+  )
+  expect_equal(
+    nrow(FIMS::get_estimates(fit) |>
+      dplyr::filter(.data$label == "numbers_at_age")),
+    n_report_years * n_ages
+  )
+  expect_equal(
+    FIMS::get_estimates(fit) |>
+    dplyr::filter(.data$label == "spawning_biomass_ratio") |>
+    dplyr::pull(.data$uncertainty),
+    rep(0.45, n_report_years)
+  )
+  expect_equal(
+    FIMS::get_estimates(fit) |>
+    dplyr::filter(.data$label == "unfished_numbers_at_age") |>
+    dplyr::pull(.data$estimated),
+    as.numeric(t(unfished_numbers_at_age))
+  )
+  expect_equal(
+    FIMS::get_estimates(fit) |>
+      dplyr::filter(.data$label == "mortality_F") |>
+      dplyr::pull(.data$uncertainty),
+    as.numeric(t(matrix(
+      seq_len(n_years * n_ages),
+      nrow = n_years
+    )))
+  )
+  expect_equal(
+    FIMS::get_estimates(fit) |>
+      dplyr::filter(
+        .data$label == "catch_expected",
+        .data$fleet == get_fleets(data)[[1]]
+      ) |>
+      dplyr::pull(.data$uncertainty),
+    seq_len(n_years)
+  )
   #' @description Test that Julia backend fits support backend-neutral glance summaries.
-  expect_equal(generics::glance(fit)[["marginal_nll"]], 12.5)
+  expect_equal(generics::glance(fit)[["marginal_nll"]], 12.5  )
+  expect_s3_class(FIMS::get_sdreport(fit), "sdreport")
+  expect_equal(
+    unname(summary(FIMS::get_sdreport(fit), "fixed")[, "Std. Error"]),
+    rep(0.1, FIMS::get_number_of_parameters(fit)[["fixed_effects"]])
+  )
+  expect_equal(FIMS::get_sdreport(fit)[["cov"]], NA_real_)
+  fit_with_covariance <- FIMS::fit_fims(
+    result,
+    optimize = TRUE,
+    getReportCovariance = TRUE
+  )
+  expect_equal(
+    FIMS::get_sdreport(fit_with_covariance)[["cov"]],
+    diag(2L)
+  )
+  fit_without_saved_sd <- FIMS::fit_fims(result, optimize = TRUE, save_sd = FALSE)
+  expect_length(FIMS::get_sdreport(fit_without_saved_sd), 0L)
+  expect_true(all(
+    FIMS::get_estimates(fit_without_saved_sd) |>
+      dplyr::filter(.data$label == "biomass") |>
+      dplyr::pull(.data$uncertainty) == 0.25
+  ))
+
+  fit_without_sd <- FIMS::fit_fims(result, optimize = TRUE, get_sd = FALSE)
+  expect_true(all(is.na(FIMS::get_estimates(fit_without_sd)[["uncertainty"]])))
 
   clear()
 })

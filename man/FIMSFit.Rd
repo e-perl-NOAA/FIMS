@@ -16,13 +16,13 @@ FIMSFit(
 \arguments{
 \item{input}{Input list as returned by \code{\link[=initialize_fims]{initialize_fims()}}.}
 
-\item{obj}{An object returned from \code{\link[TMB:MakeADFun]{TMB::MakeADFun()}}.}
+\item{obj}{A backend objective object returned by \code{\link[=fit_fims]{fit_fims()}}.}
 
 \item{opt}{An object returned from an optimizer, typically from
-\code{\link[stats:nlminb]{stats::nlminb()}}, used to fit a TMB model.}
+\code{\link[stats:nlminb]{stats::nlminb()}} or the Julia backend.}
 
-\item{sdreport}{An object of the \code{sdreport} class as returned from
-\code{\link[TMB:sdreport]{TMB::sdreport()}}.}
+\item{sdreport}{An object containing uncertainty estimates returned by the
+backend.}
 
 \item{run_time}{A vector of at least length one, where all entries are of the
 \code{timediff} class and at least one is named "time_total". This information
@@ -42,7 +42,7 @@ following slots:
 A list containing the model setup in the same form it was passed.
 }
 \item{\code{obj}:}{
-A list returned from \code{\link[TMB:MakeADFun]{TMB::MakeADFun()}} in the same form it was passed.
+The backend objective object in the same form it was passed.
 }
 \item{\code{opt}:}{
 A list containing the optimized model in the same form it was passed.
@@ -56,7 +56,7 @@ A list containing the model report from \code{obj[["report"]]()}.
 }
 \item{\code{sdreport}:}{
 An object with the \code{sdreport} class containing the output from
-\code{TMB::sdreport(obj)}.
+the backend uncertainty calculation.
 }
 \item{\code{run_time}:}{
 The length of time it took to run the model if it was optimized.

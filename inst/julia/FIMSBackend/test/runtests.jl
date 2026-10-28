@@ -2,6 +2,7 @@ using FIMSBackend
 using Test
 using ComponentArrays: ComponentArray
 using ForwardDiff: derivative
+using LinearAlgebra: diag
 using SpecialFunctions: erf
 
 @testset "age-specific selectivity" begin
@@ -48,19 +49,19 @@ end
 
 @testset "spawning biomass per recruit" begin
   natural_mortality = [0.1, 0.2, 0.3]
-  weights_at_age = repeat(reshape([2.0, 4.0, 8.0], 1, 3), 2, 1)
-  maturity_at_age = repeat(reshape([0.5, 0.75, 1.0], 1, 3), 2, 1)
+  weights_at_age = repeat(reshape([2.0, 4.0, 8.0], 1, 3), 3, 1)
+  maturity_at_age = repeat(reshape([0.5, 0.75, 1.0], 1, 3), 3, 1)
   proportion_female = [1.0, 0.5, 0.5]
   population = PopulationModel(
     ages = [1.0, 2.0, 3.0],
     weights_at_age = weights_at_age,
     maturity_at_age = maturity_at_age,
     proportion_female = proportion_female,
-    numbers_at_age = zeros(2, 3),
+    numbers_at_age = zeros(3, 3),
     catch_numbers_at_age = zeros(2, 3),
-    biomass = zeros(2),
-    spawning_biomass = zeros(2),
-    expected_recruitment = zeros(2),
+    biomass = zeros(3),
+    spawning_biomass = zeros(3),
+    expected_recruitment = zeros(3),
     mortality_F = zeros(2, 3),
     mortality_M = repeat(reshape(natural_mortality, 1, 3), 2, 1),
     mortality_Z = zeros(2, 3),
@@ -198,6 +199,8 @@ end
 
   result = evaluate_model(parameters, data, config)
   report = result["report"]
+  @test length(report["nll_components"]) == 5
+  @test sum(report["nll_components"]) ≈ result["nll"]
   vonb_result = evaluate_model(
     vonb_parameters,
     data,
@@ -293,7 +296,7 @@ end
   @test isfinite(result["nll"])
   expected_maturity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
   @test maturity_result["report"]["proportion_mature_at_age"] ≈
-    repeat(reshape(expected_maturity, 1, :), 2, 1)
+    repeat(reshape(expected_maturity, 1, :), 3, 1)
   @test maturity_result["nll"] != result["nll"]
   @test age_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
   @test year_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
@@ -307,7 +310,7 @@ end
   @test vonb_result["report"]["mean_length_at_age"] ≈
     repeat(reshape(expected_lengths, 1, :), 2, 1)
   @test vonb_result["report"]["weights_at_age"] ≈
-    repeat(reshape(2.5e-11 .* expected_lengths .^ 3.0, 1, :), 2, 1)
+    repeat(reshape(2.5e-11 .* expected_lengths .^ 3.0, 1, :), 3, 1)
   @test all(
     isapprox.(sum(vonb_result["report"]["age_to_length_conversion"], dims = 2), 1.0)
   )
@@ -347,6 +350,18 @@ end
     expected_conversion[age_index, :] ./= sum(expected_conversion[age_index, :])
   end
   @test vonb_result["report"]["age_to_length_conversion"] ≈ expected_conversion
+  vonb_report = vonb_result["report"]
+  @test vonb_report["age_to_length_conversion_derived_used"] == trues(2)
+  @test size(vonb_report["growth_derived_mean_WAA_by_fleet"]) == (2, 3, 2)
+  expected_weight_at_length =
+    exp(vonb_parameters.growth_log_length_weight_a) .*
+    data[:lengths] .^ exp(vonb_parameters.growth_log_length_weight_b)
+  expected_derived_mean_WAA =
+    expected_conversion * expected_weight_at_length
+  @test vonb_report["growth_derived_mean_WAA_by_fleet"][:, :, 1] ≈
+        repeat(reshape(expected_derived_mean_WAA, 1, 3), 2, 1)
+  @test vonb_report["growth_derived_mean_WAA_by_fleet"][:, :, 2] ≈
+        repeat(reshape(expected_derived_mean_WAA, 1, 3), 2, 1)
   fleet_specific_data = merge(
     data,
     Dict(
@@ -567,20 +582,49 @@ end
   @test size(report["catch_expected_by_fleet"]) == (2, 2)
   @test size(report["index_expected_by_fleet"]) == (2, 2)
   @test size(report["catch_numbers_at_age_by_fleet"]) == (2, 3, 2)
+  @test size(report["numbers_at_age"]) == (3, 3)
+  @test size(report["biomass"]) == (3,)
+  @test size(report["spawning_biomass"]) == (3,)
+  @test size(report["expected_recruitment"]) == (3,)
   @test size(report["mortality_F"]) == (2, 3)
   @test size(report["mortality_M"]) == (2, 3)
   @test size(report["mortality_Z"]) == (2, 3)
   @test size(report["sum_selectivity"]) == (2, 3)
   @test size(report["catch_weight_at_age_by_fleet"]) == (2, 3, 2)
   @test size(report["index_weight_at_age_by_fleet"]) == (2, 3, 2)
-  @test report["mortality_Z"] ≈ report["mortality_F"] + report["mortality_M"]
+  @test size(report["catch_numbers_at_length_by_fleet"]) == (2, 2, 2)
+  @test size(report["index_numbers_at_length_by_fleet"]) == (2, 2, 2)
+  @test size(report["unfished_numbers_at_age"]) == (3, 3)
+  @test length(report["unfished_biomass"]) == 3
+  @test length(report["unfished_spawning_biomass"]) == 3
+  @test length(report["spawning_biomass_ratio"]) == 3
+  @test report["mortality_Z"][1:2, :] ≈
+        report["mortality_F"][1:2, :] + report["mortality_M"][1:2, :]
+  @test report["numbers_at_age"][3, 1] == report["expected_recruitment"][3]
+  @test report["numbers_at_age"][3, 2] ≈
+        report["numbers_at_age"][2, 1] * exp(-report["mortality_Z"][2, 1])
+  @test report["numbers_at_age"][3, 3] ≈
+        report["numbers_at_age"][2, 2] * exp(-report["mortality_Z"][2, 2]) +
+        report["numbers_at_age"][2, 3] * exp(-report["mortality_Z"][2, 3])
+  @test report["biomass"][3] ≈
+        sum(report["numbers_at_age"][3, :] .* report["weights_at_age"][3, :])
   @test report["total_catch_numbers"] ≈ vec(sum(report["catch_numbers_by_fleet"], dims = 2))
   @test report["total_catch_weight"] ≈ vec(sum(report["catch_expected_by_fleet"], dims = 2))
   @test size(report["agecomp_expected"]) == (2, 3, 2)
   @test size(report["lengthcomp_expected"]) == (2, 2, 2)
-  @test all(isapprox(value, 1.0; atol = 1e-10) for value in sum(report["agecomp_expected"], dims = 2))
-  @test all(isapprox(value, 1.0; atol = 1e-10) for value in sum(report["lengthcomp_expected"], dims = 2))
+  @test all(isapprox(value, 1.0; atol = 1e-10) for value in sum(report["agecomp_proportion"], dims = 2))
+  @test vec(sum(report["agecomp_expected"][:, :, 1], dims = 2)) ≈ [60.0, 62.0]
+  @test vec(sum(report["agecomp_expected"][:, :, 2], dims = 2)) ≈ report["index_numbers_by_fleet"][:, 2]
+  @test all(isapprox(value, 1.0; atol = 1e-10) for value in sum(report["lengthcomp_proportion"], dims = 2))
+  @test all(isapprox(value, 1.0; atol = 1e-10) for value in sum(report["lengthcomp_proportion"], dims = 2))
+  @test vec(sum(report["lengthcomp_expected"][:, :, 1], dims = 2)) ≈ [60.0, 60.0]
   @test all(report["index_expected_by_fleet"][:, 2] .> report["index_expected_by_fleet"][:, 1])
+  @test report["catch_weight_by_fleet"] ≈ report["catch_expected_by_fleet"]
+  @test report["index_weight_by_fleet"] ≈ report["index_expected_by_fleet"]
+  @test report["log_index_expected_by_fleet"] ≈ log.(report["index_expected_by_fleet"])
+  @test report["log_catch_expected_by_fleet"] ≈ log.(report["catch_expected_by_fleet"])
+  @test report["spawning_biomass_ratio"] ≈
+        report["spawning_biomass"] ./ first(report["unfished_spawning_biomass"])
   @test_throws ArgumentError evaluate_model(
     parameters,
     data,
@@ -613,6 +657,55 @@ end
   @test fit_result["random_effect_count"] == 1
   @test isfinite(fit_result["nll"])
   @test length(fit_result["fixed_gradient"]) == 1
+  fixed_covariance = inv(fit_result["fixed_hessian"])
+  random_conditional_covariance = inv(fit_result["hessian"][15:15, 15:15])
+  random_fixed_sensitivity =
+    -random_conditional_covariance * fit_result["hessian"][15:15, 13:13]
+  @test fit_result["covariance"][13, 13] ≈ fixed_covariance[1, 1]
+  @test fit_result["covariance"][13, 15] ≈
+        (fixed_covariance * random_fixed_sensitivity')[1, 1]
+  @test fit_result["covariance"][15, 15] ≈
+        (random_conditional_covariance +
+         random_fixed_sensitivity * fixed_covariance * random_fixed_sensitivity')[1, 1]
+  @test length(fit_result["report_standard_errors"]["biomass"]) ==
+        length(fit_result["report"]["biomass"])
+  @test all(
+    name -> haskey(fit_result["report_standard_errors"], name),
+    (
+      "agecomp_proportion",
+      "catch_numbers_at_length_by_fleet",
+      "catch_weight_by_fleet",
+      "index_numbers_at_length_by_fleet",
+      "index_weight_by_fleet",
+      "lengthcomp_proportion",
+      "log_catch_expected_by_fleet",
+      "log_index_expected_by_fleet",
+      "spawning_biomass_ratio",
+      "unfished_biomass",
+      "unfished_numbers_at_age",
+      "unfished_spawning_biomass",
+    ),
+  )
+  @test all(
+    value -> isnan(value) || value >= 0,
+    fit_result["report_standard_errors"]["biomass"],
+  )
+  fitted_parameter_vector = vcat((
+    begin
+      value = fit_result["estimates"][String(name)]
+      value isa Number ? [value] : vec(value)
+    end for name in propertynames(parameters)
+  )...)
+  report_uncertainty = FIMSBackend._report_standard_errors(
+    Float64.(fitted_parameter_vector),
+    parameters,
+    data,
+    merge(fit_config, Dict(:compute_report_covariance => true)),
+    fit_result["covariance"],
+  )
+  @test size(report_uncertainty.covariance) ==
+        (length(report_uncertainty.values), length(report_uncertainty.values))
+  @test diag(report_uncertainty.covariance) ≈ report_uncertainty.standard_errors_flat .^ 2
 end
 
 @testset "multinomial likelihood includes the sampling coefficient" begin
@@ -737,4 +830,30 @@ end
   expected_process = FIMSBackend.normal_nll([0.0, 0.0], [0.0, 0.0], [0.5, 1.0])
 
   @test isapprox(with_process - without_process, expected_process; atol = 1e-10)
+
+  singleton_sd_parameters = Dict(
+    String(name) => getproperty(parameters, name) for name in propertynames(parameters)
+  )
+  singleton_sd_parameters["log_sd"] = [log(0.5)]
+  singleton_sd_config = merge(
+    config,
+    Dict(:parameter_names => String.(propertynames(parameters))),
+  )
+  singleton_sd_with_process =
+    evaluate_model(singleton_sd_parameters, data, singleton_sd_config)["nll"]
+  @test isapprox(
+    singleton_sd_with_process - without_process,
+    FIMSBackend.normal_nll([0.0, 0.0], [0.0, 0.0], 0.5);
+    atol = 1e-10,
+  )
+
+  scalar_sd_parameters = copy(singleton_sd_parameters)
+  scalar_sd_parameters["log_sd"] = log(0.5)
+  scalar_sd_with_process =
+    evaluate_model(scalar_sd_parameters, data, singleton_sd_config)["nll"]
+  @test isapprox(
+    scalar_sd_with_process - without_process,
+    FIMSBackend.normal_nll([0.0, 0.0], [0.0, 0.0], 0.5);
+    atol = 1e-10,
+  )
 end

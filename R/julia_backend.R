@@ -249,6 +249,8 @@ as_julia_fims_data <- function(data, parameters) {
     lengths = lengths,
     fleet_has_catch = vapply(fleets, \(fleet) any(raw_data$type == "catch" & raw_data$fleet == fleet), logical(1)),
     fleet_has_index = vapply(fleets, \(fleet) any(raw_data$type == "index" & raw_data$fleet == fleet), logical(1)),
+    fleet_has_age_comp = vapply(fleets, \(fleet) any(raw_data$type == "age_comp" & raw_data$fleet == fleet), logical(1)),
+    fleet_has_length_comp = vapply(fleets, \(fleet) any(raw_data$type == "length_comp" & raw_data$fleet == fleet), logical(1)),
     n_lengths = n_lengths,
     start_year = get_start_year(data),
     end_year = get_end_year(data),
@@ -371,6 +373,22 @@ julia_age_specific_parameter_rows <- function(parameters, fleet, data) {
 #' @return A named list matching the current Julia backend scaffold.
 #' @noRd
 as_julia_fims_parameters <- function(parameters, data) {
+  single_module_names <- c("Population", "Recruitment", "Maturity", "Growth")
+  for (module_name in single_module_names) {
+    module_rows <- parameters |>
+      dplyr::filter(.data$module_name == .env$module_name)
+    module_ids <- if ("module_id" %in% names(module_rows)) {
+      unique(stats::na.omit(module_rows[["module_id"]]))
+    } else {
+      integer()
+    }
+    if (length(module_ids) > 1L) {
+      cli::cli_abort(
+        "Julia backend supports one {.val {module_name}} module per model; found multiple module IDs."
+      )
+    }
+  }
+
   fleets <- get_fleets(data)
   n_years <- get_n_years(data)
   n_ages <- get_n_ages(data)
@@ -741,7 +759,7 @@ as_julia_fims_priors <- function(priors, parameters, data) {
     \(fleet) julia_age_specific_parameter_rows(parameters, fleet, data)
   )
   age_selectivity_lengths <- vapply(age_selectivity_rows, nrow, integer(1))
-  age_selectivity_offsets <- cumsum(c(0L, head(age_selectivity_lengths, -1L)))
+  age_selectivity_offsets <- cumsum(c(0L, utils::head(age_selectivity_lengths, -1L)))
 
   parameter_row_matches <- function(rows, target) {
     matches <- rep(TRUE, nrow(rows))
@@ -1104,7 +1122,7 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
     \(fleet) julia_age_specific_parameter_rows(parameters, fleet, data)
   )
   age_selectivity_lengths <- vapply(age_selectivity_rows, nrow, integer(1))
-  age_selectivity_offsets <- cumsum(c(1L, head(age_selectivity_lengths, -1L)))
+  age_selectivity_offsets <- cumsum(c(1L, utils::head(age_selectivity_lengths, -1L)))
   estimate_mask <- function(rows, type = "fixed_effects") {
     if (nrow(rows) == 0) {
       return(logical())

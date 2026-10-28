@@ -54,8 +54,9 @@ function step_population!(
   rec,
   catch_data::AbstractDict
 ) where {T <: Real}
-  n_years, n_ages = size(pop.numbers_at_age)
+  n_years, n_ages = size(pop.mortality_F)
   @assert n_ages == length(pop.ages)
+  @assert size(pop.numbers_at_age) == (n_years + 1, n_ages)
 
   fishing_mortality = Matrix{T}(catch_data[:fishing_mortality])
   fleet_selectivity = Array{T, 3}(catch_data[:fleet_selectivity])
@@ -147,6 +148,29 @@ function step_population!(
       pop.expected_recruitment[year + 1] = realized_recruitment
       pop.numbers_at_age[year + 1, 1] = realized_recruitment
     end
+  end
+
+  terminal_year = n_years + 1
+  terminal_recruitment = rec(pop.spawning_biomass[n_years], phi_0)
+  pop.numbers_at_age[terminal_year, 1] = terminal_recruitment
+  pop.expected_recruitment[terminal_year] = terminal_recruitment
+  for age in 2:n_ages
+    survivors =
+      pop.numbers_at_age[n_years, age - 1] *
+      exp(-pop.mortality_Z[n_years, age - 1])
+    pop.numbers_at_age[terminal_year, age] = age == n_ages ?
+      survivors +
+      pop.numbers_at_age[n_years, age] * exp(-pop.mortality_Z[n_years, age]) :
+      survivors
+  end
+  for age in 1:n_ages
+    pop.biomass[terminal_year] +=
+      pop.numbers_at_age[terminal_year, age] * pop.weights_at_age[terminal_year, age]
+    pop.spawning_biomass[terminal_year] +=
+      pop.numbers_at_age[terminal_year, age] *
+      pop.weights_at_age[terminal_year, age] *
+      pop.maturity_at_age[terminal_year, age] *
+      pop.proportion_female[age]
   end
 
   pop
