@@ -16,12 +16,13 @@ reset_cpp_backend_state <- function() {
 }
 
 test_that("reset_julia_backend_state restores the Julia initialization flag", {
-  FIMS:::.fims_julia_backend_state$initialized <- TRUE
+  state_environment <- getFromNamespace(".fims_julia_backend_state", "FIMS")
+  state_environment$initialized <- TRUE
   local({
     reset_julia_backend_state()
-    expect_false(FIMS:::.fims_julia_backend_state$initialized)
+    expect_false(state_environment$initialized)
   })
-  expect_true(FIMS:::.fims_julia_backend_state$initialized)
+  expect_true(state_environment$initialized)
 })
 
 test_that("load_fims_cpp_backend installs placeholders when the C++ module is unavailable", {
@@ -1039,6 +1040,7 @@ test_that("Julia backend config preserves normal catch and lognormal index likel
 
 test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bridge", {
   reset_julia_backend_state()
+  withr::local_options(list(FIMS.disable_julia = TRUE))
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
   result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
