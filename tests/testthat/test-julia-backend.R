@@ -1163,6 +1163,7 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
     mortality_M = matrix(0.2, nrow = n_years, ncol = n_ages),
     mortality_Z = matrix(0.3, nrow = n_years, ncol = n_ages),
     proportion_mature_at_age = matrix(0.5, nrow = n_years, ncol = n_ages),
+    weights_at_age = julia_input[["data"]][["weights_at_age"]],
     sum_selectivity = matrix(1, nrow = n_years, ncol = n_ages),
     total_catch_numbers = rep(1, n_years),
     total_catch_weight = rep(1, n_years),
