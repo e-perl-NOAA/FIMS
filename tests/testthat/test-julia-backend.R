@@ -1209,6 +1209,11 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
   expect_s4_class(fit, "FIMSFit")
   #' @description Test that the Julia backend fit bridge preserves backend metadata in the fit input.
   expect_equal(attr(FIMS::get_input(fit), "backend"), "julia")
+  expect_type(FIMS::get_model_output(fit), "character")
+  expect_equal(
+    jsonlite::fromJSON(FIMS::get_model_output(fit))[["backend"]],
+    "julia"
+  )
   #' @description Test that the Julia backend fit bridge records an optimizer result.
   expect_equal(FIMS::get_opt(fit)[["convergence"]], 0L)
   #' @description Test that the Julia backend fit bridge exposes the Julia report jnll through get_report().

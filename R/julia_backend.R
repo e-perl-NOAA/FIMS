@@ -199,7 +199,7 @@ as_julia_fims_data <- function(data, parameters) {
 
   maturity_parameters <- parameters |>
     dplyr::filter(.data$module_name == "Maturity", .data$label %in% c("inflection_point", "slope")) |>
-    dplyr::select(.data$label, .data$value)
+    dplyr::select(label, value)
   maturity_inflection <- maturity_parameters |>
     dplyr::filter(.data$label == "inflection_point") |>
     dplyr::pull(.data$value) |>

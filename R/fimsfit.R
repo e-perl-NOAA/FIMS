@@ -957,7 +957,9 @@ FIMSFit <- function(
       ),
       run_time = run_time,
       version = version,
-      model_output = jsonlite::toJSON(list(backend = "julia"), auto_unbox = TRUE)
+      model_output = as.character(
+        jsonlite::toJSON(list(backend = "julia"), auto_unbox = TRUE)
+      )
     ))
   }
 
