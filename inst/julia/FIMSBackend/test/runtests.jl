@@ -321,6 +321,39 @@ end
       ),
     ),
   )
+  growth_prior_result = evaluate_model(
+    vonb_parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :growth_model_type => "VonBertalanffySchnute",
+        :parameter_prior_components => [
+          "growth_log_mean_length_young",
+          "growth_log_length_weight_b",
+        ],
+        :parameter_prior_indices => [1, 1],
+        :parameter_prior_distributions => ["dnorm", "dlnorm"],
+        :parameter_prior_means => [250.0, log(2.5)],
+        :parameter_prior_sds => [10.0, 0.4],
+        :parameter_prior_transforms => ["exp", "exp"],
+      ),
+    ),
+  )
+  maturity_prior_result = evaluate_model(
+    maturity_parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :parameter_prior_components => ["maturity_slope"],
+        :parameter_prior_indices => [1],
+        :parameter_prior_distributions => ["dnorm"],
+        :parameter_prior_means => [0.5],
+        :parameter_prior_sds => [0.25],
+      ),
+    ),
+  )
 
   @test isfinite(result["nll"])
   expected_maturity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
@@ -553,6 +586,13 @@ end
     0.5 * log(2π) + log(3.0) + (1.0 - 1.5)^2 / (2 * 3.0^2)
   @test lognormal_prior_result["nll"] - result["nll"] ≈
     0.5 * log(2π) + log(0.5) + log(1.0) + (log(1.0) - 0.2)^2 / (2 * 0.5^2)
+  expected_growth_prior_nll =
+    0.5 * log(2π) + log(10.0) + (275.0 - 250.0)^2 / (2 * 10.0^2) +
+    0.5 * log(2π) + log(0.4) + log(3.0) + (log(3.0) - log(2.5))^2 / (2 * 0.4^2)
+  @test growth_prior_result["nll"] - vonb_result["nll"] ≈ expected_growth_prior_nll
+  @test growth_prior_result["report"]["parameter_prior_nll"] ≈ expected_growth_prior_nll
+  @test maturity_prior_result["nll"] - maturity_result["nll"] ≈
+        0.5 * log(2π) + log(0.25) + (1.0 - 0.5)^2 / (2 * 0.25^2)
   @test isapprox(result["nll"] - no_process_result["nll"], 0.5 * log(2π); atol = 1e-8)
   log_r_result = evaluate_model(
     parameters,
