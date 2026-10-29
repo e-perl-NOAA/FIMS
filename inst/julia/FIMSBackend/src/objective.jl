@@ -697,12 +697,18 @@ function parameter_prior_nll_components(params, model_config)
   distributions = get(model_config, :parameter_prior_distributions, String[])
   means = get(model_config, :parameter_prior_means, Float64[])
   standard_deviations = get(model_config, :parameter_prior_sds, Float64[])
+  transforms = get(
+    model_config,
+    :parameter_prior_transforms,
+    fill("identity", length(components)),
+  )
   n_priors = length(components)
   all(length(values) == n_priors for values in (
     indices,
     distributions,
     means,
     standard_deviations,
+    transforms,
   )) || throw(DimensionMismatch("Parameter prior fields must have matching lengths."))
 
   nll_components = eltype(collect(params))[]
@@ -715,7 +721,14 @@ function parameter_prior_nll_components(params, model_config)
     component_index = indices[prior_index]
     1 <= component_index <= length(component_values) ||
       throw(BoundsError(component_values, component_index))
-    value = component_values[component_index]
+    transform = lowercase(string(transforms[prior_index]))
+    value = if transform == "identity"
+      component_values[component_index]
+    elseif transform == "exp"
+      exp(component_values[component_index])
+    else
+      throw(ArgumentError("Unsupported parameter prior transform: $transform"))
+    end
     mean = means[prior_index]
     standard_deviation = standard_deviations[prior_index]
     isfinite(standard_deviation) && standard_deviation > 0 ||

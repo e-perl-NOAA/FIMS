@@ -682,7 +682,8 @@ as_julia_fims_priors <- function(priors, parameters, data) {
     parameter_prior_indices = integer(),
     parameter_prior_distributions = character(),
     parameter_prior_means = numeric(),
-    parameter_prior_sds = numeric()
+    parameter_prior_sds = numeric(),
+    parameter_prior_transforms = character()
   )
   if (is.null(priors)) {
     return(empty_priors)
@@ -750,6 +751,7 @@ as_julia_fims_priors <- function(priors, parameters, data) {
 
   component_names <- character(nrow(priors))
   component_indices <- integer(nrow(priors))
+  component_transforms <- rep("identity", nrow(priors))
   fleet_names <- get_fleets(data)
   n_years <- get_n_years(data)
   start_year <- get_start_year(data)
@@ -844,6 +846,79 @@ as_julia_fims_priors <- function(priors, parameters, data) {
         )
       }
       component_indices[[prior_index]] <- year_index + (age_index - 1L) * n_years
+    } else if (module_name == "Maturity") {
+      component_name <- switch(
+        label,
+        inflection_point = "maturity_inflection_point",
+        slope = "maturity_slope",
+        cli::cli_abort("Julia cannot apply a prior to Maturity parameter {.val {label}}.")
+      )
+      component_names[[prior_index]] <- component_name
+      component_indices[[prior_index]] <- 1L
+    } else if (module_name == "Growth") {
+      growth_type <- parameters |>
+        dplyr::filter(.data$module_name == "Growth") |>
+        dplyr::pull(.data$module_type) |>
+        unique() |>
+        stats::na.omit()
+      if (length(growth_type) != 1L || growth_type != "VonBertalanffySchnute") {
+        cli::cli_abort(
+          "Julia growth priors require {.val VonBertalanffySchnute} growth."
+        )
+      }
+      growth_component <- c(
+        mean_length_young = "growth_log_mean_length_young",
+        mean_length_old = "growth_log_mean_length_old",
+        growth_coefficient = "growth_log_coefficient",
+        reference_age_for_length_young = "growth_reference_age_young",
+        reference_age_for_length_old = "growth_reference_age_old",
+        length_weight_a = "growth_log_length_weight_a",
+        length_weight_b = "growth_log_length_weight_b",
+        log_sd_mean_length_young = "growth_log_sd_mean_length_young",
+        log_sd_mean_length_old = "growth_log_sd_mean_length_old",
+        log_sd_growth_coefficient = "growth_log_sd_growth_coefficient",
+        mean_length_young_mean_length_old_logit_corr =
+          "growth_mean_length_young_mean_length_old_logit_corr",
+        mean_length_young_growth_coefficient_logit_corr =
+          "growth_mean_length_young_growth_coefficient_logit_corr",
+        mean_length_old_growth_coefficient_logit_corr =
+          "growth_mean_length_old_growth_coefficient_logit_corr"
+      )
+      if (label == "length_at_age_sd_at_reference_ages") {
+        growth_sd_rows <- parameters |>
+          dplyr::filter(
+            .data$module_name == "Growth",
+            .data$label == "length_at_age_sd_at_reference_ages"
+          ) |>
+          dplyr::arrange(.data$age)
+        target_position <- parameter_row_matches(growth_sd_rows, target)
+        if (length(target_position) != 1L || nrow(growth_sd_rows) != 2L) {
+          cli::cli_abort(
+            paste(
+              "A prior on Growth {.val length_at_age_sd_at_reference_ages}",
+              "must identify one of the two reference-age SD parameters."
+            )
+          )
+        }
+        component_names[[prior_index]] <- c(
+          "growth_log_length_sd_at_young",
+          "growth_log_length_sd_at_old"
+        )[[target_position]]
+        component_indices[[prior_index]] <- 1L
+        component_transforms[[prior_index]] <- "exp"
+      } else {
+        if (!label %in% names(growth_component)) {
+          cli::cli_abort("Julia cannot apply a prior to Growth parameter {.val {label}}.")
+        }
+        component_names[[prior_index]] <- unname(growth_component[[label]])
+        component_indices[[prior_index]] <- 1L
+        if (label %in% c(
+          "mean_length_young", "mean_length_old", "growth_coefficient",
+          "length_weight_a", "length_weight_b"
+        )) {
+          component_transforms[[prior_index]] <- "exp"
+        }
+      }
     } else {
       cli::cli_abort(
         "Julia cannot apply a prior to parameter {.val {module_name}/{label}}."
@@ -861,7 +936,8 @@ as_julia_fims_priors <- function(priors, parameters, data) {
     parameter_prior_indices = component_indices,
     parameter_prior_distributions = distributions,
     parameter_prior_means = priors[["mean"]],
-    parameter_prior_sds = priors[["sd"]]
+    parameter_prior_sds = priors[["sd"]],
+    parameter_prior_transforms = component_transforms
   )
 }
 

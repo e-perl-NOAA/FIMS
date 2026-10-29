@@ -673,6 +673,107 @@ test_that("Julia backend serializes VonBertalanffy growth parameters and masks",
     length(julia_config[["fixed_parameter_mask"]]),
     sum(purrr::map_int(julia_parameters, length))
   )
+
+  prior_rows <- function(module_name, label) {
+    parameters |>
+      dplyr::filter(
+        .data$module_name == .env$module_name,
+        .data$label == .env$label
+      ) |>
+      dplyr::transmute(
+        module_name = .data$module_name,
+        fleet = .data$fleet,
+        label = .data$label,
+        timing = .data$timing,
+        age = .data$age,
+        distribution = "Dnorm",
+        mean = 0,
+        sd = 1
+      )
+  }
+  growth_priors <- dplyr::bind_rows(
+    prior_rows("Growth", "mean_length_young"),
+    prior_rows("Growth", "length_weight_b"),
+    prior_rows("Growth", "reference_age_for_length_old"),
+    prior_rows("Growth", "length_at_age_sd_at_reference_ages"),
+    prior_rows("Maturity", "slope")
+  )
+  growth_prior_config <- FIMS:::as_julia_fims_model_config(
+    parameters = parameters,
+    data = data,
+    priors = growth_priors
+  )
+  expect_equal(
+    growth_prior_config[["parameter_prior_components"]],
+    c(
+      "growth_log_mean_length_young",
+      "growth_log_length_weight_b",
+      "growth_reference_age_old",
+      "growth_log_length_sd_at_young",
+      "growth_log_length_sd_at_old",
+      "maturity_slope"
+    )
+  )
+  expect_equal(
+    growth_prior_config[["parameter_prior_transforms"]],
+    c("exp", "exp", "identity", "exp", "exp", "identity")
+  )
+
+  delta_labels <- c(
+    "log_sd_mean_length_young",
+    "log_sd_mean_length_old",
+    "log_sd_growth_coefficient",
+    "mean_length_young_mean_length_old_logit_corr",
+    "mean_length_young_growth_coefficient_logit_corr",
+    "mean_length_old_growth_coefficient_logit_corr"
+  )
+  delta_growth_parameters <- FIMS::setup_default_Growth(
+    data,
+    module_type = "VonBertalanffySchnute"
+  ) |>
+    dplyr::filter(.data$label != "length_at_age_sd_at_reference_ages") |>
+    dplyr::bind_rows(purrr::map_dfr(delta_labels, \(label) {
+      FIMS::setup_default_Growth(data, module_type = "VonBertalanffySchnute") |>
+        dplyr::slice(1L) |>
+        dplyr::mutate(
+          label = .env$label,
+          age = NA_real_,
+          value = 0
+        )
+    }))
+  delta_parameters <- dplyr::bind_rows(
+    parameters |>
+      dplyr::filter(.data$module_name != "Growth"),
+    delta_growth_parameters
+  )
+  delta_priors <- delta_parameters |>
+    dplyr::filter(
+      .data$module_name == "Growth",
+      .data$label %in% .env$delta_labels
+    ) |>
+    dplyr::transmute(
+      module_name = .data$module_name,
+      fleet = .data$fleet,
+      label = .data$label,
+      timing = .data$timing,
+      age = .data$age,
+      distribution = "Dnorm",
+      mean = 0,
+      sd = 1
+    )
+  delta_prior_config <- FIMS:::as_julia_fims_priors(
+    priors = delta_priors,
+    parameters = delta_parameters,
+    data = data
+  )
+  expect_equal(
+    delta_prior_config[["parameter_prior_components"]],
+    paste0("growth_", delta_labels)
+  )
+  expect_equal(
+    delta_prior_config[["parameter_prior_transforms"]],
+    rep("identity", length(delta_labels))
+  )
 })
 
 test_that("Julia backend serializes fleet-specific VonBertalanffy length bins", {

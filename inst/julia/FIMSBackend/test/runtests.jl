@@ -5,6 +5,35 @@ using ForwardDiff: derivative
 using LinearAlgebra: diag
 using SpecialFunctions: erf
 
+@testset "parameter prior transforms" begin
+  parameters = ComponentArray((
+    maturity_slope = 2.0,
+    growth_log_length_weight_b = log(3.0),
+    growth_log_mean_length_young = log(4.0),
+  ))
+  config = Dict(
+    :parameter_prior_components => [
+      "maturity_slope",
+      "growth_log_length_weight_b",
+      "growth_log_mean_length_young",
+    ],
+    :parameter_prior_indices => [1, 1, 1],
+    :parameter_prior_distributions => ["dnorm", "dlnorm", "dnorm"],
+    :parameter_prior_means => [1.0, log(2.0), 3.0],
+    :parameter_prior_sds => [0.5, 0.4, 0.5],
+    :parameter_prior_transforms => ["identity", "exp", "exp"],
+  )
+  components = FIMSBackend.parameter_prior_nll_components(parameters, config)
+  @test components[1] ≈ 0.5 * log(2π) + log(0.5) + 2.0
+  @test components[2] ≈
+        0.5 * log(2π) + log(0.4) + log(3.0) + (log(3.0) - log(2.0))^2 / (2 * 0.4^2)
+  @test components[3] ≈ 0.5 * log(2π) + log(0.5) + 2.0
+  @test_throws ArgumentError FIMSBackend.parameter_prior_nll_components(
+    parameters,
+    merge(config, Dict(:parameter_prior_transforms => ["identity", "exp", "sqrt"])),
+  )
+end
+
 @testset "age-specific selectivity" begin
   ages = [1.0, 2.0, 3.0]
   parameters = ComponentArray((

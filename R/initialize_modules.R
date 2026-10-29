@@ -852,7 +852,11 @@ initialize_comp <- function(data,
 #'   and `sd`. The first five columns identify one row of `parameters`.
 #'   `distribution` supports `"Dnorm"` and `"Dlnorm"`; for `"Dlnorm"`, `mean`
 #'   and `sd` are the mean and standard deviation on the log scale. Not used
-#'   with the TMB backend.
+#'   with the TMB backend. Julia supports the Selectivity, Fleet, Recruitment,
+#'   and Population layouts, plus Logistic Maturity and
+#'   VonBertalanffySchnute Growth parameters. Growth priors are evaluated on
+#'   natural-scale parameter values, including parameters stored internally
+#'   on the log scale.
 #' @return
 #' A list is returned with two elements, `parameters` and `model`. The list can
 #' be passed to the `input` argument of [fit_fims()] to fit the model. The first
