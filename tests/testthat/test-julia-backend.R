@@ -291,7 +291,7 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   #' @description Test that Julia backend input includes serialized population and observation values.
   expect_true(all(c("proportion_female", "fleet_has_catch", "observed_catch", "observed_age_comp", "observed_length_comp", "age_to_length_conversion") %in% names(julia_input[["data"]])))
   #' @description Test that Julia backend parameters are serialized to the named structure expected by the Julia objective scaffold.
-  expect_true(all(c("log_Fmort", "log_M", "log_init_naa", "log_rzero", "logit_steep") %in% names(julia_input[["parameters"]])))
+  expect_true(all(c("log_Fmort", "log_M", "log_init_naa", "proportion_female", "log_rzero", "logit_steep") %in% names(julia_input[["parameters"]])))
   #' @description Test that the Julia backend weight-at-age matrix has one row per modeled year and one column per age.
   expect_equal(dim(julia_input[["data"]][["weights_at_age"]]), c(get_n_years(data), get_n_ages(data)))
   #' @description Test that the Julia backend maturity-at-age matrix has one row per modeled year and one column per age.
@@ -300,6 +300,8 @@ test_that("Julia backend input preparation preserves existing initialize_fims ou
   expect_equal(dim(julia_input[["parameters"]][["log_Fmort"]]), c(get_n_years(data), length(get_fleets(data))))
   #' @description Test that the serialized natural mortality vector spans every year-age cell.
   expect_equal(dim(julia_input[["parameters"]][["log_M"]]), c(get_n_years(data), get_n_ages(data)))
+  #' @description Test that the default scalar proportion-female parameter remains scalar in the Julia parameter payload.
+  expect_length(julia_input[["parameters"]][["proportion_female"]], 1L)
   #' @description Test that the serialized initial numbers-at-age preserve the original parameter order.
   expect_equal(
     julia_input[["parameters"]][["log_init_naa"]],
@@ -449,6 +451,106 @@ test_that("Julia backend serializes maturity parameters and estimation masks", {
   )
   expect_true(julia_config[["fixed_parameter_mask"]][inflection_start])
   expect_true(julia_config[["fixed_parameter_mask"]][slope_start])
+})
+
+test_that("Julia backend serializes scalar and age-specific proportion-female parameters", {
+  data <- FIMS::FIMSFrame(data_big)
+  ages <- FIMS:::get_ages(data)
+  default_parameters <- FIMS::setup_default_parameters(data = data)
+  scalar_parameters <- default_parameters |>
+    dplyr::mutate(
+      estimation_type = dplyr::if_else(
+        .data$module_name == "Population" & .data$label == "proportion_female",
+        "fixed_effects",
+        .data$estimation_type
+      )
+    )
+  scalar_julia_parameters <- FIMS:::as_julia_fims_parameters(scalar_parameters, data)
+  scalar_config <- FIMS:::as_julia_fims_model_config(scalar_parameters, data)
+  scalar_parameter_index <- sum(purrr::map_int(
+    scalar_julia_parameters[seq_len(match("proportion_female", names(scalar_julia_parameters)) - 1L)],
+    length
+  )) + 1L
+  expect_length(scalar_julia_parameters[["proportion_female"]], 1L)
+  expect_true(scalar_config[["fixed_parameter_mask"]][scalar_parameter_index])
+
+  scalar_prior <- tibble::tibble(
+    module_name = "Population",
+    fleet = NA_character_,
+    label = "proportion_female",
+    timing = NA_integer_,
+    age = NA_real_,
+    distribution = "Dnorm",
+    mean = 0.5,
+    sd = 0.1
+  )
+  scalar_prior_config <- FIMS:::as_julia_fims_model_config(
+    scalar_parameters,
+    data,
+    priors = scalar_prior
+  )
+  expect_equal(scalar_prior_config[["parameter_prior_components"]], "proportion_female")
+  expect_equal(scalar_prior_config[["parameter_prior_indices"]], 1L)
+
+  age_specific_rows <- default_parameters |>
+    dplyr::filter(
+      .data$module_name == "Population",
+      .data$label == "proportion_female"
+    ) |>
+    dplyr::slice(rep(1L, length(ages))) |>
+    dplyr::mutate(
+      age = .env$ages,
+      value = seq(0.25, 0.75, length.out = length(.env$ages)),
+      estimation_type = "fixed_effects"
+    ) |>
+    dplyr::arrange(dplyr::desc(.data$age))
+  age_specific_parameters <- dplyr::bind_rows(
+    default_parameters |>
+      dplyr::filter(
+        !(.data$module_name == "Population" & .data$label == "proportion_female")
+      ),
+    age_specific_rows
+  )
+  age_specific_julia_parameters <- FIMS:::as_julia_fims_parameters(
+    age_specific_parameters,
+    data
+  )
+  age_specific_config <- FIMS:::as_julia_fims_model_config(
+    age_specific_parameters,
+    data
+  )
+  proportion_indices <- sum(purrr::map_int(
+    age_specific_julia_parameters[seq_len(match("proportion_female", names(age_specific_julia_parameters)) - 1L)],
+    length
+  )) + seq_along(ages)
+  expect_equal(
+    age_specific_julia_parameters[["proportion_female"]],
+    age_specific_rows |>
+      dplyr::arrange(.data$age) |>
+      dplyr::pull(.data$value)
+  )
+  expect_true(all(age_specific_config[["fixed_parameter_mask"]][proportion_indices]))
+  expected_age_values <- age_specific_rows |>
+    dplyr::arrange(.data$age) |>
+    dplyr::pull(.data$value)
+  flattened_proportion_female <- FIMS:::flatten_julia_parameter_rows(
+    age_specific_rows,
+    estimates = list(proportion_female = expected_age_values),
+    standard_errors = list(proportion_female = rep(0.05, length(ages)))
+  )
+  expect_equal(flattened_proportion_female[["estimated"]], expected_age_values)
+  expect_equal(flattened_proportion_female[["uncertainty"]], rep(0.05, length(ages)))
+
+  age_specific_prior <- dplyr::mutate(
+    scalar_prior,
+    age = ages[[2]]
+  )
+  age_specific_prior_config <- FIMS:::as_julia_fims_model_config(
+    age_specific_parameters,
+    data,
+    priors = age_specific_prior
+  )
+  expect_equal(age_specific_prior_config[["parameter_prior_indices"]], 2L)
 })
 
 test_that("Julia backend serializes AgeSpecific selectivity by fleet and age", {

@@ -28,9 +28,10 @@ and \code{sd}. The first five columns identify one row of \code{parameters}.
 \code{distribution} supports \code{"Dnorm"} and \code{"Dlnorm"}; for \code{"Dlnorm"}, \code{mean}
 and \code{sd} are the mean and standard deviation on the log scale. Not used
 with the TMB backend. Julia supports the Selectivity, Fleet, Recruitment, and
-Population layouts, plus Logistic Maturity and VonBertalanffySchnute Growth
-parameters. Growth priors are evaluated on natural-scale parameter values,
-including parameters stored internally on the log scale.}
+Population layouts (including scalar or age-specific
+\code{proportion_female}), plus Logistic Maturity and VonBertalanffySchnute
+Growth parameters. Growth priors are evaluated on natural-scale parameter
+values, including parameters stored internally on the log scale.}
 }
 \value{
 A list is returned with two elements, \code{parameters} and \code{model}. The list can

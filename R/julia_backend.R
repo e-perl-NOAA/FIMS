@@ -210,9 +210,11 @@ as_julia_fims_data <- function(data, parameters) {
     {\(x) if (length(x) > 0) x[[1]] else 1}()
   maturity_by_age <- 1 / (1 + exp(-maturity_slope * (ages - maturity_inflection)))
 
-  proportion_female <- parameters |>
-    dplyr::filter(.data$module_name == "Population", .data$label == "proportion_female") |>
-    dplyr::pull(.data$value)
+  proportion_female_rows <- julia_population_proportion_female_rows(
+    parameters,
+    data
+  )
+  proportion_female <- proportion_female_rows[["value"]]
   proportion_female <- if (length(proportion_female) == 0) {
     rep(0.5, n_ages)
   } else if (length(proportion_female) == 1) {
@@ -366,6 +368,41 @@ julia_age_specific_parameter_rows <- function(parameters, fleet, data) {
     dplyr::arrange(.data$timing, .data$age)
 }
 
+#' Arrange and validate population proportion-female parameters
+#'
+#' @param parameters Parameter tibble.
+#' @param data A `FIMSFrame` object.
+#' @return Rows ordered by the scalar or age-specific parameter layout.
+#' @noRd
+julia_population_proportion_female_rows <- function(parameters, data) {
+  rows <- parameters |>
+    dplyr::filter(
+      .data$module_name == "Population",
+      .data$label == "proportion_female"
+    )
+  if (nrow(rows) == 0L) {
+    return(rows)
+  }
+
+  ages <- get_ages(data)
+  scalar_layout <- nrow(rows) == 1L && is.na(rows[["age"]][[1]])
+  age_layout <- nrow(rows) == length(ages) &&
+    all(!is.na(rows[["age"]])) &&
+    !anyDuplicated(rows[["age"]]) &&
+    setequal(rows[["age"]], ages)
+  if (!scalar_layout && !age_layout) {
+    cli::cli_abort(
+      "Julia population proportion_female requires one unindexed value or one value per modeled age."
+    )
+  }
+
+  if (age_layout) {
+    rows <- rows |>
+      dplyr::arrange(match(.data$age, .env$ages))
+  }
+  rows
+}
+
 #' Convert the current parameter tibble to a Julia-friendly list
 #'
 #' @param parameters Parameter tibble.
@@ -396,6 +433,10 @@ as_julia_fims_parameters <- function(parameters, data) {
     dplyr::filter(.data$module_name == "Recruitment")
   population_parameters <- parameters |>
     dplyr::filter(.data$module_name == "Population")
+  proportion_female_rows <- julia_population_proportion_female_rows(
+    parameters,
+    data
+  )
   maturity_parameters <- parameters |>
     dplyr::filter(.data$module_name == "Maturity")
   selectivity_types <- parameters |>
@@ -508,6 +549,11 @@ as_julia_fims_parameters <- function(parameters, data) {
     log_sd = values_for(recruitment_parameters, "log_sd", 0),
     log_init_naa = values_for(population_parameters, "log_init_naa", rep(log(1e6), n_ages)),
     log_M = parameter_matrix(population_parameters, "log_M", log(0.2), by_age = TRUE),
+    proportion_female = if (nrow(proportion_female_rows) == 0L) {
+      rep(0.5, n_ages)
+    } else {
+      proportion_female_rows[["value"]]
+    },
     log_Fmort = log_fmort,
     log_q = log_q,
     maturity_inflection_point = values_for(
@@ -846,6 +892,10 @@ as_julia_fims_priors <- function(priors, parameters, data) {
         )
       }
       component_indices[[prior_index]] <- year_index + (age_index - 1L) * n_years
+    } else if (module_name == "Population" && label == "proportion_female") {
+      related_rows <- julia_population_proportion_female_rows(parameters, data)
+      target_position <- parameter_row_matches(related_rows, target)
+      component_indices[[prior_index]] <- target_position[[1]]
     } else if (module_name == "Maturity") {
       component_name <- switch(
         label,
@@ -1259,6 +1309,10 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
   }
   log_m_rows <- rows_for("Population", "log_M")
   log_init_rows <- rows_for("Population", "log_init_naa")
+  proportion_female_rows <- julia_population_proportion_female_rows(
+    parameters,
+    data
+  )
   fleet_parameter_matrix_mask <- function(label, type) {
     result <- matrix(FALSE, nrow = get_n_years(data), ncol = length(get_fleets(data)))
     for (fleet_index in seq_along(get_fleets(data))) {
@@ -1301,6 +1355,11 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
       recruitment_parameter_mask("log_sd", type),
       estimate_mask(log_init_rows, type),
       as.vector(matrix_estimate_mask(log_m_rows, type, by_age = TRUE)),
+      if (nrow(proportion_female_rows) == 0L) {
+        rep(FALSE, get_n_ages(data))
+      } else {
+        estimate_mask(proportion_female_rows, type)
+      },
       as.vector(fleet_parameter_matrix_mask("log_Fmort", type)),
       fleet_vector_mask("log_q", type),
       maturity_parameter_mask("inflection_point", type),

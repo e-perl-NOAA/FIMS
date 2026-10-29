@@ -654,6 +654,9 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
     if (identical(label_name, "length_at_age_sd_at_reference_ages")) {
       rows <- rows |>
         dplyr::arrange(.data$age)
+    } else if (identical(label_name, "proportion_female")) {
+      rows <- rows |>
+        dplyr::arrange(.data$age)
     } else if (identical(label_name, "logit_sel_at_age")) {
       fleet_order <- unique(rows[["fleet"]])
       rows <- rows |>

@@ -580,20 +580,28 @@ function build_population_model(params, data_dict, weights_at_age)
     extend_terminal_year(weights_at_age, data_dict[:n_years], "weights_at_age")
   population_maturity_at_age =
     extend_terminal_year(maturity_at_age, data_dict[:n_years], "maturity_at_age")
+  proportion_female_values = if has_component(params, :proportion_female)
+    collect(params.proportion_female)
+  else
+    collect(get(data_dict, :proportion_female, ones(Float64, data_dict[:n_ages])))
+  end
+  length(proportion_female_values) in (1, data_dict[:n_ages]) ||
+    throw(ArgumentError("proportion_female must be scalar or provide one value per age."))
   T = promote_type(
     eltype(collect(params.log_init_naa)),
     eltype(data_dict[:ages]),
     eltype(population_weights_at_age),
     eltype(population_maturity_at_age),
     eltype(collect(params.log_Fmort)),
+    eltype(proportion_female_values),
   )
+  proportion_female = length(proportion_female_values) == 1 ?
+    fill(only(proportion_female_values), data_dict[:n_ages]) :
+    proportion_female_values
   n_fleets = size(params.log_Fmort, 2)
   numbers_at_age = Matrix{T}(undef, data_dict[:n_years] + 1, data_dict[:n_ages])
   numbers_at_age .= zero(T)
   numbers_at_age[1, :] .= exp.(collect(params.log_init_naa))
-  proportion_female = collect(get(data_dict, :proportion_female, ones(T, data_dict[:n_ages])))
-  length(proportion_female) == data_dict[:n_ages] ||
-    throw(ArgumentError("proportion_female must provide one value per age."))
 
   PopulationModel(
     ages = collect(data_dict[:ages]),

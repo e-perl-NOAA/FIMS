@@ -853,7 +853,8 @@ initialize_comp <- function(data,
 #'   `distribution` supports `"Dnorm"` and `"Dlnorm"`; for `"Dlnorm"`, `mean`
 #'   and `sd` are the mean and standard deviation on the log scale. Not used
 #'   with the TMB backend. Julia supports the Selectivity, Fleet, Recruitment,
-#'   and Population layouts, plus Logistic Maturity and
+#'   and Population layouts (including scalar or age-specific
+#'   `proportion_female`), plus Logistic Maturity and
 #'   VonBertalanffySchnute Growth parameters. Growth priors are evaluated on
 #'   natural-scale parameter values, including parameters stored internally
 #'   on the log scale.

@@ -34,6 +34,58 @@ using SpecialFunctions: erf
   )
 end
 
+@testset "population proportion-female parameter layouts" begin
+  parameter_values = (
+    log_init_naa = log.([1000.0, 800.0, 600.0]),
+    log_M = fill(log(0.2), 2, 3),
+    log_Fmort = fill(log(0.1), 2, 1),
+  )
+  data = Dict(
+    :n_years => 2,
+    :n_ages => 3,
+    :ages => [1.0, 2.0, 3.0],
+    :weights_at_age => ones(2, 3),
+    :maturity_at_age => ones(2, 3),
+    :proportion_female => [0.2, 0.5, 0.8],
+  )
+
+  scalar_parameters = ComponentArray(
+    merge(parameter_values, (proportion_female = 0.35,)),
+  )
+  scalar_population = FIMSBackend.build_population_model(
+    scalar_parameters,
+    data,
+    data[:weights_at_age],
+  )
+  @test scalar_population.proportion_female == fill(0.35, 3)
+
+  age_parameters = ComponentArray(
+    merge(parameter_values, (proportion_female = [0.2, 0.5, 0.8],)),
+  )
+  age_population = FIMSBackend.build_population_model(
+    age_parameters,
+    data,
+    data[:weights_at_age],
+  )
+  @test age_population.proportion_female == [0.2, 0.5, 0.8]
+
+  data_only_population = FIMSBackend.build_population_model(
+    ComponentArray(parameter_values),
+    data,
+    data[:weights_at_age],
+  )
+  @test data_only_population.proportion_female == [0.2, 0.5, 0.8]
+
+  invalid_parameters = ComponentArray(
+    merge(parameter_values, (proportion_female = [0.2, 0.5],)),
+  )
+  @test_throws ArgumentError FIMSBackend.build_population_model(
+    invalid_parameters,
+    data,
+    data[:weights_at_age],
+  )
+end
+
 @testset "age-specific selectivity" begin
   ages = [1.0, 2.0, 3.0]
   parameters = ComponentArray((
