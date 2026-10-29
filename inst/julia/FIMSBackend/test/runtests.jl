@@ -657,6 +657,18 @@ end
   @test fit_result["random_effect_count"] == 1
   @test isfinite(fit_result["nll"])
   @test length(fit_result["fixed_gradient"]) == 1
+  dictionary_parameters = Dict{String,Any}()
+  for name in reverse(propertynames(parameters))
+    dictionary_parameters[string(name)] = getproperty(parameters, name)
+  end
+  dictionary_fit_result = fit_model(
+    dictionary_parameters,
+    data,
+    merge(fit_config, Dict(:parameter_names => String.(propertynames(parameters)))),
+  )
+  @test dictionary_fit_result["estimates"]["log_rzero"] ≈ fit_result["estimates"]["log_rzero"]
+  @test dictionary_fit_result["estimates"]["log_devs"] ≈ fit_result["estimates"]["log_devs"]
+  @test dictionary_fit_result["nll"] ≈ fit_result["nll"]
   fixed_covariance = inv(fit_result["fixed_hessian"])
   random_conditional_covariance = inv(fit_result["hessian"][15:15, 15:15])
   random_fixed_sensitivity =

@@ -6,7 +6,7 @@ using Optim: LBFGS, OnceDifferentiable, converged, iterations, minimum, minimize
 _primal_float(value::ForwardDiff.Dual) = _primal_float(ForwardDiff.value(value))
 _primal_float(value::Real) = Float64(value)
 
-function _flatten_init_params(init_params)
+function _flatten_init_params(init_params, model_config = Dict())
   if init_params isa ComponentArray
     return Float64.(collect(init_params)), init_params
   end
@@ -17,7 +17,7 @@ function _flatten_init_params(init_params)
   end
 
   if init_params isa AbstractDict
-    params = component_array_from_input(init_params, Dict())
+    params = component_array_from_input(init_params, model_config)
     return Float64.(collect(params)), params
   end
 
@@ -216,12 +216,13 @@ function _report_standard_errors(
 end
 
 function fit_model(init_params, data_dict, config = Dict())
-  x0, parameter_layout = _flatten_init_params(init_params)
+  objective_config = Dict(config)
+  x0, parameter_layout = _flatten_init_params(init_params, objective_config)
   parameter_names =
     parameter_layout isa ComponentArray ?
     String.(Symbol.(propertynames(parameter_layout))) :
     String.(parameter_layout)
-  objective_config = merge(Dict(:parameter_names => parameter_names), Dict(config))
+  objective_config = merge(Dict(:parameter_names => parameter_names), objective_config)
 
   fixed_mask = Bool.(collect(get(objective_config, :fixed_parameter_mask, trues(length(x0)))))
   random_mask = Bool.(collect(get(objective_config, :random_parameter_mask, falses(length(x0)))))
