@@ -1405,16 +1405,17 @@ FIMSFit <- function(
 #'   uncertainty report is retained in the output. If `FALSE`, the `sdreport`
 #'   slot will be empty. For Julia fits, uncertainty values in `estimates` are
 #'   retained.
-#' @param number_of_loops A positive integer specifying the number of
+#' @param number_of_loops A non-negative integer specifying the number of
 #'   iterations of the optimizer that will be performed to improve the
 #'   gradient. The default is three, leading to four total optimization steps.
 #' @param optimize Optimize (TRUE, default) or (FALSE) build and return
 #'   a list containing the obj and report slot.
 #' @param number_of_newton_steps The number of Newton steps using the inverse
 #'   Hessian to do after optimization. Not yet implemented.
-#' @param control A list of optimizer settings passed to [stats::nlminb()]. The
-#'   the default is a list of length three with `eval.max = 1000`,
-#'   `iter.max = 10000`, and `trace = 0`.
+#' @param control A list of optimizer settings passed to [stats::nlminb()] for
+#'   the TMB backend. The default is a list with `eval.max = 10000`,
+#'   `iter.max = 10000`, and `trace = 0`. The Julia backend maps these three
+#'   settings to its optimizer and rejects other `nlminb` control fields.
 #' @param filename Character string giving a file name to save the fitted
 #'   object as an RDS object. Defaults to 'fit.RDS', and a value of NULL
 #'   indicates not to save it. If specified, it must end in .RDS. The file is
@@ -1448,6 +1449,20 @@ fit_fims <- function(input,
                      ),
                      filename = NULL,
                      getReportCovariance = FALSE) {
+                       if (number_of_newton_steps > 0) {
+                         cli::cli_abort(c(
+                           "x" = "Newton steps are not implemented yet.",
+                           "i" = "Use {.code number_of_newton_steps = 0}. To improve the gradient, increase {.arg number_of_loops} instead."
+                         ))
+                       }
+                       if (length(number_of_loops) != 1L ||
+                         !is.numeric(number_of_loops) ||
+                         !is.finite(number_of_loops) ||
+                         number_of_loops < 0 ||
+                         number_of_loops > .Machine$integer.max ||
+                         number_of_loops != as.integer(number_of_loops)) {
+                         cli::cli_abort("number_of_loops must be a non-negative integer.")
+                       }
                        if (is_julia_backend_input(input)) {
                          if (!initialize_julia_backend()) {
                            cli::cli_abort(c(
@@ -1458,6 +1473,59 @@ fit_fims <- function(input,
 
                          julia_input <- attr(input, "julia_input")
                          julia_model_config <- attr(input, "julia_model_config")
+                         if (!is.list(control)) {
+                           cli::cli_abort("{.arg control} must be a list for the Julia backend.")
+                         }
+                         if (length(control) > 0L &&
+                           (is.null(names(control)) || anyNA(names(control)) ||
+                             any(names(control) == "") || anyDuplicated(names(control)) > 0L)) {
+                           cli::cli_abort("{.arg control} must have unique, non-empty names for the Julia backend.")
+                         }
+                         unsupported_control <- setdiff(
+                           names(control),
+                           c("eval.max", "iter.max", "trace")
+                         )
+                         if (length(unsupported_control) > 0L) {
+                           cli::cli_abort(
+                             "Julia backend does not support optimizer control fields: {toString(unsupported_control)}."
+                           )
+                         }
+                         optimizer_eval_max <- control[["eval.max"]] %||% 10000
+                         optimizer_iter_max <- control[["iter.max"]] %||% 10000
+                         optimizer_trace <- control[["trace"]] %||% 0
+                         if (length(optimizer_eval_max) != 1L ||
+                           !is.numeric(optimizer_eval_max) ||
+                           !is.finite(optimizer_eval_max) ||
+                           optimizer_eval_max < 1 ||
+                           optimizer_eval_max > .Machine$integer.max ||
+                           optimizer_eval_max != as.integer(optimizer_eval_max)) {
+                           cli::cli_abort("{.field control$eval.max} must be a positive integer for the Julia backend.")
+                         }
+                         if (length(optimizer_iter_max) != 1L ||
+                           !is.numeric(optimizer_iter_max) ||
+                           !is.finite(optimizer_iter_max) ||
+                           optimizer_iter_max < 1 ||
+                           optimizer_iter_max > .Machine$integer.max ||
+                           optimizer_iter_max != as.integer(optimizer_iter_max)) {
+                           cli::cli_abort("{.field control$iter.max} must be a positive integer for the Julia backend.")
+                         }
+                         if (length(optimizer_trace) != 1L ||
+                           !is.numeric(optimizer_trace) ||
+                           !is.finite(optimizer_trace) ||
+                           optimizer_trace < 0) {
+                           cli::cli_abort("{.field control$trace} must be a non-negative number for the Julia backend.")
+                         }
+                         if (!is_fims_verbose()) {
+                           optimizer_trace <- 0
+                         }
+                         julia_model_config[["optimizer_max_evaluations"]] <-
+                           as.integer(optimizer_eval_max)
+                         julia_model_config[["optimizer_max_iterations"]] <-
+                           as.integer(optimizer_iter_max)
+                         julia_model_config[["optimizer_trace"]] <-
+                           optimizer_trace > 0
+                         julia_model_config[["optimizer_restarts"]] <-
+                           as.integer(number_of_loops)
                          julia_model_config[["compute_standard_errors"]] <- isTRUE(get_sd)
                          julia_model_config[["compute_report_covariance"]] <-
                            isTRUE(get_sd) && isTRUE(getReportCovariance)
@@ -1566,16 +1634,6 @@ fit_fims <- function(input,
   # between outputs as last.par may not equal last.par.best due to
   # the smallest newton gradient solution not matching the smallest
   # likelihood value. This can cause sanity issues in output reporting.
-  if (number_of_newton_steps > 0) {
-    cli::cli_abort(c(
-      "x" = "Newton steps are not implemented yet.",
-      "i" = "Use {.code number_of_newton_steps = 0}. To improve the gradient,
-      increase {.arg number_of_loops} instead."
-    ))
-  }
-  if (number_of_loops < 0) {
-    cli::cli_abort("number_of_loops ({.par {number_of_loops}}) must be >= 0.")
-  }
   # If the estimation_type of all parameters is constant, FIMS will abort if
   # optimize is set to TRUE
   if (optimize == TRUE & all(purrr::map_vec(input[["parameters"]], length) == 0)) {
@@ -1599,7 +1657,7 @@ fit_fims <- function(input,
     return(initial_fit)
   }
   if (!is_fims_verbose()) {
-    control$trace <- 0
+    control[["trace"]] <- 0
   }
   ## optimize and compare
   cli::cli_inform(c("v" = "Starting optimization ..."))

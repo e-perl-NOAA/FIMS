@@ -1,7 +1,7 @@
 using ComponentArrays: ComponentArray, getaxes
 using ForwardDiff: gradient, hessian
 using LinearAlgebra: Symmetric, cholesky, diag, inv, isposdef, logdet, pinv
-using Optim: LBFGS, OnceDifferentiable, converged, iterations, minimum, minimizer, optimize
+using Optim: LBFGS, OnceDifferentiable, Options, converged, iterations, minimum, minimizer, optimize
 
 _primal_float(value::ForwardDiff.Dual) = _primal_float(ForwardDiff.value(value))
 _primal_float(value::Real) = Float64(value)
@@ -108,6 +108,20 @@ function _positive_definite_logdet(hessian_matrix)
     throw(ArgumentError("Random-effect Hessian is not positive definite: $(sprint(showerror, error))"))
   end
   logdet(factorization)
+end
+
+function _optimizer_options(config)
+  maximum_iterations = Int(get(config, :optimizer_max_iterations, 10_000))
+  maximum_evaluations = Int(get(config, :optimizer_max_evaluations, 10_000))
+  maximum_iterations > 0 ||
+    throw(ArgumentError("optimizer_max_iterations must be positive."))
+  maximum_evaluations > 0 ||
+    throw(ArgumentError("optimizer_max_evaluations must be positive."))
+  Options(
+    iterations = maximum_iterations,
+    f_calls_limit = maximum_evaluations,
+    show_trace = Bool(get(config, :optimizer_trace, false)),
+  )
 end
 
 function _report_standard_errors(
@@ -223,6 +237,10 @@ function fit_model(init_params, data_dict, config = Dict())
     String.(Symbol.(propertynames(parameter_layout))) :
     String.(parameter_layout)
   objective_config = merge(Dict(:parameter_names => parameter_names), objective_config)
+  optimizer_options = _optimizer_options(objective_config)
+  optimizer_restarts = Int(get(objective_config, :optimizer_restarts, 0))
+  optimizer_restarts >= 0 ||
+    throw(ArgumentError("optimizer_restarts must be non-negative."))
 
   fixed_mask = Bool.(collect(get(objective_config, :fixed_parameter_mask, trues(length(x0)))))
   random_mask = Bool.(collect(get(objective_config, :random_parameter_mask, falses(length(x0)))))
@@ -266,6 +284,7 @@ function fit_model(init_params, data_dict, config = Dict())
       OnceDifferentiable(random_objective, random_gradient!, random_start),
       random_start,
       LBFGS(),
+      optimizer_options,
     )
     random_mode = minimizer(random_result)
     parameters =
@@ -297,11 +316,21 @@ function fit_model(init_params, data_dict, config = Dict())
   outer_result = if isempty(fixed_indices)
     nothing
   else
-    optimize(
+    result = optimize(
       OnceDifferentiable(marginal_objective, outer_gradient!, fixed_start),
       fixed_start,
       LBFGS(),
+      optimizer_options,
     )
+    for _ in 1:optimizer_restarts
+      result = optimize(
+        OnceDifferentiable(marginal_objective, outer_gradient!, minimizer(result)),
+        minimizer(result),
+        LBFGS(),
+        optimizer_options,
+      )
+    end
+    result
   end
   fixed_hat = _primal_float.(isnothing(outer_result) ? fixed_start : minimizer(outer_result))
   conditional_result = conditional_mode(fixed_hat)
@@ -381,6 +410,19 @@ function fit_model(init_params, data_dict, config = Dict())
     fit_gradient[fixed_indices] .= fixed_gradient
   end
 
+  fixed_converged = isnothing(outer_result) || converged(outer_result)
+  random_converged = conditional_result.converged
+  fit_converged = fixed_converged && random_converged
+  convergence_code = if fixed_converged && random_converged
+    isnothing(outer_result) ? "random_effects_converged" : "converged"
+  elseif !fixed_converged && !random_converged
+    "fixed_and_random_effects_not_converged"
+  elseif !fixed_converged
+    "fixed_effects_not_converged"
+  else
+    "random_effects_not_converged"
+  end
+
   Dict(
     "estimates" => _result_dict(estimate_components),
     "fixed_parameters" => fixed_hat,
@@ -388,11 +430,10 @@ function fit_model(init_params, data_dict, config = Dict())
     "fixed_effect_count" => length(fixed_indices),
     "random_effect_count" => length(random_indices),
     "nll" => conditional_result.marginal_nll,
-    "convergence" => isnothing(outer_result) ? conditional_result.converged : converged(outer_result),
-    "convergence_code" =>
-      isnothing(outer_result) ?
-      (conditional_result.converged ? "random_effects_converged" : "random_effects_not_converged") :
-      (converged(outer_result) ? "converged" : "not_converged"),
+    "convergence" => fit_converged,
+    "convergence_code" => convergence_code,
+    "fixed_convergence" => fixed_converged,
+    "random_convergence" => random_converged,
     "iterations" => isnothing(outer_result) ? conditional_result.iterations : iterations(outer_result),
     "gradient" => fit_gradient,
     "report" => evaluated_model["report"],

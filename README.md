@@ -61,6 +61,28 @@ clear()
 
 ## Troubleshooting
 
+### Backend migration checks
+
+The Julia backend is selected with `initialize_fims(..., backend = "julia")`.
+The native backend remains the default while numerical and R-interface parity
+are being established.
+
+The **Test Julia backend** workflow runs Julia package tests and a separate
+R-to-Julia/native comparison job. The comparison uses the same parameter
+tibble for both backends, converts random effects to fixed effects to compare
+joint objectives without inner optimization, and checks population and fleet
+reports for EWAA and VonBertalanffySchnute growth at two deterministic starting
+points. Its relative numerical tolerance is `1e-8`; missing report fields and
+non-finite values fail the comparison. JUnit results are retained as a workflow
+artifact. This check does not establish optimized-fit or uncertainty parity.
+
+To run the comparison locally with both backends available:
+
+```r
+Sys.setenv(FIMS_RUN_BACKEND_PARITY = "true")
+devtools::test(filter = "^julia-backend$")
+```
+
 If you encounter a :bug:, please file an [Issue](https://github.com/NOAA-FIMS/FIMS/issues) with a minimal reproducible example on GitHub.
 
 If you are uncertain that you have actually encountered a :bug:, are looking for more information, or want to talk about some new ideas please use the [Discussion Board](https://github.com/orgs/NOAA-FIMS/discussions) to post your thoughts. Anyone interested in our project is welcome to join the discussions, this is a place for **all** members of the assessment and open-source software community to ask and answer questions, share updates, have open-ended conversations, and follow along. Please introduce yourself :wave: on the [Introduction Discussion](https://github.com/orgs/NOAA-FIMS/discussions/801).

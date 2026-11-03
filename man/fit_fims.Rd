@@ -27,7 +27,7 @@ uncertainty report is retained in the output. If \code{FALSE}, the
 \code{sdreport} slot will be empty. For Julia fits, uncertainty values in
 \code{estimates} are retained.}
 
-\item{number_of_loops}{A positive integer specifying the number of
+\item{number_of_loops}{A non-negative integer specifying the number of
 iterations of the optimizer that will be performed to improve the
 gradient. The default is three, leading to four total optimization steps.}
 
@@ -37,9 +37,10 @@ a list containing the obj and report slot.}
 \item{number_of_newton_steps}{The number of Newton steps using the inverse
 Hessian to do after optimization. Not yet implemented.}
 
-\item{control}{A list of optimizer settings passed to \code{\link[stats:nlminb]{stats::nlminb()}}. The
-the default is a list of length three with \code{eval.max = 1000},
-\code{iter.max = 10000}, and \code{trace = 0}.}
+\item{control}{A list of optimizer settings passed to \code{\link[stats:nlminb]{stats::nlminb()}} for
+the TMB backend. The default is a list with \code{eval.max = 10000},
+\code{iter.max = 10000}, and \code{trace = 0}. The Julia backend maps these
+three settings to its optimizer and rejects other \code{nlminb} control fields.}
 
 \item{filename}{Character string giving a file name to save the fitted
 object as an RDS object. Defaults to 'fit.RDS', and a value of NULL

@@ -34,6 +34,20 @@ using SpecialFunctions: erf
   )
 end
 
+@testset "optimizer settings" begin
+  options = FIMSBackend._optimizer_options(Dict(
+    :optimizer_max_iterations => 12,
+    :optimizer_max_evaluations => 34,
+    :optimizer_trace => true,
+  ))
+  @test options.iterations == 12
+  @test options.f_calls_limit == 34
+  @test options.show_trace
+  @test_throws ArgumentError FIMSBackend._optimizer_options(
+    Dict(:optimizer_max_iterations => 0),
+  )
+end
+
 @testset "population proportion-female parameter layouts" begin
   parameter_values = (
     log_init_naa = log.([1000.0, 800.0, 600.0]),
@@ -777,6 +791,10 @@ end
   @test fit_result["fixed_effect_count"] == 1
   @test fit_result["random_effect_count"] == 1
   @test isfinite(fit_result["nll"])
+  @test fit_result["convergence"]
+  @test fit_result["fixed_convergence"]
+  @test fit_result["random_convergence"]
+  @test fit_result["convergence_code"] == "converged"
   @test length(fit_result["fixed_gradient"]) == 1
   dictionary_parameters = Dict{String,Any}()
   for name in reverse(propertynames(parameters))
