@@ -839,6 +839,46 @@ end
     @test gaussian_fit["standard_errors"]["log_q"] ≈ prior_sds rtol = 1e-5
     @test gaussian_fit["covariance"][log_q_start, log_q_start + 1] ≈ 0.0 atol = 1e-8
     @test gaussian_fit["pd_hessian"]
+
+    shifted_fixed = [prior_means[1] + 0.2]
+    @test FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, shifted_fixed,
+    ) ≈ 0.5 * log(2π) + log(prior_sds[1]) + 0.2^2 / (2 * prior_sds[1]^2)
+    @test FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, shifted_fixed, 1,
+    ) ≈ [0.2 / prior_sds[1]^2] rtol = 1e-5
+    @test FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, shifted_fixed, 2,
+    ) ≈ reshape([inv(prior_sds[1]^2)], 1, 1) rtol = 1e-5
+    shifted_report = FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, shifted_fixed, 3,
+    )
+    @test shifted_report["estimates"]["log_q"] ≈ [shifted_fixed[1], prior_means[2]]
+    @test_throws ArgumentError FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, [1.0, 2.0],
+    )
+    @test_throws ArgumentError FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, [NaN],
+    )
+
+    fixed_only_config = merge(gaussian_config, Dict(
+      :fixed_parameter_mask => gaussian_fixed_mask .| gaussian_random_mask,
+      :random_parameter_mask => falses(length(parameters)),
+    ))
+    @test FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, fixed_only_config, prior_means, 1,
+    ) ≈ zeros(2) atol = 1e-8
+    @test diag(FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, fixed_only_config, prior_means, 2,
+    )) ≈ inv.(prior_sds .^ 2)
+    random_only_config = merge(gaussian_config, Dict(
+      :fixed_parameter_mask => falses(length(parameters)),
+      :random_parameter_mask => gaussian_fixed_mask .| gaussian_random_mask,
+    ))
+    random_only_fit = fit_model(parameters, prior_only_data, random_only_config)
+    @test random_only_fit["convergence"]
+    @test random_only_fit["nll"] ≈ 0.0 atol = 1e-8
+    @test random_only_fit["standard_errors"]["log_q"] ≈ prior_sds
   end
 
   dictionary_parameters = Dict{String,Any}()

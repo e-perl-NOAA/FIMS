@@ -1458,6 +1458,30 @@ fit_julia_backend_model <- function(julia_input, model_config) {
   )
 }
 
+#' Evaluate a fixed-effect objective, derivative, or conditional report
+#'
+#' @param julia_input Prepared Julia input list.
+#' @param model_config Julia backend configuration list.
+#' @param parameters Fixed-effect parameter vector.
+#' @param derivative_order Zero for objective, one for gradient, two for
+#'   Hessian, or three for a conditional report.
+#' @return A numeric objective, derivative array, or report list.
+#' @noRd
+evaluate_julia_fixed_objective <- function(julia_input, model_config, parameters,
+                                           derivative_order = 0L) {
+  if (!initialize_julia_backend()) {
+    cli::cli_abort("Julia startup is disabled; the objective cannot be evaluated.")
+  }
+  JuliaCall::julia_call(
+    "FIMSBackend.evaluate_fixed_objective",
+    julia_input[["parameters"]],
+    julia_input[["data"]],
+    model_config,
+    as.numeric(parameters),
+    as.integer(derivative_order)
+  )
+}
+
 #' Evaluate the Julia backend without optimization
 #'
 #' @param julia_input Prepared Julia input list.

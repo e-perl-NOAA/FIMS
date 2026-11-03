@@ -369,6 +369,114 @@ test_that("parallel Julia diagnostics use separate R sessions rather than forks"
   expect_identical(strategies[[2]], future::sequential)
 })
 
+test_that("Julia objective methods evaluate changed fixed parameters instead of cached values", {
+  parameters <- list(fixed = 2, constant = 7, random = 3)
+  config <- list(
+    fixed_parameter_mask = c(TRUE, FALSE, FALSE),
+    random_parameter_mask = c(FALSE, FALSE, TRUE),
+    compute_standard_errors = TRUE
+  )
+  captured <- NULL
+  testthat::local_mocked_bindings(
+    evaluate_julia_fixed_objective = function(julia_input, model_config, parameters, derivative_order) {
+      captured <<- list(parameters = parameters, order = derivative_order)
+      switch(derivative_order + 1L,
+        parameters^2,
+        2 * parameters,
+        matrix(2),
+        list(estimates = list(fixed = parameters, constant = 7, random = 3))
+      )
+    },
+    build_julia_backend_report = function(julia_input, fit_result) {
+      list(fixed = julia_input[["parameters"]][["fixed"]])
+    },
+    .package = "FIMS"
+  )
+  obj <- FIMS:::build_julia_backend_obj(
+    # Julia dictionaries need not preserve serialization order.
+    parameters = rev(parameters),
+    report = list(fixed = 2),
+    fit_result = list(nll = 4, fixed_gradient = 4, fixed_hessian = matrix(2)),
+    julia_input = list(parameters = parameters),
+    model_config = config
+  )
+  expect_equal(unname(obj[["par"]]), 2)
+  expect_equal(obj[["env"]][["parList"]]()[["re"]], 3)
+  expect_identical(obj[["env"]][["random"]], 3L)
+  expect_equal(obj[["fn"]](), 4)
+  expect_equal(obj[["gr"]](), 4)
+  expect_equal(obj[["he"]](), matrix(2))
+  expect_null(captured)
+  expect_equal(obj[["fn"]](3), 9)
+  expect_identical(captured[["order"]], 0L)
+  expect_equal(obj[["gr"]](3), 6)
+  expect_identical(captured[["order"]], 1L)
+  expect_equal(obj[["he"]](3), matrix(2))
+  expect_identical(captured[["order"]], 2L)
+  expect_equal(obj[["report"]](3), list(fixed = 3))
+  expect_identical(captured[["order"]], 3L)
+  for (invalid_parameters in list(c(1, 2), NA_real_, Inf, "3")) {
+    expect_error(obj[["fn"]](invalid_parameters), "fixed-effect count")
+  }
+  expect_error(obj[["simulate"]](), "not implemented")
+})
+
+test_that("Julia fixed objective bridge forwards derivative requests and runtime failures", {
+  captured <- NULL
+  testthat::local_mocked_bindings(
+    initialize_julia_backend = function(...) TRUE,
+    .package = "FIMS"
+  )
+  testthat::local_mocked_bindings(
+    julia_call = function(...) {
+      captured <<- list(...)
+      42
+    },
+    .package = "JuliaCall"
+  )
+  input <- list(parameters = list(value = 2), data = list(n_years = 1L))
+  config <- list(fixed_parameter_mask = TRUE)
+  expect_equal(
+    FIMS:::evaluate_julia_fixed_objective(input, config, 3, 2L), 42
+  )
+  expect_identical(captured[[1]], "FIMSBackend.evaluate_fixed_objective")
+  expect_identical(captured[[2]], input[["parameters"]])
+  expect_identical(captured[[3]], input[["data"]])
+  expect_identical(captured[[4]], config)
+  expect_identical(captured[[5]], 3)
+  expect_identical(captured[[6]], 2L)
+  testthat::local_mocked_bindings(
+    initialize_julia_backend = function(...) FALSE,
+    .package = "FIMS"
+  )
+  expect_error(
+    FIMS:::evaluate_julia_fixed_objective(input, config, 3),
+    "Julia startup is disabled"
+  )
+})
+
+test_that("Julia uncertainty uses serialized parameter order rather than dictionary order", {
+  parameters <- list(fixed = 2, constant = 7, random = 3)
+  input <- structure(
+    list(),
+    julia_input = list(parameters = parameters),
+    julia_model_config = list(
+      fixed_parameter_mask = c(TRUE, FALSE, FALSE),
+      random_parameter_mask = c(FALSE, FALSE, TRUE)
+    )
+  )
+  report <- FIMS:::build_julia_backend_sdreport(input, list(
+    estimates = rev(parameters),
+    fixed_parameters = 2,
+    covariance = diag(c(4, 0, 9)),
+    pd_hessian = TRUE
+  ))
+  expect_equal(unname(report[["par.fixed"]]), 2)
+  expect_equal(unname(report[["par.random"]]), 3)
+  expect_equal(unname(report[["cov.fixed"]]), matrix(4))
+  expect_equal(unname(report[["cov.random"]]), matrix(9))
+})
+
 test_that("Julia backend package scaffolding exists", {
   backend_root <- normalizePath(
     FIMS:::julia_backend_package_path(),
@@ -1804,7 +1912,9 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
          NULL
        },
        covariance = diag(0.01, flattened_parameter_count),
-       fixed_parameters = rep(0, sum(model_config[["fixed_parameter_mask"]])),
+       fixed_parameters = purrr::flatten_dbl(julia_input[["parameters"]])[
+         as.logical(model_config[["fixed_parameter_mask"]])
+       ],
        pd_hessian = TRUE,
        gradient = rep(0, flattened_parameter_count),
        hessian = diag(flattened_parameter_count),
@@ -1990,6 +2100,20 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
 
   fit_without_sd <- FIMS::fit_fims(result, optimize = TRUE, get_sd = FALSE)
   expect_true(all(is.na(FIMS::get_estimates(fit_without_sd)[["uncertainty"]])))
+
+  testthat::local_mocked_bindings(
+    evaluate_julia_backend_model = function(...) list(
+      nll = 13.5, report = mocked_report
+    ),
+    .package = "FIMS"
+  )
+  initial_fit <- FIMS::fit_fims(result, optimize = FALSE, get_sd = FALSE)
+  expect_length(
+    FIMS::get_obj(initial_fit)[["par"]],
+    sum(attr(result, "julia_model_config")[["fixed_parameter_mask"]])
+  )
+  expect_true(all(is.na(FIMS::get_gradient(initial_fit))))
+  expect_equal(FIMS::get_report(initial_fit)[["jnll"]], 13.5)
 
   clear_cpp_backend_test_state()
 })

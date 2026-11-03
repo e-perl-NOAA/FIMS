@@ -89,6 +89,10 @@ Its \code{jnll} is the joint negative log likelihood at the fitted parameters;
 the optimizer objective includes the Laplace adjustment for random effects.
 
 \code{\link[=get_obj]{get_obj()}} returns the backend objective stored in the fit.
+For Julia fits, \code{par} contains fixed effects only. The \code{fn},
+\code{gr}, \code{he}, and \code{report} functions accept a fixed-effect vector
+and evaluate the model at those values, optimizing random effects
+conditionally when present. Simulation through this objective is not implemented.
 
 \code{\link[=get_opt]{get_opt()}} returns the output from \code{\link[=nlminb]{nlminb()}}, which is the minimizer used
 in \code{\link[=fit_fims]{fit_fims()}}.

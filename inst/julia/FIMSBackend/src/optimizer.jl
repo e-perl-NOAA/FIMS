@@ -124,6 +124,95 @@ function _optimizer_options(config)
   )
 end
 
+function _conditional_mode(x0, fixed_indices, fixed_values, random_indices, joint_objective, options)
+  if isempty(random_indices)
+    parameters = _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, Float64[])
+    joint_nll = joint_objective(parameters)
+    return (
+      parameters = parameters,
+      random_hessian = zeros(Float64, 0, 0),
+      joint_nll = joint_nll,
+      marginal_nll = joint_nll,
+      converged = true,
+      iterations = 0,
+    )
+  end
+  random_start = x0[random_indices]
+  random_objective = random_values -> joint_objective(
+    _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, random_values),
+  )
+  random_gradient! = (storage, random_values) ->
+    copyto!(storage, gradient(random_objective, random_values))
+  random_result = optimize(
+    OnceDifferentiable(random_objective, random_gradient!, random_start),
+    random_start,
+    LBFGS(),
+    options,
+  )
+  random_mode = minimizer(random_result)
+  parameters = _compose_parameter_vector(
+    x0, fixed_indices, fixed_values, random_indices, random_mode,
+  )
+  random_hessian = hessian(random_objective, random_mode)
+  joint_nll = minimum(random_result)
+  (
+    parameters = parameters,
+    random_hessian = random_hessian,
+    joint_nll = joint_nll,
+    marginal_nll = joint_nll + 0.5 * _positive_definite_logdet(random_hessian) -
+      0.5 * length(random_indices) * log(2π),
+    converged = converged(random_result),
+    iterations = iterations(random_result),
+  )
+end
+
+function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, derivative_order = 0)
+  objective_config = normalize_keys(config)
+  x0, parameter_layout = _flatten_init_params(init_params, objective_config)
+  fixed_mask = Bool.(collect(get(objective_config, :fixed_parameter_mask, trues(length(x0)))))
+  random_mask = Bool.(collect(get(objective_config, :random_parameter_mask, falses(length(x0)))))
+  length(fixed_mask) == length(x0) && length(random_mask) == length(x0) ||
+    throw(ArgumentError("Parameter masks must match the initial parameter count."))
+  any(fixed_mask .& random_mask) &&
+    throw(ArgumentError("A parameter cannot be both fixed and random."))
+  fixed_indices = findall(fixed_mask)
+  random_indices = findall(random_mask)
+  values = Float64.(vec(collect(fixed_values)))
+  length(values) == length(fixed_indices) ||
+    throw(ArgumentError("Fixed parameter values must match the fixed-effect count."))
+  all(isfinite, values) || throw(ArgumentError("Fixed parameter values must be finite."))
+  derivative_order in (0, 1, 2, 3) ||
+    throw(ArgumentError("derivative_order must be 0, 1, 2, or 3 (report)."))
+  options = _optimizer_options(objective_config)
+  joint_objective = parameters -> evaluate_nll(
+    _named_component_array(parameters, parameter_layout), data_dict, objective_config,
+  )
+  objective = fixed -> begin
+    result = _conditional_mode(
+      x0, fixed_indices, fixed, random_indices, joint_objective, options,
+    )
+    result.converged ||
+      throw(ArgumentError("Random-effect optimization did not converge while evaluating the objective."))
+    result.marginal_nll
+  end
+  if derivative_order == 3
+    result = _conditional_mode(
+      x0, fixed_indices, values, random_indices, joint_objective, options,
+    )
+    result.converged ||
+      throw(ArgumentError("Random-effect optimization did not converge while evaluating the report."))
+    parameters = _named_component_array(result.parameters, parameter_layout)
+    evaluated = evaluate_model(parameters, data_dict, objective_config)
+    evaluated["estimates"] = _result_dict(parameters)
+    return evaluated
+  elseif derivative_order == 1
+    return isempty(random_indices) ? gradient(objective, values) : _numerical_gradient(objective, values)
+  elseif derivative_order == 2
+    return isempty(random_indices) ? hessian(objective, values) : _numerical_hessian(objective, values)
+  end
+  objective(values)
+end
+
 function _report_standard_errors(
   parameters,
   parameter_layout,
@@ -256,50 +345,12 @@ function fit_model(init_params, data_dict, config = Dict())
   isempty(fixed_indices) && isempty(random_indices) &&
     throw(ArgumentError("The model has no fixed or random parameters to fit."))
   fixed_start = x0[fixed_indices]
-  random_start = x0[random_indices]
   joint_objective = parameters ->
     evaluate_nll(_named_component_array(parameters, parameter_layout), data_dict, objective_config)
 
   function conditional_mode(fixed_values)
-    if isempty(random_indices)
-      parameters = _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, Float64[])
-      return (
-        parameters = parameters,
-        random_hessian = zeros(Float64, 0, 0),
-        joint_nll = joint_objective(parameters),
-        marginal_nll = joint_objective(parameters),
-        converged = true,
-        iterations = 0,
-      )
-    end
-
-    random_objective = random_values -> begin
-      parameters =
-        _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, random_values)
-      joint_objective(parameters)
-    end
-    random_gradient! = (storage, random_values) ->
-      copyto!(storage, gradient(random_objective, random_values))
-    random_result = optimize(
-      OnceDifferentiable(random_objective, random_gradient!, random_start),
-      random_start,
-      LBFGS(),
-      optimizer_options,
-    )
-    random_mode = minimizer(random_result)
-    parameters =
-      _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, random_mode)
-    random_hessian = hessian(random_objective, random_mode)
-    marginal_nll =
-      minimum(random_result) + 0.5 * _positive_definite_logdet(random_hessian) -
-      0.5 * length(random_indices) * log(2π)
-    (
-      parameters = parameters,
-      random_hessian = random_hessian,
-      joint_nll = minimum(random_result),
-      marginal_nll = marginal_nll,
-      converged = converged(random_result),
-      iterations = iterations(random_result),
+    _conditional_mode(
+      x0, fixed_indices, fixed_values, random_indices, joint_objective, optimizer_options,
     )
   end
 

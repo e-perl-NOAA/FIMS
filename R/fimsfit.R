@@ -147,6 +147,10 @@ methods::setMethod("get_report", "FIMSFit", function(x) x@report)
 
 #' @return
 #' [get_obj()] returns the backend objective stored in the fit.
+#' For Julia fits, `par` contains fixed effects only. The `fn`, `gr`, `he`,
+#' and `report` functions accept a fixed-effect vector and evaluate the model
+#' at those values, optimizing random effects conditionally when present.
+#' Simulation through this objective is not implemented.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -1129,7 +1133,7 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
 build_julia_backend_sdreport <- function(input, fit_result) {
   julia_input <- attr(input, "julia_input")
   model_config <- attr(input, "julia_model_config")
-  parameters <- fit_result[["estimates"]]
+  parameters <- fit_result[["estimates"]][names(julia_input[["parameters"]])]
   parameter_values <- purrr::flatten_dbl(parameters)
   fixed_mask <- as.logical(model_config[["fixed_parameter_mask"]])
   random_mask <- as.logical(model_config[["random_parameter_mask"]])
@@ -1181,40 +1185,91 @@ build_julia_backend_sdreport <- function(input, fit_result) {
   )
 }
 
-build_julia_backend_stub_obj <- function(parameters, report, fit_result) {
+build_julia_backend_obj <- function(parameters, report, fit_result,
+                                     julia_input, model_config) {
+  parameters <- parameters[names(julia_input[["parameters"]])]
   parameter_vector <- purrr::flatten_dbl(parameters)
+  fixed_indices <- which(as.logical(model_config[["fixed_parameter_mask"]]))
+  random_indices <- which(as.logical(model_config[["random_parameter_mask"]]))
+  fixed_parameters <- parameter_vector[fixed_indices]
   gradient_vector <- if (!is.null(fit_result[["fixed_gradient"]])) {
     as.numeric(fit_result[["fixed_gradient"]])
   } else if (!is.null(fit_result[["gradient"]])) {
-    as.numeric(fit_result[["gradient"]])
+    as.numeric(fit_result[["gradient"]])[fixed_indices]
   } else {
-    rep(NA_real_, length(parameter_vector))
+    rep(NA_real_, length(fixed_parameters))
   }
-  hessian_matrix <- if (!is.null(fit_result[["hessian"]])) {
-    as.matrix(fit_result[["hessian"]])
-  } else {
-    diag(length(parameter_vector))
+  validate_parameters <- function(par) {
+    if (!is.numeric(par) || length(par) != length(fixed_parameters) ||
+      any(!is.finite(par))) {
+      cli::cli_abort("Objective parameters must be finite numeric values matching the fixed-effect count.")
+    }
+    as.numeric(par)
   }
-
-  report_function <- function(...) report
-  par_list_function <- function(...) list(re = numeric())
+  evaluate <- function(par, derivative_order) {
+    par <- validate_parameters(par)
+    evaluate_julia_fixed_objective(
+      julia_input, model_config, par, derivative_order
+    )
+  }
+  objective_function <- function(par = fixed_parameters) {
+    par <- validate_parameters(par)
+    if (identical(par, as.numeric(fixed_parameters)) &&
+      !(identical(fit_result[["convergence_code"]], "not_optimized") &&
+        length(random_indices) > 0L)) {
+      return(as.numeric(fit_result[["nll"]]))
+    }
+    as.numeric(evaluate(par, 0L))
+  }
+  gradient_function <- function(par = fixed_parameters) {
+    par <- validate_parameters(par)
+    if (identical(par, as.numeric(fixed_parameters)) &&
+      all(is.finite(gradient_vector))) {
+      return(gradient_vector)
+    }
+    as.numeric(evaluate(par, 1L))
+  }
+  hessian_function <- function(par = fixed_parameters) {
+    par <- validate_parameters(par)
+    if (identical(par, as.numeric(fixed_parameters)) &&
+      !is.null(fit_result[["fixed_hessian"]]) &&
+      (length(random_indices) == 0L || isTRUE(model_config[["compute_standard_errors"]]))) {
+      return(as.matrix(fit_result[["fixed_hessian"]]))
+    }
+    as.matrix(evaluate(par, 2L))
+  }
+  report_function <- function(par = fixed_parameters) {
+    par <- validate_parameters(par)
+    if (identical(par, as.numeric(fixed_parameters))) {
+      return(report)
+    }
+    evaluated <- evaluate(par, 3L)
+    report_input <- julia_input
+    report_input[["parameters"]] <- evaluated[["estimates"]]
+    build_julia_backend_report(report_input, evaluated)
+  }
+  par_list_function <- function(...) list(
+    p = fixed_parameters, re = parameter_vector[random_indices]
+  )
 
   list(
-    par = stats::setNames(parameter_vector, names(parameter_vector)),
-    fn = function(...) as.numeric(fit_result[["nll"]]),
-    gr = function(...) gradient_vector,
-    he = function(...) hessian_matrix,
-    hessian = function(...) hessian_matrix,
+    par = fixed_parameters,
+    fn = objective_function,
+    gr = gradient_function,
+    he = hessian_function,
+    hessian = hessian_function,
     method = "JuliaCall",
     retape = function(...) NULL,
     env = list(
       last.par.best = parameter_vector,
-      parameters = list(p = parameter_vector, re = numeric()),
+      parameters = par_list_function(),
       parList = par_list_function,
-      random = character()
+      random = random_indices
     ),
     report = report_function,
-    simulate = function(...) NULL
+    simulate = function(...) cli::cli_abort(
+      "Simulation through the Julia objective is not implemented."
+    )
   )
 }
 
@@ -1291,12 +1346,12 @@ FIMSFit <- function(
     optimized_parameters <- if (length(opt) > 0 && !is.null(opt[["par"]])) {
       opt[["par"]]
     } else {
-      purrr::flatten_dbl(attr(input, "julia_input")[["parameters"]])
+      obj[["par"]]
     }
     fixed_effect_count <- as.integer(
       input[["julia_fixed_parameter_count"]] %||% length(optimized_parameters)
     )
-    gradient_vector <- if (!is.null(obj[["gr"]])) {
+    gradient_vector <- if (length(opt) > 0 && !is.null(obj[["gr"]])) {
       as.numeric(obj[["gr"]](optimized_parameters))
     } else {
       rep(NA_real_, fixed_effect_count)
@@ -1562,8 +1617,10 @@ fit_fims <- function(input,
                          }
                          time_optimization <- Sys.time() - t0
 
+                         report_input <- julia_input
+                         report_input[["parameters"]] <- fit_result[["estimates"]]
                          report <- build_julia_backend_report(
-                           julia_input = julia_input,
+                           julia_input = report_input,
                            fit_result = fit_result
                          )
                          input[["julia_estimates"]] <- build_julia_backend_estimates(
@@ -1582,10 +1639,12 @@ fit_fims <- function(input,
                          input[["julia_random_parameter_count"]] <-
                            fit_result[["random_effect_count"]] %||% 0L
 
-                         obj <- build_julia_backend_stub_obj(
+                         obj <- build_julia_backend_obj(
                            parameters = if (!is.null(fit_result[["estimates"]])) fit_result[["estimates"]] else julia_input[["parameters"]],
                            report = report,
-                           fit_result = fit_result
+                           fit_result = fit_result,
+                           julia_input = julia_input,
+                           model_config = julia_model_config
                          )
 
                          run_time <- c(
