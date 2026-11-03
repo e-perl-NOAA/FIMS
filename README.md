@@ -112,6 +112,12 @@ libunwind library conflict. The comparison workflow pins JuliaCall to upstream
 commit `f7878f0371c6114493c3d067b8fb24cf6160c1cb`, which includes the
 [JuliaInterop/JuliaCall#265](https://github.com/JuliaInterop/JuliaCall/pull/265)
 fix that loads Julia's bundled libunwind before initializing Julia.
+The workflow also installs `Suppressor` and `RCall` and rebuilds `RCall` for the
+selected R installation in a standalone Julia process before embedding Julia.
+This keeps package installation and precompilation outside the embedded R
+process, exposes setup failures directly, and refreshes cached RCall builds.
+The bridge smoke test disables JuliaCall's dependency installer because these
+dependencies have already been prepared.
 
 If you encounter a :bug:, please file an [Issue](https://github.com/NOAA-FIMS/FIMS/issues) with a minimal reproducible example on GitHub.
 
