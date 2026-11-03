@@ -78,6 +78,7 @@ jobs:
       contents: read
     env:
       FIMS_RUN_BACKEND_PARITY: "true"
+      JULIA_PROJECT: ${{ runner.temp }}/fims-julia-bridge
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v2
@@ -105,6 +106,7 @@ jobs:
             using Pkg
             println("Installing bridge packages for R_HOME=", ENV["R_HOME"])
             flush(stdout)
+            Pkg.develop(path="inst/julia/FIMSBackend")
             Pkg.add(["Suppressor", "RCall"])
             println("Rebuilding RCall for the selected R installation")
             flush(stdout)
@@ -122,7 +124,18 @@ jobs:
           set -o pipefail
           julia --startup-file=no --project=inst/julia/FIMSBackend -e '
             using Pkg
+            backend_project = Base.active_project()
+            Pkg.activate(ENV["JULIA_PROJECT"])
+            bridge_dependencies = Pkg.dependencies()
+            Pkg.activate(dirname(backend_project))
             Pkg.instantiate()
+            for (uuid, dependency) in Pkg.dependencies()
+              haskey(bridge_dependencies, uuid) || continue
+              bridge_dependency = bridge_dependencies[uuid]
+              dependency.version == bridge_dependency.version &&
+                dependency.tree_hash == bridge_dependency.tree_hash ||
+                error("Bridge/backend dependency mismatch: ", dependency.name)
+            end
             Pkg.precompile(; strict=true)
             using FIMSBackend
             @assert isdefined(FIMSBackend, :evaluate_model)

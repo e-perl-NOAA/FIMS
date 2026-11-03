@@ -127,6 +127,12 @@ and loaded in standalone Julia before the R steps. The bridge smoke test then
 loads FIMSBackend inside R, so a successful scalar bridge check alone cannot
 hide model dependency-loading failures. Backend setup output is retained as
 `julia-fims-setup.log`; numerical comparisons and their tolerances are unchanged.
+The R bridge starts in a dedicated Julia project that resolves `RCall`,
+`Suppressor`, and the local FIMSBackend together. Resolving the bridge separately
+can load a different version of a shared dependency before FIMS activates its
+project (for example, LogExpFunctions 1.x versus 0.3.x); switching projects cannot
+replace a package already loaded into Julia. CI checks shared dependency versions
+and source hashes against the backend environment before starting R.
 
 If you encounter a :bug:, please file an [Issue](https://github.com/NOAA-FIMS/FIMS/issues) with a minimal reproducible example on GitHub.
 
