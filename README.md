@@ -122,6 +122,11 @@ Both R workflow steps disable JuliaCall's dependency installer because these
 dependencies have already been prepared. Verbose RCall build output and stage
 markers are retained in the `julia-bridge-setup.log` workflow artifact, including
 on preparation failure.
+FIMSBackend's own Julia environment is also instantiated, strictly precompiled,
+and loaded in standalone Julia before the R steps. The bridge smoke test then
+loads FIMSBackend inside R, so a successful scalar bridge check alone cannot
+hide model dependency-loading failures. Backend setup output is retained as
+`julia-fims-setup.log`; numerical comparisons and their tolerances are unchanged.
 
 If you encounter a :bug:, please file an [Issue](https://github.com/NOAA-FIMS/FIMS/issues) with a minimal reproducible example on GitHub.
 

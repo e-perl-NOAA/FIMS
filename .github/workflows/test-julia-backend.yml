@@ -114,6 +114,20 @@ jobs:
             Pkg.precompile(; strict=true)
             println("Bridge dependency preparation completed")
           ' 2>&1 | tee julia-bridge-setup.log
+      - name: Prepare FIMS Julia dependencies before embedding Julia
+        shell: bash
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: |
+          set -o pipefail
+          julia --startup-file=no --project=inst/julia/FIMSBackend -e '
+            using Pkg
+            Pkg.instantiate()
+            Pkg.precompile(; strict=true)
+            using FIMSBackend
+            @assert isdefined(FIMSBackend, :evaluate_model)
+            println("FIMS Julia dependency preparation completed")
+          ' 2>&1 | tee julia-fims-setup.log
       - name: Verify the R-to-Julia bridge
         shell: Rscript {0}
         run: |
@@ -126,6 +140,17 @@ jobs:
           message("R: ", R.version.string)
           message("JuliaCall: ", utils::packageVersion("JuliaCall"))
           message("Julia: ", JuliaCall::julia_eval("string(VERSION)"))
+          backend_path <- normalizePath("inst/julia/FIMSBackend", "/")
+          JuliaCall::julia_command(sprintf(
+            'using Pkg; Pkg.activate(raw"%s")', backend_path
+          ))
+          JuliaCall::julia_command(sprintf(
+            'Base.include(Main, raw"%s/src/FIMSBackend.jl"); using .FIMSBackend',
+            backend_path
+          ))
+          stopifnot(JuliaCall::julia_eval(
+            'isdefined(Main.FIMSBackend, :evaluate_model)'
+          ))
       - name: Compare real native and Julia backends through R
         shell: Rscript {0}
         run: |
@@ -149,6 +174,7 @@ jobs:
           path: |
             backend-parity.xml
             julia-bridge-setup.log
+            julia-fims-setup.log
           if-no-files-found: warn
           retention-days: 7
       - name: Report backend comparison result
