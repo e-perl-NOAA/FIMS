@@ -135,6 +135,8 @@ methods::setMethod("get_input", "FIMSFit", function(x) x@input)
 #' @return
 #' [get_report()] returns the report produced by the selected backend, including
 #' the `nll_components` objective decomposition when the backend supports it.
+#' Its `jnll` is the joint negative log likelihood at the fitted parameters;
+#' the optimizer objective includes the Laplace adjustment for random effects.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -595,7 +597,7 @@ build_julia_backend_report <- function(julia_input, fit_result) {
     log_index_expected_by_fleet = optional_report_array("log_index_expected_by_fleet"),
     log_catch_expected_by_fleet = optional_report_array("log_catch_expected_by_fleet"),
     nll_components = as_julia_backend_numeric(report[["nll_components"]]),
-    jnll = as.numeric(fit_result[["nll"]])
+    jnll = as.numeric(fit_result[["joint_nll"]] %||% fit_result[["nll"]])
   )
 }
 

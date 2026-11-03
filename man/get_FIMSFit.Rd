@@ -85,6 +85,8 @@ is the returned object from \code{\link[=setup_default_parameters]{setup_default
 
 \code{\link[=get_report]{get_report()}} returns the report produced by the selected backend, including
 the \code{nll_components} objective decomposition when the backend supports it.
+Its \code{jnll} is the joint negative log likelihood at the fitted parameters;
+the optimizer objective includes the Laplace adjustment for random effects.
 
 \code{\link[=get_obj]{get_obj()}} returns the backend objective stored in the fit.
 

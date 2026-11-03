@@ -430,6 +430,7 @@ function fit_model(init_params, data_dict, config = Dict())
     "fixed_effect_count" => length(fixed_indices),
     "random_effect_count" => length(random_indices),
     "nll" => conditional_result.marginal_nll,
+    "joint_nll" => conditional_result.joint_nll,
     "convergence" => fit_converged,
     "convergence_code" => convergence_code,
     "fixed_convergence" => fixed_converged,

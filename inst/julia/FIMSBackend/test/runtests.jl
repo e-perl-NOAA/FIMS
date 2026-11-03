@@ -791,6 +791,14 @@ end
   @test fit_result["fixed_effect_count"] == 1
   @test fit_result["random_effect_count"] == 1
   @test isfinite(fit_result["nll"])
+  @test fit_result["joint_nll"] ≈ evaluate_nll(
+    fit_result["estimates"],
+    data,
+    merge(fit_config, Dict(:parameter_names => String.(propertynames(parameters)))),
+  )
+  @test fit_result["nll"] ≈
+        fit_result["joint_nll"] + 0.5 * log(fit_result["hessian"][15, 15]) -
+        0.5 * log(2π)
   @test fit_result["convergence"]
   @test fit_result["fixed_convergence"]
   @test fit_result["random_convergence"]

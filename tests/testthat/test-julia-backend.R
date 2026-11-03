@@ -1737,6 +1737,7 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
        gradient = rep(0, flattened_parameter_count),
        hessian = diag(flattened_parameter_count),
        nll = 12.5,
+       joint_nll = 13.5,
        convergence = TRUE,
        convergence_code = "SUCCESS",
        iterations = 4L,
@@ -1791,7 +1792,7 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
   #' @description Test that the Julia backend fit bridge records an optimizer result.
   expect_equal(FIMS::get_opt(fit)[["convergence"]], 0L)
   #' @description Test that the Julia backend fit bridge exposes the Julia report jnll through get_report().
-  expect_equal(FIMS::get_report(fit)[["jnll"]], 12.5)
+  expect_equal(FIMS::get_report(fit)[["jnll"]], 13.5)
   expect_equal(FIMS::get_report(fit)[["nll_components"]], c(2.5, 10))
   #' @description Test that Julia backend reports include the mortality and fleet-derived quantities used by FIMS summaries.
   expect_true(all(c("mortality_F", "mortality_M", "mortality_Z", "total_catch_numbers") %in% names(FIMS::get_report(fit))))
