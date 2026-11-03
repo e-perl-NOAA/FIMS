@@ -78,9 +78,11 @@ jobs:
       contents: read
     env:
       FIMS_RUN_BACKEND_PARITY: "true"
-      JULIA_PROJECT: ${{ runner.temp }}/fims-julia-bridge
     steps:
       - uses: actions/checkout@v7
+      - name: Configure the shared Julia environment
+        shell: bash
+        run: echo "JULIA_PROJECT=${RUNNER_TEMP}/fims-julia-bridge" >> "${GITHUB_ENV}"
       - uses: julia-actions/setup-julia@v2
         with:
           version: "1.10"
