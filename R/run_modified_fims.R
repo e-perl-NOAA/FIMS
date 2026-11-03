@@ -10,6 +10,8 @@
 #' @param module_name The name of module associated with the parameter to be changed. Default is NULL.
 #' @param parameters The tibble of input parameters for a FIMS model
 #' @param data A dataframe of input data for FIMS model
+#' @param backend Backend passed to [initialize_fims()].
+#' @param priors Optional parameter priors passed to [initialize_fims()].
 #'
 #' @return FIMS model fitted to the new parameter input value
 #' @export
@@ -35,8 +37,11 @@ run_modified_pars_fims <- function(
   parameter_name,
   module_name = NULL,
   parameters,
-  data
+  data,
+  backend = c("tmb", "julia"),
+  priors = NULL
 ) {
+  backend <- match.arg(backend)
   # Need to load packages for each worker for furrr functions
   # suppressWarnings({
   #   suppressPackageStartupMessages({
@@ -94,7 +99,7 @@ run_modified_pars_fims <- function(
   data_model <- FIMS::FIMSFrame(data)
 
   new_fit <- parameters_mod |>
-    FIMS::initialize_fims(data = data_model) |>
+    FIMS::initialize_fims(data = data_model, backend = backend, priors = priors) |>
     FIMS::fit_fims(optimize = TRUE)
 
   return(new_fit)
@@ -109,6 +114,8 @@ run_modified_pars_fims <- function(
 #' @param years_to_remove number of years to remove
 #' @param data full dataset used in base model run
 #' @param parameters input parameters used in base FIMS model
+#' @param backend Backend passed to [initialize_fims()].
+#' @param priors Optional parameter priors passed to [initialize_fims()].
 #' @return FIMS model fitted with years of data removed
 #' @export
 #' @keywords diagnostics
@@ -128,7 +135,14 @@ run_modified_pars_fims <- function(
 #'   parameters = parameters
 #' )
 #' }
-run_modified_data_fims <- function(years_to_remove = 0, data, parameters) {
+run_modified_data_fims <- function(
+  years_to_remove = 0,
+  data,
+  parameters,
+  backend = c("tmb", "julia"),
+  priors = NULL
+) {
+  backend <- match.arg(backend)
   # check if the input is a FIMSframe object and if so, extract the data
   # this is to avoid the warning:
   # no applicable method for 'filter' applied to an object of class "FIMSFrame"
@@ -165,7 +179,7 @@ run_modified_data_fims <- function(years_to_remove = 0, data, parameters) {
 
   # User supplies parameters from base model
   fit <- parameters |>
-    FIMS::initialize_fims(data = data_model) |>
+    FIMS::initialize_fims(data = data_model, backend = backend, priors = priors) |>
     FIMS::fit_fims(optimize = TRUE)
 
   return(fit)

@@ -4,7 +4,10 @@
 \alias{run_modified_data_fims}
 \title{Modify data for a FIMS Model}
 \usage{
-run_modified_data_fims(years_to_remove = 0, data, parameters)
+run_modified_data_fims(
+  years_to_remove = 0, data, parameters,
+  backend = c("tmb", "julia"), priors = NULL
+)
 }
 \arguments{
 \item{years_to_remove}{number of years to remove}
@@ -12,6 +15,10 @@ run_modified_data_fims(years_to_remove = 0, data, parameters)
 \item{data}{full dataset used in base model run}
 
 \item{parameters}{input parameters used in base FIMS model}
+
+\item{backend}{Backend passed to \code{\link[=initialize_fims]{initialize_fims()}}.}
+
+\item{priors}{Optional parameter priors passed to \code{\link[=initialize_fims]{initialize_fims()}}.}
 }
 \value{
 FIMS model fitted with years of data removed

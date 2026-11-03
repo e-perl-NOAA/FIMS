@@ -4,7 +4,10 @@
 \alias{run_fims_retrospective}
 \title{Run Retrospective Analysis}
 \usage{
-run_fims_retrospective(years_to_remove, data, parameters, n_cores = NULL)
+run_fims_retrospective(
+  years_to_remove, data, parameters, n_cores = NULL,
+  backend = c("tmb", "julia"), priors = NULL
+)
 }
 \arguments{
 \item{years_to_remove}{A numeric vector specifying the number of terminal
@@ -24,6 +27,10 @@ and initial parameter values for the base model.}
 \item{n_cores}{An integer specifying the number of CPU cores to use for
 parallel processing. If \code{NULL} (default), uses \code{parallel::detectCores() - 1}.
 Set to 1 for sequential processing. Must be a positive integer.}
+
+\item{backend}{Backend passed to \code{\link[=initialize_fims]{initialize_fims()}} for each refit.}
+
+\item{priors}{Optional Julia parameter priors used for each refit.}
 }
 \value{
 A list with two named elements:
@@ -48,6 +55,8 @@ This diagnostic tool is used to detect retrospective patterns or bias in
 model estimates.
 }
 \details{
+Julia refits use separate R sessions rather than forked workers.
+
 Run Retrospective Analysis for a FIMS Model
 
 Retrospective analysis involves refitting a model after sequentially removing

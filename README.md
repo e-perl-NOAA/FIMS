@@ -76,6 +76,11 @@ points. Its relative numerical tolerance is `1e-8`; missing report fields and
 non-finite values fail the comparison. JUnit results are retained as a workflow
 artifact. This check does not establish optimized-fit or uncertainty parity.
 
+Likelihood profiles retain the backend and priors of their base fit.
+Retrospective analyses and direct refit helpers accept `backend = "julia"` and
+`priors` explicitly. Parallel Julia diagnostics use separate R worker sessions
+to avoid forking an initialized Julia runtime.
+
 To run the comparison locally with both backends available:
 
 ```r

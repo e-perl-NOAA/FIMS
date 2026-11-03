@@ -13,7 +13,9 @@ run_fims_likelihood(
   n_cores = NULL,
   min = -2,
   max = 2,
-  length = 5
+  length = 5,
+  backend = NULL,
+  priors = attr(get_input(model), "julia_priors")
 )
 }
 \arguments{
@@ -52,6 +54,11 @@ parameter value. Default is \code{2}. The profile range ends at
 \item{length}{An integer specifying the number of points in the likelihood
 profile. Default is \code{5}. Use an odd number to include the estimated value.
 Must be a positive integer. Values above 50 will generate a warning}
+
+\item{backend}{Backend for refits. Defaults to the backend of \code{model}.}
+
+\item{priors}{Optional Julia parameter priors. Defaults to the priors
+retained in \code{model}.}
 }
 \value{
 A list with two named elements:
@@ -77,6 +84,9 @@ diagnostic tool helps assess parameter uncertainty, identifiability, and
 potential local minima in the likelihood surface.
 }
 \details{
+Julia refits use separate R sessions rather than forked workers when
+running in parallel.
+
 Run Likelihood Profile for a FIMS Model
 
 Likelihood profiling involves systematically varying a parameter of interest

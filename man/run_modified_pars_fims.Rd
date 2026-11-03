@@ -9,7 +9,9 @@ run_modified_pars_fims(
   parameter_name,
   module_name = NULL,
   parameters,
-  data
+  data,
+  backend = c("tmb", "julia"),
+  priors = NULL
 )
 }
 \arguments{
@@ -23,6 +25,10 @@ This should match a value in the \code{label} column of the parameters tibble.}
 \item{parameters}{The tibble of input parameters for a FIMS model}
 
 \item{data}{A dataframe of input data for FIMS model}
+
+\item{backend}{Backend passed to \code{\link[=initialize_fims]{initialize_fims()}}.}
+
+\item{priors}{Optional parameter priors passed to \code{\link[=initialize_fims]{initialize_fims()}}.}
 }
 \value{
 FIMS model fitted to the new parameter input value

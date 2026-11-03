@@ -961,6 +961,7 @@ initialize_fims <- function(parameters, data, backend = c("tmb", "julia"), prior
     attr(parameter_list, "parameter_info") <- parameters
     attr(parameter_list, "julia_input") <- julia_input
     attr(parameter_list, "julia_model_config") <- julia_model_config
+    attr(parameter_list, "julia_priors") <- priors
 
     if (initialize_julia_backend()) {
       assign_julia_backend_input(julia_input)

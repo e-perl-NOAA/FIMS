@@ -171,6 +171,132 @@ test_that("Julia and native objectives and reports agree at identical fixed para
   }
 })
 
+test_that("diagnostic refit helpers forward the selected backend and priors", {
+  parameters <- FIMS::setup_default_parameters(data = FIMS::FIMSFrame(data_big))
+  captured <- NULL
+  priors <- tibble::tibble(test_prior = 1)
+  testthat::local_mocked_bindings(
+    initialize_fims = function(parameters, data, backend, priors) {
+      captured <<- list(parameters = parameters, backend = backend, priors = priors)
+      list()
+    },
+    fit_fims = function(input, optimize) {
+      force(input)
+      "refit"
+    },
+    .package = "FIMS"
+  )
+
+  expect_identical(FIMS::run_modified_pars_fims(
+    new_value = 12, parameter_name = "log_rzero",
+    parameters = parameters, data = data_big, backend = "julia", priors = priors
+  ), "refit")
+  expect_identical(captured[["backend"]], "julia")
+  expect_identical(captured[["priors"]], priors)
+  changed <- captured[["parameters"]] |>
+    dplyr::filter(.data$label == "log_rzero")
+  expect_equal(changed[["value"]], 12)
+  expect_identical(changed[["estimation_type"]], "constant")
+  expect_identical(FIMS::run_modified_data_fims(
+    data = data_big, parameters = parameters, backend = "julia", priors = priors
+  ), "refit")
+  expect_identical(captured[["backend"]], "julia")
+  expect_identical(captured[["priors"]], priors)
+  FIMS::run_modified_data_fims(data = data_big, parameters = parameters)
+  expect_identical(captured[["backend"]], "tmb")
+  expect_null(captured[["priors"]])
+})
+
+test_that("likelihood profiles retain the base model backend and priors", {
+  parameters <- tibble::tibble(
+    module_name = "Recruitment", label = "log_rzero"
+  )
+  priors <- tibble::tibble(test_prior = 1)
+  model_input <- structure(list(), backend = "julia", julia_priors = priors)
+  captured <- list()
+  testthat::local_mocked_bindings(
+    get_input = function(...) model_input,
+    get_estimates = function(...) tibble::tibble(
+      module_name = "Recruitment", label = "log_rzero", estimated = 12
+    ),
+    run_modified_pars_fims = function(..., backend, priors) {
+      captured[[length(captured) + 1L]] <<- list(backend = backend, priors = priors)
+      list()
+    },
+    .package = "FIMS"
+  )
+  result <- FIMS::run_fims_likelihood(
+    model = structure(list(), class = "FIMSFit"),
+    parameters = parameters, data = data_big, n_cores = 1,
+    min = -1, max = 1, length = 3
+  )
+  expect_equal(result[["vec"]], c(11, 12, 13))
+  expect_length(captured, 3L)
+  expect_true(all(vapply(captured, \(x) identical(x[["backend"]], "julia"), logical(1))))
+  expect_true(all(vapply(captured, \(x) identical(x[["priors"]], priors), logical(1))))
+})
+
+test_that("retrospective analyses forward backend and priors to every peel", {
+  captured <- list()
+  priors <- tibble::tibble(test_prior = 1)
+  testthat::local_mocked_bindings(
+    run_modified_data_fims = function(years_to_remove, data, parameters, backend, priors) {
+      captured[[length(captured) + 1L]] <<- list(
+        years = years_to_remove, backend = backend, priors = priors
+      )
+      list()
+    },
+    get_estimates = function(...) tibble::tibble(estimated = 1),
+    .package = "FIMS"
+  )
+  result <- FIMS::run_fims_retrospective(
+    years_to_remove = 0:1, data = data_big, parameters = tibble::tibble(),
+    n_cores = 1, backend = "julia", priors = priors
+  )
+  expect_equal(result[["estimates"]][["retrospective_peel"]], 0:1)
+  expect_equal(vapply(captured, \(x) x[["years"]], integer(1)), 0:1)
+  expect_true(all(vapply(captured, \(x) identical(x[["backend"]], "julia"), logical(1))))
+  expect_true(all(vapply(captured, \(x) identical(x[["priors"]], priors), logical(1))))
+})
+
+test_that("parallel Julia diagnostics use separate R sessions rather than forks", {
+  strategies <- list()
+  testthat::local_mocked_bindings(
+    plan = function(strategy, ...) {
+      strategies[[length(strategies) + 1L]] <<- strategy
+      invisible(NULL)
+    },
+    .package = "future"
+  )
+  testthat::local_mocked_bindings(
+    future_map = function(.x, .f, ..., .options) lapply(.x, .f, ...),
+    .package = "furrr"
+  )
+  testthat::local_mocked_bindings(
+    get_input = function(...) structure(list(), backend = "julia"),
+    get_estimates = function(...) tibble::tibble(
+      module_name = "Recruitment", label = "log_rzero", estimated = 12
+    ),
+    run_modified_pars_fims = function(...) list(),
+    run_modified_data_fims = function(...) list(),
+    .package = "FIMS"
+  )
+  FIMS::run_fims_likelihood(
+    model = structure(list(), class = "FIMSFit"),
+    parameters = tibble::tibble(module_name = "Recruitment", label = "log_rzero"),
+    data = data_big, n_cores = 2, min = -1, max = 1, length = 3
+  )
+  expect_identical(strategies[[1]], future::multisession)
+  expect_identical(strategies[[2]], future::sequential)
+  strategies <- list()
+  FIMS::run_fims_retrospective(
+    years_to_remove = 0:1, data = data_big, parameters = tibble::tibble(),
+    n_cores = 2, backend = "julia"
+  )
+  expect_identical(strategies[[1]], future::multisession)
+  expect_identical(strategies[[2]], future::sequential)
+})
+
 test_that("Julia backend package scaffolding exists", {
   backend_root <- normalizePath(
     FIMS:::julia_backend_package_path(),
@@ -620,6 +746,13 @@ test_that("Julia backend serializes scalar and age-specific proportion-female pa
   )
   expect_equal(scalar_prior_config[["parameter_prior_components"]], "proportion_female")
   expect_equal(scalar_prior_config[["parameter_prior_indices"]], 1L)
+  reset_julia_backend_state()
+  withr::local_options(list(FIMS.disable_julia = TRUE))
+  initialized <- FIMS::initialize_fims(
+    parameters = scalar_parameters, data = data,
+    backend = "julia", priors = scalar_prior
+  )
+  expect_identical(attr(initialized, "julia_priors"), scalar_prior)
 
   age_specific_rows <- default_parameters |>
     dplyr::filter(

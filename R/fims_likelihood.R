@@ -25,6 +25,8 @@
 #' when the same parameter label exists in more than 1 module. Parameters with
 #' more than 1 row in a module (for example, 1 per fleet, year, or age) cannot
 #' be profiled yet.
+#' Julia refits use separate R sessions rather than forked workers when
+#' running in parallel.
 #'
 #' @param model A FIMSFit object returned by [FIMS::fit_fims()]. Used to extract
 #'   the estimated value of the parameter being profiled.
@@ -53,6 +55,9 @@
 #' @param length An integer specifying the number of points in the likelihood
 #'   profile. Default is `5`. Use an odd number to include the estimated value.
 #'   Must be a positive integer. Values above 50 will generate a warning
+#' @param backend Backend for refits. Defaults to the backend of `model`.
+#' @param priors Optional Julia parameter priors. Defaults to the priors
+#'   retained in `model`.
 #'
 #' @return
 #' A list with two named elements:
@@ -129,7 +134,9 @@ run_fims_likelihood <- function(
   n_cores = NULL,
   min = -2,
   max = 2,
-  length = 5
+  length = 5,
+  backend = NULL,
+  priors = attr(get_input(model), "julia_priors")
   # TODO: check inputs to make sure they make sense
 ) {
   # checking inputs
@@ -148,6 +155,10 @@ run_fims_likelihood <- function(
   if (!inherits(model, "FIMSFit")) {
     cli::cli_abort("Input model needs to be a FIMSFit object.")
   }
+  if (is.null(backend)) {
+    backend <- if (is_julia_backend_input(get_input(model))) "julia" else "tmb"
+  }
+  backend <- match.arg(backend, c("tmb", "julia"))
   # calculate vector
   values <- seq(min, max, length = length)
 
@@ -236,11 +247,13 @@ run_fims_likelihood <- function(
     }
     n_cores_to_use <- as.integer(n_cores)
   }
-  dplyr::case_when(
-    n_cores_to_use == 1 ~ future::plan(future::sequential),
-    n_cores_to_use > 1 & Sys.info()["sysname"] == "Windows" ~ future::plan(future::multisession, workers = n_cores_to_use),
-    n_cores_to_use > 1 & Sys.info()["sysname"] != "Windows" ~ future::plan(future::multicore, workers = n_cores_to_use)
-  )
+  if (n_cores_to_use == 1) {
+    future::plan(future::sequential)
+  } else if (backend == "julia" || Sys.info()[["sysname"]] == "Windows") {
+    future::plan(future::multisession, workers = n_cores_to_use)
+  } else {
+    future::plan(future::multicore, workers = n_cores_to_use)
+  }
 
   if (n_cores_to_use == 1) {
     cli::cli_alert_info("...Running sequentially on a single core")
@@ -254,14 +267,16 @@ run_fims_likelihood <- function(
   # run FIMS in parallel for each of the likelihood profile values
   estimates_list <- furrr::future_map(
     .x = vec,
-    .f = function(value, parameter_name, module_name, parameters, data) {
+    .f = function(value, parameter_name, module_name, parameters, data, backend, priors) {
       # Run the model
       fit <- run_modified_pars_fims(
         new_value = value,
         parameter_name = parameter_name,
         module_name = module_name,
         parameters = parameters,
-        data = data
+        data = data,
+        backend = backend,
+        priors = priors
       )
       # Extract estimates immediately while still in worker
       FIMS::get_estimates(fit)
@@ -270,6 +285,8 @@ run_fims_likelihood <- function(
     module_name = module_name,
     parameters = parameters,
     data = data,
+    backend = backend,
+    priors = priors,
     .options = furrr::furrr_options(seed = TRUE, globals = TRUE)
   )
 
