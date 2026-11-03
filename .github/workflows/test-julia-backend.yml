@@ -96,16 +96,24 @@ jobs:
           needs: check
       - name: Prepare Julia bridge dependencies before embedding Julia
         shell: bash
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
         run: |
           export R_HOME="$(R RHOME)"
+          set -o pipefail
           julia --startup-file=no -e '
             using Pkg
+            println("Installing bridge packages for R_HOME=", ENV["R_HOME"])
+            flush(stdout)
             Pkg.add(["Suppressor", "RCall"])
-            Pkg.build("RCall")
-            Pkg.precompile()
-            using Suppressor, RCall
-            @assert rcopy(R"1 + 1") == 2
-          '
+            println("Rebuilding RCall for the selected R installation")
+            flush(stdout)
+            Pkg.build("RCall"; verbose=true)
+            println("Precompiling bridge dependencies")
+            flush(stdout)
+            Pkg.precompile(; strict=true)
+            println("Bridge dependency preparation completed")
+          ' 2>&1 | tee julia-bridge-setup.log
       - name: Verify the R-to-Julia bridge
         shell: Rscript {0}
         run: |
@@ -114,6 +122,7 @@ jobs:
           Sys.setenv(JULIA_HOME = dirname(julia_executable))
           JuliaCall::julia_setup(installJulia = FALSE, install = FALSE)
           stopifnot(JuliaCall::julia_eval("1 + 1") == 2)
+          stopifnot(as.numeric(JuliaCall::julia_call("sum", c(1, 2, 3))) == 6)
           message("R: ", R.version.string)
           message("JuliaCall: ", utils::packageVersion("JuliaCall"))
           message("Julia: ", JuliaCall::julia_eval("string(VERSION)"))
@@ -137,7 +146,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: backend-parity-results
-          path: backend-parity.xml
+          path: |
+            backend-parity.xml
+            julia-bridge-setup.log
           if-no-files-found: warn
           retention-days: 7
       - name: Report backend comparison result

@@ -115,9 +115,13 @@ fix that loads Julia's bundled libunwind before initializing Julia.
 The workflow also installs `Suppressor` and `RCall` and rebuilds `RCall` for the
 selected R installation in a standalone Julia process before embedding Julia.
 This keeps package installation and precompilation outside the embedded R
-process, exposes setup failures directly, and refreshes cached RCall builds.
-The bridge smoke test disables JuliaCall's dependency installer because these
-dependencies have already been prepared.
+process and refreshes cached RCall builds. Preparation does not initialize an
+embedded R session inside standalone Julia: the separate R-to-Julia smoke test
+checks the embedding direction FIMS actually uses, including vector conversion.
+Both R workflow steps disable JuliaCall's dependency installer because these
+dependencies have already been prepared. Verbose RCall build output and stage
+markers are retained in the `julia-bridge-setup.log` workflow artifact, including
+on preparation failure.
 
 If you encounter a :bug:, please file an [Issue](https://github.com/NOAA-FIMS/FIMS/issues) with a minimal reproducible example on GitHub.
 
