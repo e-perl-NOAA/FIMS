@@ -236,6 +236,7 @@ test_that("optimized Julia fits and uncertainty agree with native fits", {
         FIMS::get_estimates(fit) |>
           dplyr::filter(.data$estimation_type %in% c("fixed_effects", "random_effects")) |>
           dplyr::arrange(.data$module_name, .data$fleet, .data$label) |>
+          dplyr::mutate(uncertainty = unname(.data$uncertainty)) |>
           dplyr::select(
             dplyr::all_of(c("module_name", "fleet", "label", "estimated", "uncertainty"))
           )
@@ -1747,6 +1748,22 @@ test_that("Julia backend config preserves normal catch and lognormal index likel
   expect_error(
     FIMS:::as_julia_fims_model_config(partial_process_parameters, data),
     regexp = "distribution for every"
+  )
+  constant_process_parameters <- partial_process_parameters |>
+    dplyr::mutate(
+      estimation_type = dplyr::if_else(
+        .data$module_name == "Recruitment" & .data$label == "log_devs" &
+          is.na(.data$distribution),
+        "constant",
+        .data$estimation_type
+      )
+    )
+  constant_process_config <- FIMS:::as_julia_fims_model_config(
+    constant_process_parameters, data
+  )
+  expect_true(constant_process_config[["recruitment_process_active"]])
+  expect_equal(
+    constant_process_config[["recruitment_process_distribution"]], "dnorm"
   )
 
   log_r_parameters <- parameters |>

@@ -4,8 +4,6 @@ using ..Recruitment: BevertonHolt, Ricker
 
 export PopulationModel, spawning_biomass_per_recruit, step_population!
 
-positive_guard(x) = x + oftype(x, sqrt(eps(Float64)))
-
 Base.@kwdef mutable struct PopulationModel{T <: Real, A <: Real, W <: Real, M <: Real}
   ages::Vector{A}
   weights_at_age::Matrix{W}
@@ -112,15 +110,16 @@ function step_population!(
         pop.maturity_at_age[year, age] *
         pop.proportion_female[age]
 
-      total_mortality = positive_guard(pop.mortality_Z[year, age])
-      total_harvest_fraction = one(T) - exp(-pop.mortality_Z[year, age])
+      total_mortality = pop.mortality_Z[year, age]
+      harvest_per_mortality =
+        iszero(total_mortality) ? one(T) : -expm1(-total_mortality) / total_mortality
       for fleet in 1:n_fleets
         selectivity_value = fleet_selectivity[year, age, fleet]
         fleet_fishing_mortality =
           exp(fishing_mortality[year, fleet]) * selectivity_value
         catch_numbers =
           pop.numbers_at_age[year, age] *
-          fleet_fishing_mortality / total_mortality * total_harvest_fraction
+          fleet_fishing_mortality * harvest_per_mortality
         pop.catch_numbers_at_age_by_fleet[year, age, fleet] = catch_numbers
         pop.index_numbers_at_age_by_fleet[year, age, fleet] =
           catchability[fleet] *

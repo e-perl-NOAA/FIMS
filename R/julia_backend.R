@@ -1208,10 +1208,17 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
         any(!is.na(.data$distribution))
     ) |>
     dplyr::pull(.data$has_metadata)
+  unannotated_constant_rows <- recruitment_process_mode_rows |>
+    dplyr::filter(
+      is.na(.data$estimation_type) | .data$estimation_type == "constant",
+      is.na(.data$distribution_type),
+      is.na(.data$distribution)
+    )
   if (has_recruitment_process_metadata &&
-    nrow(recruitment_process_rows) != nrow(recruitment_process_mode_rows)) {
+    nrow(recruitment_process_rows) + nrow(unannotated_constant_rows) !=
+      nrow(recruitment_process_mode_rows)) {
     cli::cli_abort(
-      "Recruitment process metadata must specify a distribution for every {.val {recruitment_process_mode}} parameter."
+      "Recruitment process metadata must specify a distribution for every estimated {.val {recruitment_process_mode}} parameter; constant parameters may omit both distribution fields."
     )
   }
   recruitment_process_families <- unique(tolower(recruitment_process_rows[["distribution"]]))

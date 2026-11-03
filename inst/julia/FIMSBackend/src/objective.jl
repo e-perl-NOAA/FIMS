@@ -139,6 +139,11 @@ function build_recruitment(params, model_config)
   throw(ArgumentError("Unsupported recruitment type: $recruitment_type"))
 end
 
+# Match the native AD-safe approximations, including away from their floors.
+growth_smooth_abs(value) = sqrt(value^2 + oftype(value, 1e-5))
+growth_smooth_max(value, floor) =
+  (value + floor + growth_smooth_abs(value - floor)) / 2
+
 function growth_length_at_age(params, age)
   mean_length_young = exp(params.growth_log_mean_length_young)
   mean_length_old = exp(params.growth_log_mean_length_old)
@@ -151,7 +156,9 @@ function growth_length_at_age(params, age)
   denominator =
     one(growth_coefficient) -
     exp(-growth_coefficient * (reference_age_old - reference_age_young))
-  safe_denominator = max(abs(denominator), oftype(denominator, 1e-8))
+  safe_denominator = growth_smooth_max(
+    growth_smooth_abs(denominator), oftype(denominator, 1e-8)
+  )
   numerator =
     one(growth_coefficient) -
     exp(-growth_coefficient * (age - reference_age_young))
@@ -223,7 +230,7 @@ function growth_log_length_gradient(params, age)
   reference_age_young = params.growth_reference_age_young
   reference_age_old = params.growth_reference_age_old
   mean_length = growth_length_at_age(params, age)
-  safe_mean_length = max(mean_length, oftype(mean_length, 1e-8))
+  safe_mean_length = growth_smooth_max(mean_length, oftype(mean_length, 1e-8))
 
   if reference_age_young > 0 && age < reference_age_young
     ratio = max(age, zero(age)) / reference_age_young
@@ -240,7 +247,9 @@ function growth_log_length_gradient(params, age)
   exp_denominator = exp(-growth_coefficient * age_delta_old)
   numerator = one(exp_numerator) - exp_numerator
   denominator = one(exp_denominator) - exp_denominator
-  safe_denominator = max(abs(denominator), oftype(denominator, 1e-8))
+  safe_denominator = growth_smooth_max(
+    growth_smooth_abs(denominator), oftype(denominator, 1e-8)
+  )
   ratio = numerator / safe_denominator
   d_length_d_young = one(ratio) - ratio
   d_length_d_old = ratio
@@ -394,19 +403,21 @@ function build_growth_products(params, data_dict, model_config)
   reference_length_old = growth_length_at_age(params, reference_age_old)
   sd_length = if has_delta_method
     [
-      max(
-        length * sqrt(max(growth_log_length_variance(params, age, covariance), zero(length))),
+      growth_smooth_max(
+        length * sqrt(growth_smooth_max(
+          growth_log_length_variance(params, age, covariance), zero(length)
+        )),
         oftype(length, 1e-8),
       ) for (age, length) in zip(age_values, mean_length)
     ]
   else
-    length_delta = max(
-      abs(reference_length_old - reference_length_young),
+    length_delta = growth_smooth_max(
+      growth_smooth_abs(reference_length_old - reference_length_young),
       oftype(reference_length_young, 1e-8),
     )
     length_sd_slope = (length_sd_old - length_sd_young) / length_delta
     [
-      max(
+      growth_smooth_max(
         length_sd_young + length_sd_slope * (length - reference_length_young),
         oftype(length, 1e-8),
       ) for length in mean_length
@@ -463,7 +474,7 @@ function build_growth_products(params, data_dict, model_config)
         length(lengths),
       )
       for age_index in 1:n_ages
-        sd = max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
+        sd = growth_smooth_max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
         population_probabilities = growth_size_bin_probabilities(
           mean_length[age_index],
           sd,
@@ -496,7 +507,7 @@ function build_growth_products(params, data_dict, model_config)
         size_edges = growth_population_size_edges(observation_edges)
         rebin_weights = growth_rebin_weights(size_edges, observation_edges)
         for age_index in 1:n_ages
-          sd = max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
+          sd = growth_smooth_max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))
           population_probabilities = growth_size_bin_probabilities(
             mean_length[age_index],
             sd,
@@ -532,7 +543,11 @@ function build_growth_products(params, data_dict, model_config)
       for year in 1:n_years, age_index in 1:n_ages
         mean_weights[year, age_index, fleet_index] = sum(
           fleet_conversion[age_index, length_index] *
-          length_weight_a * data_dict[:lengths][length_index]^length_weight_b for
+          length_weight_a *
+          growth_smooth_max(
+            oftype(length_weight_a, data_dict[:lengths][length_index]),
+            oftype(length_weight_a, 1e-8),
+          )^length_weight_b for
           length_index in eachindex(data_dict[:lengths])
         )
       end
@@ -801,7 +816,6 @@ end
 
 function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
   total = zero(promote_type(eltype(observed), eltype(expected)))
-  probability_floor = oftype(total, sqrt(eps(Float64)))
 
   for row in axes(observed, 1)
     obs_row = observed[row, :]
@@ -818,7 +832,10 @@ function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
     normalized_probabilities = probs ./ probability_sum
     total -=
       loggamma(sum(obs_row) + 1) - sum(loggamma.(obs_row .+ 1)) +
-      sum(obs_row .* log.(normalized_probabilities .+ probability_floor))
+      sum(
+        iszero(count) ? zero(total) : count * log(probability) for
+        (count, probability) in zip(obs_row, normalized_probabilities)
+      )
   end
 
   total

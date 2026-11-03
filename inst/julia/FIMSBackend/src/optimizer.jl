@@ -2,6 +2,7 @@ using ComponentArrays: ComponentArray, getaxes
 using ForwardDiff: gradient, hessian
 using LinearAlgebra: Symmetric, cholesky, diag, inv, isposdef, logdet
 using Optim: LBFGS, OnceDifferentiable, Options, converged, iterations, minimum, minimizer, optimize
+using Optim: LineSearches
 
 _primal_float(value::ForwardDiff.Dual) = _primal_float(ForwardDiff.value(value))
 _primal_float(value::Real) = Float64(value)
@@ -155,7 +156,7 @@ function _conditional_mode(x0, fixed_indices, fixed_values, random_indices, join
   random_result = optimize(
     OnceDifferentiable(random_objective, random_gradient!, random_start),
     random_start,
-    LBFGS(),
+    LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
     options,
   )
   random_mode = minimizer(random_result)
@@ -379,14 +380,14 @@ function fit_model(init_params, data_dict, config = Dict())
     result = optimize(
       OnceDifferentiable(marginal_objective, outer_gradient!, fixed_start),
       fixed_start,
-      LBFGS(),
+      LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
       optimizer_options,
     )
     for _ in 1:optimizer_restarts
       result = optimize(
         OnceDifferentiable(marginal_objective, outer_gradient!, minimizer(result)),
         minimizer(result),
-        LBFGS(),
+        LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
         optimizer_options,
       )
     end

@@ -201,6 +201,25 @@ end
     ),
   )
   @test observed_phi_0[] ≈ expected_phi_0
+
+  for fishing_rate in (0.0, 1e-12)
+    low_mortality_population = deepcopy(population)
+    low_mortality_population.mortality_M .= 0
+    low_mortality_population.numbers_at_age[1, :] .= 1000
+    step_population!(
+      low_mortality_population,
+      nothing,
+      (spawners, phi_0) -> zero(phi_0),
+      Dict(
+        :fishing_mortality => fill(log(fishing_rate), 2, 1),
+        :fleet_selectivity => ones(2, 3, 1),
+        :phi_0 => expected_phi_0,
+      ),
+    )
+    @test all(isfinite, low_mortality_population.catch_numbers_at_age)
+    @test low_mortality_population.catch_numbers_at_age[1, :] ≈
+      fill(1000 * -expm1(-fishing_rate), 3) rtol = 1e-13
+  end
 end
 
 @testset "multi-fleet catch, index, age, and length streams" begin
@@ -302,6 +321,13 @@ end
 
   result = evaluate_model(parameters, data, config)
   report = result["report"]
+  expected_selectivity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
+  expected_mortality = 0.2 .+ (0.1 + exp(-200.0)) .* expected_selectivity
+  expected_catch_numbers =
+    [1000.0, 800.0, 600.0] .* 0.1 .* expected_selectivity ./
+    expected_mortality .* (1.0 .- exp.(-expected_mortality))
+  @test report["catch_numbers_at_age_by_fleet"][1, :, 1] ≈
+    expected_catch_numbers rtol = 1e-13
   @test length(report["nll_components"]) == 5
   @test sum(report["nll_components"]) ≈ result["nll"]
   vonb_result = evaluate_model(
@@ -437,14 +463,16 @@ end
   @test age_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
   @test year_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
   @test year_specific_result["report"]["sum_selectivity"][2, :] ≈ [1.5, 0.75, 0.75]
+  native_abs(value) = sqrt(value^2 + 1e-5)
+  native_max(value, floor) = (value + floor + native_abs(value - floor)) / 2
   expected_lengths = [
     275.0 +
     (725.0 - 275.0) *
     (1.0 - exp(-0.18 * (age - 1.0))) /
-    (1.0 - exp(-0.18 * (3.0 - 1.0))) for age in data[:ages]
+    native_max(native_abs(1.0 - exp(-0.18 * (3.0 - 1.0))), 1e-8) for age in data[:ages]
   ]
   @test vonb_result["report"]["mean_length_at_age"] ≈
-    repeat(reshape(expected_lengths, 1, :), 2, 1)
+    repeat(reshape(expected_lengths, 1, :), 2, 1) rtol = 1e-13
   @test vonb_result["report"]["weights_at_age"] ≈
     repeat(reshape(2.5e-11 .* expected_lengths .^ 3.0, 1, :), 3, 1)
   @test all(
@@ -459,7 +487,7 @@ end
   expected_conversion = zeros(3, 2)
   for age_index in 1:3
     mean_length = vonb_result["report"]["mean_length_at_age"][1, age_index]
-    sd_length = vonb_result["report"]["sd_length_at_age"][1, age_index]
+    sd_length = native_max(vonb_result["report"]["sd_length_at_age"][1, age_index], 1e-8)
     cdf(edge) = 0.5 * (1 + erf((edge - mean_length) / (sd_length * sqrt(2))))
     size_probabilities = zeros(length(size_edges) - 1)
     size_probabilities[1] = cdf(size_edges[2])
@@ -491,7 +519,7 @@ end
   @test size(vonb_report["growth_derived_mean_WAA_by_fleet"]) == (2, 3, 2)
   expected_weight_at_length =
     exp(vonb_parameters.growth_log_length_weight_a) .*
-    data[:lengths] .^ exp(vonb_parameters.growth_log_length_weight_b)
+    native_max.(data[:lengths], 1e-8) .^ exp(vonb_parameters.growth_log_length_weight_b)
   expected_derived_mean_WAA =
     expected_conversion * expected_weight_at_length
   @test vonb_report["growth_derived_mean_WAA_by_fleet"][:, :, 1] ≈
@@ -544,10 +572,9 @@ end
     mean_old = exp(log_lengths[2])
     coefficient = exp(log_lengths[3])
     numerator = 1 - exp(-coefficient * (age - 1.0))
-    denominator = 1 - exp(-coefficient * (3.0 - 1.0))
+    denominator = native_max(native_abs(1 - exp(-coefficient * (3.0 - 1.0))), 1e-8)
     mean_young + (mean_old - mean_young) * numerator / denominator
   end
-  log_length_at_age = (log_lengths, age) -> log(mean_length_at_age(log_lengths, age))
   correlation(value) = 2 / (1 + exp(-value)) - 1
   covariance_young_old = correlation(0.2) * 12.0 * 20.0
   covariance_young_coefficient = correlation(-0.3) * 12.0 * 0.03
@@ -560,28 +587,29 @@ end
     covariance_young_old variance_old covariance_old_coefficient
     covariance_young_coefficient covariance_old_coefficient variance_coefficient
   ]
-  function finite_difference_gradient(age)
-    gradient = zeros(3)
-    for parameter_index in 1:3
-      offset = zeros(3)
-      offset[parameter_index] = 1e-5
-      gradient[parameter_index] =
-        (
-          log_length_at_age(reference_log_lengths .+ offset, age) -
-          log_length_at_age(reference_log_lengths .- offset, age)
-        ) / 2e-5
-    end
-    gradient
+  function native_log_length_gradient(age)
+    numerator = 1 - exp(-0.18 * (age - 1.0))
+    denominator = native_max(native_abs(1 - exp(-0.18 * 2.0)), 1e-8)
+    ratio = numerator / denominator
+    mean_length = native_max(mean_length_at_age(reference_log_lengths, age), 1e-8)
+    # Native delta-method gradients use the unsmoothed denominator derivative.
+    ratio_derivative =
+      ((age - 1.0) * exp(-0.18 * (age - 1.0)) * denominator -
+       numerator * 2.0 * exp(-0.18 * 2.0)) / denominator^2
+    [(1 - ratio) * 275.0, ratio * 725.0, 450.0 * ratio_derivative * 0.18] ./ mean_length
   end
   expected_delta_sd = [
-    mean_length_at_age(reference_log_lengths, age) *
-    sqrt(max(
-      sum(
-        finite_difference_gradient(age) .*
-        (growth_covariance * finite_difference_gradient(age))
-      ),
-      0.0,
-    )) for age in data[:ages]
+    native_max(
+      mean_length_at_age(reference_log_lengths, age) *
+      sqrt(native_max(
+        sum(
+          native_log_length_gradient(age) .*
+          (growth_covariance * native_log_length_gradient(age))
+        ),
+        0.0,
+      )),
+      1e-8,
+    ) for age in data[:ages]
   ]
   @test delta_sd[1, :] ≈ expected_delta_sd atol = 1e-5
   @test_throws ArgumentError evaluate_model(
@@ -980,7 +1008,9 @@ end
 @testset "multinomial likelihood includes the sampling coefficient" begin
   observed = [1.0 1.0; -999.0 -999.0]
   expected = [0.25 0.75; 0.5 0.5]
-  @test isapprox(FIMSBackend.multinomial_nll(observed, expected), -log(2 * 0.25 * 0.75); atol = 1e-7)
+  @test isapprox(FIMSBackend.multinomial_nll(observed, expected), -log(2 * 0.25 * 0.75); atol = 1e-13)
+  @test FIMSBackend.multinomial_nll([0.0 2.0], [0.0 1.0]) == 0.0
+  @test FIMSBackend.multinomial_nll([1.0 1.0], [0.0 1.0]) == Inf
 end
 
 @testset "normal data likelihood" begin

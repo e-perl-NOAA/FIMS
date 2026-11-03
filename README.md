@@ -79,9 +79,22 @@ a recruitment random effect under each growth model, checking convergence,
 joint and marginal objectives, parameter estimates, and standard errors. These
 limited cases do not establish parity across all supported model configurations.
 
+Julia growth calculations retain the native backend's smooth absolute-value and
+maximum approximations, including its delta-method gradient convention. Replacing
+these with hard floors changes predictions even away from the floor. Catch uses
+the unperturbed Baranov mortality denominator, with its continuous zero-mortality
+limit, rather than adding an epsilon that biases expected catches.
+Multinomial likelihoods likewise use the unperturbed probabilities: zero counts
+contribute zero, and positive counts in a zero-probability bin give infinite NLL.
+With a partially estimated recruitment process, constant deviations may omit both
+distribution fields, as for the native backend; the process density still
+includes those constant values.
+
 Julia uncertainty requires finite, positive-definite parameter Hessians; singular
 or indefinite Hessians are not replaced with pseudoinverses. Invalid curvature
 emits a warning and leaves affected covariance and standard errors unavailable.
+Inner and outer optimizer line searches use norm-scaled initial steps to avoid
+extreme trials when likelihood gradients are large; Hessian checks remain strict.
 The Julia `get_sdreport()` result includes `uncertainty_status`: `"available"`,
 `"invalid_hessian"`, or `"not_requested"`. Its `pdHess` is `FALSE` when uncertainty
 is invalid or was not requested; optimizer convergence alone does not establish
