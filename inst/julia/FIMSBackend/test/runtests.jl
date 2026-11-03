@@ -804,6 +804,43 @@ end
   @test fit_result["random_convergence"]
   @test fit_result["convergence_code"] == "converged"
   @test length(fit_result["fixed_gradient"]) == 1
+
+  @testset "Gaussian prior-only Laplace and uncertainty oracle" begin
+    prior_only_data = Dict(
+      key => value for (key, value) in data if !startswith(string(key), "observed_")
+    )
+    component_names = propertynames(parameters)
+    log_q_component = findfirst(==(:log_q), component_names)
+    log_q_start = 1 + sum(
+      length(getproperty(parameters, name)) for name in component_names[1:(log_q_component - 1)]
+    )
+    gaussian_fixed_mask = falses(length(parameters))
+    gaussian_random_mask = falses(length(parameters))
+    gaussian_fixed_mask[log_q_start] = true
+    gaussian_random_mask[log_q_start + 1] = true
+    prior_means = [-2.0, -1.0]
+    prior_sds = [0.3, 0.7]
+    gaussian_config = merge(config, Dict(
+      :recruitment_process_active => false,
+      :fixed_parameter_mask => gaussian_fixed_mask,
+      :random_parameter_mask => gaussian_random_mask,
+      :parameter_prior_components => ["log_q", "log_q"],
+      :parameter_prior_indices => [1, 2],
+      :parameter_prior_distributions => ["dnorm", "dnorm"],
+      :parameter_prior_means => prior_means,
+      :parameter_prior_sds => prior_sds,
+    ))
+    gaussian_fit = fit_model(parameters, prior_only_data, gaussian_config)
+    @test gaussian_fit["convergence"]
+    @test gaussian_fit["estimates"]["log_q"] ≈ prior_means atol = 1e-6
+    @test gaussian_fit["joint_nll"] ≈ log(2π) + sum(log, prior_sds) atol = 1e-8
+    @test gaussian_fit["nll"] ≈ 0.5 * log(2π) + log(prior_sds[1]) atol = 1e-8
+    @test gaussian_fit["fixed_hessian"][1, 1] ≈ inv(prior_sds[1]^2) rtol = 1e-5
+    @test gaussian_fit["standard_errors"]["log_q"] ≈ prior_sds rtol = 1e-5
+    @test gaussian_fit["covariance"][log_q_start, log_q_start + 1] ≈ 0.0 atol = 1e-8
+    @test gaussian_fit["pd_hessian"]
+  end
+
   dictionary_parameters = Dict{String,Any}()
   for name in reverse(propertynames(parameters))
     dictionary_parameters[string(name)] = getproperty(parameters, name)

@@ -120,4 +120,4 @@ jobs:
         run: |
           echo "## Native/Julia comparison: ${PARITY_JOB_STATUS}" >> "${GITHUB_STEP_SUMMARY}"
           echo "Joint objectives and population/fleet reports are compared at identical fixed parameters for both growth models." >> "${GITHUB_STEP_SUMMARY}"
-          echo "Optimized-fit and uncertainty parity are not covered by this job." >> "${GITHUB_STEP_SUMMARY}"
+          echo "Limited optimized-fit cases compare catchability estimates and standard errors with and without a recruitment random effect under each growth model." >> "${GITHUB_STEP_SUMMARY}"

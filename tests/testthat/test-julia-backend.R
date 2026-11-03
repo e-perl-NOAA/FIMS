@@ -171,6 +171,78 @@ test_that("Julia and native objectives and reports agree at identical fixed para
   }
 })
 
+test_that("optimized Julia fits and uncertainty agree with native fits", {
+  skip_if(
+    Sys.getenv("FIMS_RUN_BACKEND_PARITY") != "true",
+    "Set FIMS_RUN_BACKEND_PARITY=true to run both real backends."
+  )
+  expect_true(FIMS:::is_fims_cpp_backend_available())
+  withr::local_options(list(FIMS.disable_julia = FALSE))
+  withr::defer(FIMS::clear())
+  data <- FIMS::FIMSFrame(data_big)
+  for (growth_type in c("EWAA", "VonBertalanffySchnute")) {
+    parameters <- FIMS::setup_default_parameters(data = data)
+    if (growth_type != "EWAA") {
+      parameters <- parameters |>
+        dplyr::filter(.data$module_name != "Growth") |>
+        dplyr::bind_rows(FIMS::setup_default_Growth(
+          data = data, module_type = growth_type
+        ))
+    }
+    fixed_row <- which(
+      parameters[["label"]] == "log_q" &
+        parameters[["estimation_type"]] == "fixed_effects"
+    )[[1]]
+    random_row <- which(parameters[["label"]] == "log_devs")[[1]]
+    for (use_random_effect in c(FALSE, TRUE)) {
+      comparison_parameters <- parameters |>
+        dplyr::mutate(estimation_type = "constant")
+      comparison_parameters[["estimation_type"]][fixed_row] <- "fixed_effects"
+      if (use_random_effect) {
+        comparison_parameters[["estimation_type"]][random_row] <- "random_effects"
+      }
+      context <- paste(growth_type, "random effect", use_random_effect)
+      native_fit <- comparison_parameters |>
+        FIMS::initialize_fims(data = data, backend = "tmb") |>
+        FIMS::fit_fims(number_of_loops = 0, get_sd = TRUE)
+      julia_fit <- comparison_parameters |>
+        FIMS::initialize_fims(data = data, backend = "julia") |>
+        FIMS::fit_fims(number_of_loops = 0, get_sd = TRUE)
+      expect_equal(FIMS::get_opt(native_fit)[["convergence"]], 0L, info = context)
+      expect_equal(FIMS::get_opt(julia_fit)[["convergence"]], 0L, info = context)
+      expect_true(FIMS::get_sdreport(native_fit)[["pdHess"]], info = context)
+      expect_true(FIMS::get_sdreport(julia_fit)[["pdHess"]], info = context)
+      expect_equal(
+        FIMS::get_opt(julia_fit)[["objective"]],
+        FIMS::get_opt(native_fit)[["objective"]],
+        tolerance = 1e-6, info = context
+      )
+      expect_equal(
+        FIMS::get_report(julia_fit)[["jnll"]],
+        FIMS::get_report(native_fit)[["jnll"]],
+        tolerance = 1e-6, info = context
+      )
+      estimates <- lapply(list(native_fit, julia_fit), function(fit) {
+        FIMS::get_estimates(fit) |>
+          dplyr::filter(.data$estimation_type %in% c("fixed_effects", "random_effects")) |>
+          dplyr::arrange(.data$module_name, .data$fleet, .data$label) |>
+          dplyr::select(
+            dplyr::all_of(c("module_name", "fleet", "label", "estimated", "uncertainty"))
+          )
+      })
+      expect_equal(nrow(estimates[[1]]), 1L + as.integer(use_random_effect), info = context)
+      expect_equal(nrow(estimates[[2]]), 1L + as.integer(use_random_effect), info = context)
+      expect_true(all(is.finite(estimates[[1]][["uncertainty"]])), info = context)
+      expect_true(all(is.finite(estimates[[2]][["uncertainty"]])), info = context)
+      expect_equal(
+        estimates[[2]], estimates[[1]], tolerance = 1e-4, info = context
+      )
+      expect_lt(FIMS::get_max_gradient(native_fit), 1e-3)
+      expect_lt(FIMS::get_max_gradient(julia_fit), 1e-3)
+    }
+  }
+})
+
 test_that("diagnostic refit helpers forward the selected backend and priors", {
   parameters <- FIMS::setup_default_parameters(data = FIMS::FIMSFrame(data_big))
   captured <- NULL

@@ -74,7 +74,10 @@ joint objectives without inner optimization, and checks population and fleet
 reports for EWAA and VonBertalanffySchnute growth at two deterministic starting
 points. Its relative numerical tolerance is `1e-8`; missing report fields and
 non-finite values fail the comparison. JUnit results are retained as a workflow
-artifact. This check does not establish optimized-fit or uncertainty parity.
+artifact. A second comparison fits one catchability parameter with and without
+a recruitment random effect under each growth model, checking convergence,
+joint and marginal objectives, parameter estimates, and standard errors. These
+limited cases do not establish parity across all supported model configurations.
 
 Likelihood profiles retain the backend and priors of their base fit.
 Retrospective analyses and direct refit helpers accept `backend = "julia"` and
