@@ -3,14 +3,14 @@ name: Test Julia backend
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - ".github/workflows/test-julia-backend.yml"
-      - "inst/julia/FIMSBackend/**"
-      - "R/**"
-      - "tests/testthat/test-julia-backend.R"
-      - "src/**"
-      - "inst/include/**"
-      - "DESCRIPTION"
+    # paths:
+    #   - ".github/workflows/test-julia-backend.yml"
+    #   - "inst/julia/FIMSBackend/**"
+    #   - "R/**"
+    #   - "tests/testthat/test-julia-backend.R"
+    #   - "src/**"
+    #   - "inst/include/**"
+    #   - "DESCRIPTION"
   push:
     branches:
       - main
