@@ -89,12 +89,26 @@ jobs:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::devtools
+          # Includes the upstream Ubuntu 24.04 libunwind startup fix.
+          extra-packages: |
+            any::devtools
+            github::JuliaInterop/JuliaCall@f7878f0371c6114493c3d067b8fb24cf6160c1cb
           needs: check
+      - name: Verify the R-to-Julia bridge
+        shell: Rscript {0}
+        run: |
+          julia_executable <- Sys.which("julia")
+          stopifnot(nzchar(julia_executable))
+          Sys.setenv(JULIA_HOME = dirname(julia_executable))
+          JuliaCall::julia_setup(installJulia = FALSE)
+          stopifnot(JuliaCall::julia_eval("1 + 1") == 2)
+          message("R: ", R.version.string)
+          message("JuliaCall: ", utils::packageVersion("JuliaCall"))
+          message("Julia: ", JuliaCall::julia_eval("string(VERSION)"))
       - name: Compare real native and Julia backends through R
         shell: Rscript {0}
         run: |
-          Sys.setenv(JULIA_BINDIR = dirname(Sys.which("julia")))
+          Sys.setenv(JULIA_HOME = dirname(Sys.which("julia")))
           devtools::test(
             filter = "^julia-backend$",
             reporter = testthat::MultiReporter$new(list(

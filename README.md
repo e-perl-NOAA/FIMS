@@ -95,9 +95,23 @@ to avoid forking an initialized Julia runtime.
 To run the comparison locally with both backends available:
 
 ```r
+# Set this to the bin directory of the Julia installation being compared.
+Sys.setenv(JULIA_HOME = dirname(Sys.which("julia")))
+JuliaCall::julia_setup(installJulia = FALSE)
+stopifnot(JuliaCall::julia_eval("1 + 1") == 2)
 Sys.setenv(FIMS_RUN_BACKEND_PARITY = "true")
 devtools::test(filter = "^julia-backend$")
 ```
+
+JuliaCall selects an explicitly configured runtime using `JULIA_HOME`, not
+`JULIA_BINDIR`. Run the check in a fresh R session after changing Julia versions.
+The comparison workflow runs the bridge smoke test in a separate R process so
+startup failures can be distinguished from model or numerical comparison failures.
+On Ubuntu 24.04, JuliaCall 0.17.6 can segfault during startup because of a
+libunwind library conflict. The comparison workflow pins JuliaCall to upstream
+commit `f7878f0371c6114493c3d067b8fb24cf6160c1cb`, which includes the
+[JuliaInterop/JuliaCall#265](https://github.com/JuliaInterop/JuliaCall/pull/265)
+fix that loads Julia's bundled libunwind before initializing Julia.
 
 If you encounter a :bug:, please file an [Issue](https://github.com/NOAA-FIMS/FIMS/issues) with a minimal reproducible example on GitHub.
 

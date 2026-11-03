@@ -22,6 +22,7 @@ clear_cpp_backend_test_state <- function() {
 }
 
 test_that("reset_julia_backend_state restores the Julia initialization flag", {
+  reset_julia_backend_state()
   state_environment <- getFromNamespace(".fims_julia_backend_state", "FIMS")
   state_environment$initialized <- TRUE
   local({
@@ -200,14 +201,16 @@ test_that("optimized Julia fits and uncertainty agree with native fits", {
       comparison_parameters[["estimation_type"]][fixed_row] <- "fixed_effects"
       if (use_random_effect) {
         comparison_parameters[["estimation_type"]][random_row] <- "random_effects"
-      } else {
-        recruitment_process_rows <- which(
-          comparison_parameters[["module_name"]] == "Recruitment" &
-            comparison_parameters[["label"]] == "log_devs"
-        )
-        comparison_parameters[["distribution"]][recruitment_process_rows] <- NA_character_
-        comparison_parameters[["distribution_type"]][recruitment_process_rows] <- NA_character_
       }
+      inactive_process_rows <- which(
+        comparison_parameters[["module_name"]] == "Recruitment" &
+          comparison_parameters[["distribution_type"]] == "process" &
+          (!use_random_effect |
+            (comparison_parameters[["label"]] == "log_devs" &
+              comparison_parameters[["estimation_type"]] == "constant"))
+      )
+      comparison_parameters[["distribution"]][inactive_process_rows] <- NA_character_
+      comparison_parameters[["distribution_type"]][inactive_process_rows] <- NA_character_
       context <- paste(growth_type, "random effect", use_random_effect)
       native_fit <- comparison_parameters |>
         FIMS::initialize_fims(data = data, backend = "tmb") |>
