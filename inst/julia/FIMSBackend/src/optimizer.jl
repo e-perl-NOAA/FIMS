@@ -1,6 +1,6 @@
 using ComponentArrays: ComponentArray, getaxes
 using ForwardDiff: gradient, hessian
-using LinearAlgebra: Symmetric, cholesky, diag, inv, isposdef, logdet, pinv
+using LinearAlgebra: Symmetric, cholesky, diag, inv, isposdef, logdet
 using Optim: LBFGS, OnceDifferentiable, Options, converged, iterations, minimum, minimizer, optimize
 
 _primal_float(value::ForwardDiff.Dual) = _primal_float(ForwardDiff.value(value))
@@ -108,6 +108,15 @@ function _positive_definite_logdet(hessian_matrix)
     throw(ArgumentError("Random-effect Hessian is not positive definite: $(sprint(showerror, error))"))
   end
   logdet(factorization)
+end
+
+function _hessian_covariance(hessian_matrix)
+  isempty(hessian_matrix) && return zeros(Float64, 0, 0)
+  if !all(isfinite, hessian_matrix)
+    return fill(NaN, size(hessian_matrix))
+  end
+  factorization = cholesky(Symmetric(hessian_matrix); check = false)
+  isposdef(factorization) ? Matrix(inv(factorization)) : fill(NaN, size(hessian_matrix))
 end
 
 function _optimizer_options(config)
@@ -400,20 +409,20 @@ function fit_model(init_params, data_dict, config = Dict())
   else
     Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   end
-  fixed_covariance = try
-    inv(Symmetric(fixed_hessian))
-  catch
-    pinv(fixed_hessian)
-  end
-  conditional_random_covariance = if isempty(random_indices)
-    zeros(Float64, 0, 0)
+  fixed_covariance = if compute_standard_errors
+    _hessian_covariance(fixed_hessian)
   else
-    random_hessian = Symmetric(joint_hessian[random_indices, random_indices])
-    try
-      inv(random_hessian)
-    catch
-      pinv(Matrix(random_hessian))
-    end
+    fill(NaN, length(fixed_indices), length(fixed_indices))
+  end
+  conditional_random_covariance = if compute_standard_errors
+    _hessian_covariance(joint_hessian[random_indices, random_indices])
+  else
+    fill(NaN, length(random_indices), length(random_indices))
+  end
+  uncertainty_valid = compute_standard_errors &&
+    all(isfinite, fixed_covariance) && all(isfinite, conditional_random_covariance)
+  if compute_standard_errors && !uncertainty_valid
+    @warn "Parameter Hessian is non-finite or not positive definite; affected covariance and standard errors are unavailable."
   end
   random_fixed_sensitivity =
     isempty(random_indices) || isempty(fixed_indices) ?
@@ -494,7 +503,9 @@ function fit_model(init_params, data_dict, config = Dict())
     "report_values" => report_uncertainty.values,
     "report_value_names" => report_uncertainty.value_names,
     "report_covariance" => report_uncertainty.covariance,
-    "pd_hessian" => isempty(fixed_indices) || isposdef(Symmetric(fixed_hessian)),
+    "pd_hessian" => uncertainty_valid,
+    "uncertainty_status" => !compute_standard_errors ? "not_requested" :
+      (uncertainty_valid ? "available" : "invalid_hessian"),
     "hessian" => joint_hessian,
     "fixed_hessian" => fixed_hessian,
     "covariance" => covariance,

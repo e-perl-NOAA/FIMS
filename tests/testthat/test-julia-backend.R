@@ -465,16 +465,31 @@ test_that("Julia uncertainty uses serialized parameter order rather than diction
       random_parameter_mask = c(FALSE, FALSE, TRUE)
     )
   )
-  report <- FIMS:::build_julia_backend_sdreport(input, list(
+  fit_result <- list(
     estimates = rev(parameters),
     fixed_parameters = 2,
     covariance = diag(c(4, 0, 9)),
-    pd_hessian = TRUE
-  ))
+    pd_hessian = TRUE,
+    uncertainty_status = "available"
+  )
+  report <- FIMS:::build_julia_backend_sdreport(input, fit_result)
   expect_equal(unname(report[["par.fixed"]]), 2)
   expect_equal(unname(report[["par.random"]]), 3)
   expect_equal(unname(report[["cov.fixed"]]), matrix(4))
   expect_equal(unname(report[["cov.random"]]), matrix(9))
+  expect_true(report[["pdHess"]])
+  expect_identical(report[["uncertainty_status"]], "available")
+
+  for (status in c("invalid_hessian", "not_requested")) {
+    fit_result[["pd_hessian"]] <- FALSE
+    fit_result[["uncertainty_status"]] <- status
+    fit_result[["covariance"]] <- matrix(NaN, 3, 3)
+    report <- FIMS:::build_julia_backend_sdreport(input, fit_result)
+    expect_false(report[["pdHess"]])
+    expect_identical(report[["uncertainty_status"]], status)
+    expect_true(all(is.nan(report[["cov.fixed"]])))
+    expect_true(all(is.nan(report[["cov.random"]])))
+  }
 })
 
 test_that("Julia backend package scaffolding exists", {

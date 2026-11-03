@@ -1179,6 +1179,7 @@ build_julia_backend_sdreport <- function(input, fit_result) {
       cov.random = random_covariance,
       diag.cov.random = diag(random_covariance),
       pdHess = isTRUE(fit_result[["pd_hessian"]]),
+      uncertainty_status = fit_result[["uncertainty_status"]],
       unbiased = list(value = NULL, sd = NULL)
     ),
     class = "sdreport"

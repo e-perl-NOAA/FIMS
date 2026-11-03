@@ -48,6 +48,14 @@ end
   )
 end
 
+@testset "Hessian covariance requires positive definite curvature" begin
+  @test FIMSBackend._hessian_covariance([4.0 0.0; 0.0 2.0]) ≈ [0.25 0.0; 0.0 0.5]
+  @test all(isnan, FIMSBackend._hessian_covariance([1.0 1.0; 1.0 1.0]))
+  @test all(isnan, FIMSBackend._hessian_covariance([-1.0 0.0; 0.0 1.0]))
+  @test all(isnan, FIMSBackend._hessian_covariance(reshape([NaN], 1, 1)))
+  @test size(FIMSBackend._hessian_covariance(zeros(0, 0))) == (0, 0)
+end
+
 @testset "population proportion-female parameter layouts" begin
   parameter_values = (
     log_init_naa = log.([1000.0, 800.0, 600.0]),
@@ -879,6 +887,31 @@ end
     @test random_only_fit["convergence"]
     @test random_only_fit["nll"] ≈ 0.0 atol = 1e-8
     @test random_only_fit["standard_errors"]["log_q"] ≈ prior_sds
+    @test gaussian_fit["uncertainty_status"] == "available"
+    no_uncertainty_fit = fit_model(
+      parameters, prior_only_data,
+      merge(gaussian_config, Dict(:compute_standard_errors => false)),
+    )
+    @test no_uncertainty_fit["uncertainty_status"] == "not_requested"
+    @test !no_uncertainty_fit["pd_hessian"]
+    @test all(isnan, no_uncertainty_fit["standard_errors"]["log_q"])
+    @test all(isnan, no_uncertainty_fit["covariance"][
+      [log_q_start, log_q_start + 1], [log_q_start, log_q_start + 1]
+    ])
+    singular_config = merge(gaussian_config, Dict(
+      :parameter_prior_components => ["log_q"],
+      :parameter_prior_indices => [2],
+      :parameter_prior_distributions => ["dnorm"],
+      :parameter_prior_means => [prior_means[2]],
+      :parameter_prior_sds => [prior_sds[2]],
+    ))
+    singular_fit = @test_logs (
+      :warn, r"Parameter Hessian is non-finite or not positive definite"
+    ) fit_model(parameters, prior_only_data, singular_config)
+    @test singular_fit["uncertainty_status"] == "invalid_hessian"
+    @test !singular_fit["pd_hessian"]
+    @test isnan(singular_fit["standard_errors"]["log_q"][1])
+    @test isnan(singular_fit["covariance"][log_q_start, log_q_start])
   end
 
   dictionary_parameters = Dict{String,Any}()

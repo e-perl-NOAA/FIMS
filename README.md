@@ -79,6 +79,14 @@ a recruitment random effect under each growth model, checking convergence,
 joint and marginal objectives, parameter estimates, and standard errors. These
 limited cases do not establish parity across all supported model configurations.
 
+Julia uncertainty requires finite, positive-definite parameter Hessians; singular
+or indefinite Hessians are not replaced with pseudoinverses. Invalid curvature
+emits a warning and leaves affected covariance and standard errors unavailable.
+The Julia `get_sdreport()` result includes `uncertainty_status`: `"available"`,
+`"invalid_hessian"`, or `"not_requested"`. Its `pdHess` is `FALSE` when uncertainty
+is invalid or was not requested; optimizer convergence alone does not establish
+valid uncertainty.
+
 Likelihood profiles retain the backend and priors of their base fit.
 Retrospective analyses and direct refit helpers accept `backend = "julia"` and
 `priors` explicitly. Parallel Julia diagnostics use separate R worker sessions
