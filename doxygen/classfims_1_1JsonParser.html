@@ -84,10 +84,11 @@ MathJax.Hub.Config({
               <li><h6 class="dropdown-header" data-toc-skip>intro to fims</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo.html">introducing the fisheries integrated modeling system (fims)</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-input-data.html">introducing FIMS input data</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-growth-vonb-schnute.html">FIMS Growth with VonBertalanffySchnute</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-logging.html">introducing the fims logging system</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-user-setup-guide.html">fims user setup guide</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo-projections.html">simple projections using fims</a></li>
-              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">Running diagnostics on a FIMS model</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">running diagnostics on a FIMS model</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><h6 class="dropdown-header" data-toc-skip>developer</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/adding-new-module.html">adding a new c++ module</a></li>
@@ -224,24 +225,53 @@ $(document).ready(function(){initNavTree('classfims_1_1JsonParser.html',''); ini
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a7b1ee7df3bdbac4c23a282e308ab4f9f" id="r_a7b1ee7df3bdbac4c23a282e308ab4f9f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classfims_1_1JsonValue.html">JsonValue</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#a7b1ee7df3bdbac4c23a282e308ab4f9f">Parse</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::string &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">json</a>)</td></tr>
+<tr class="memitem:a7b1ee7df3bdbac4c23a282e308ab4f9f" id="r_a7b1ee7df3bdbac4c23a282e308ab4f9f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classfims_1_1JsonValue.html">JsonValue</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#a7b1ee7df3bdbac4c23a282e308ab4f9f">Parse</a> (const std::string &amp;json)</td></tr>
 <tr class="separator:a7b1ee7df3bdbac4c23a282e308ab4f9f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a55f6f9bca8044fd53600d0aeb7f9c027" id="r_a55f6f9bca8044fd53600d0aeb7f9c027"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">void</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#a55f6f9bca8044fd53600d0aeb7f9c027">WriteToFile</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::string &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">filename</a>, <a class="el" href="classfims_1_1JsonValue.html">JsonValue</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">jsonValue</a>)</td></tr>
+<tr class="memitem:a55f6f9bca8044fd53600d0aeb7f9c027" id="r_a55f6f9bca8044fd53600d0aeb7f9c027"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#a55f6f9bca8044fd53600d0aeb7f9c027">WriteToFile</a> (const std::string &amp;filename, <a class="el" href="classfims_1_1JsonValue.html">JsonValue</a> jsonValue)</td></tr>
 <tr class="separator:a55f6f9bca8044fd53600d0aeb7f9c027"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a443c839ec331593e450b57285e7ab59a" id="r_a443c839ec331593e450b57285e7ab59a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">void</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#a443c839ec331593e450b57285e7ab59a">Show</a> (<a class="el" href="classfims_1_1JsonValue.html">JsonValue</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">jsonValue</a>)</td></tr>
+<tr class="memitem:a443c839ec331593e450b57285e7ab59a" id="r_a443c839ec331593e450b57285e7ab59a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#a443c839ec331593e450b57285e7ab59a">Show</a> (<a class="el" href="classfims_1_1JsonValue.html">JsonValue</a> jsonValue)</td></tr>
 <tr class="separator:a443c839ec331593e450b57285e7ab59a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
-<tr class="memitem:aa376edce137153ad7db370db5f0750d4" id="r_aa376edce137153ad7db370db5f0750d4"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">static</a> std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#aa376edce137153ad7db370db5f0750d4">removeWhitespace</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::string &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">input</a>)</td></tr>
+<tr class="memitem:aa376edce137153ad7db370db5f0750d4" id="r_aa376edce137153ad7db370db5f0750d4"><td class="memItemLeft" align="right" valign="top">static std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#aa376edce137153ad7db370db5f0750d4">removeWhitespace</a> (const std::string &amp;input)</td></tr>
 <tr class="separator:aa376edce137153ad7db370db5f0750d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5dc54b2cbbf6e2089d91fc696d8e1ab2" id="r_a5dc54b2cbbf6e2089d91fc696d8e1ab2"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">static</a> std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#a5dc54b2cbbf6e2089d91fc696d8e1ab2">PrettyFormatJSON</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::string &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">json</a>)</td></tr>
+<tr class="memitem:ababcc9acff3e23ee507b875cd9793343" id="r_ababcc9acff3e23ee507b875cd9793343"><td class="memItemLeft" align="right" valign="top">static std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#ababcc9acff3e23ee507b875cd9793343">EscapeString</a> (const std::string &amp;input)</td></tr>
+<tr class="separator:ababcc9acff3e23ee507b875cd9793343"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5dc54b2cbbf6e2089d91fc696d8e1ab2" id="r_a5dc54b2cbbf6e2089d91fc696d8e1ab2"><td class="memItemLeft" align="right" valign="top">static std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classfims_1_1JsonParser.html#a5dc54b2cbbf6e2089d91fc696d8e1ab2">PrettyFormatJSON</a> (const std::string &amp;json)</td></tr>
 <tr class="memdesc:a5dc54b2cbbf6e2089d91fc696d8e1ab2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Formats a JSON string.  <br /></td></tr>
 <tr class="separator:a5dc54b2cbbf6e2089d91fc696d8e1ab2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Parses JSON strings and generates JSON values. </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
+<a id="ababcc9acff3e23ee507b875cd9793343" name="ababcc9acff3e23ee507b875cd9793343"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ababcc9acff3e23ee507b875cd9793343">&#9670;&#160;</a></span>EscapeString()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static std::string fims::JsonParser::EscapeString </td>
+          <td>(</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>input</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Escape a string so it can be written as a JSON string value. </p>
+
+</div>
+</div>
 <a id="a7b1ee7df3bdbac4c23a282e308ab4f9f" name="a7b1ee7df3bdbac4c23a282e308ab4f9f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a7b1ee7df3bdbac4c23a282e308ab4f9f">&#9670;&#160;</a></span>Parse()</h2>
 
@@ -251,7 +281,7 @@ Static Public Member Functions</h2></td></tr>
         <tr>
           <td class="memname"><a class="el" href="classfims_1_1JsonValue.html">JsonValue</a> fims::JsonParser::Parse </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::string &amp;&#160;</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
           <td class="paramname"><em>json</em></td><td>)</td>
           <td></td>
         </tr>
@@ -278,9 +308,9 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">static</a> std::string fims::JsonParser::PrettyFormatJSON </td>
+          <td class="memname">static std::string fims::JsonParser::PrettyFormatJSON </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::string &amp;&#160;</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
           <td class="paramname"><em>json</em></td><td>)</td>
           <td></td>
         </tr>
@@ -313,9 +343,9 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">static</a> std::string fims::JsonParser::removeWhitespace </td>
+          <td class="memname">static std::string fims::JsonParser::removeWhitespace </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::string &amp;&#160;</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
           <td class="paramname"><em>input</em></td><td>)</td>
           <td></td>
         </tr>
@@ -326,7 +356,7 @@ Static Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
-<p>Remove whitespace in JSON. </p>
+<p>Remove whitespace in JSON, except inside strings. </p>
 
 </div>
 </div>
@@ -337,7 +367,7 @@ Static Public Member Functions</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">void</a> fims::JsonParser::Show </td>
+          <td class="memname">void fims::JsonParser::Show </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="classfims_1_1JsonValue.html">JsonValue</a>&#160;</td>
           <td class="paramname"><em>jsonValue</em></td><td>)</td>
@@ -362,9 +392,9 @@ Static Public Member Functions</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">void</a> fims::JsonParser::WriteToFile </td>
+          <td class="memname">void fims::JsonParser::WriteToFile </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::string &amp;&#160;</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
           <td class="paramname"><em>filename</em>, </td>
         </tr>
         <tr>

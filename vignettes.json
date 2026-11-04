@@ -34,6 +34,13 @@
     "page": "https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html",
     "source": "vignettes/fims-diagnostics.Rmd"
   },
+  "vignettes/fims-growth-vonb-schnute.Rmd": {
+    "title": "FIMS Growth With VonBertalanffySchnute",
+    "summary": "",
+    "level": "new-user",
+    "page": "https://noaa-fims.github.io/FIMS/articles/fims-growth-vonb-schnute.html",
+    "source": "vignettes/fims-growth-vonb-schnute.Rmd"
+  },
   "vignettes/fims-input-data.Rmd": {
     "title": "Introducing FIMS input data",
     "summary": "More details about the data structure for a FIMS model and how to prepare your data for using the `FIMSFrame()` function",

@@ -12,7 +12,7 @@ to access objects stored in the available slots."><meta property="og:image" cont
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -30,6 +30,7 @@ to access objects stored in the available slots."><meta property="og:image" cont
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -113,6 +114,11 @@ to access objects stored in the available slots.</p>
 <span><span class="co"># S4 method for class 'FIMSFit'</span></span>
 <span><span class="fu">get_sdreport</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
 <span></span>
+<span><span class="fu">get_convergence</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># S4 method for class 'FIMSFit'</span></span>
+<span><span class="fu">get_convergence</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span></span>
 <span><span class="fu">get_estimates</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S4 method for class 'FIMSFit'</span></span>
@@ -163,8 +169,15 @@ stored during fitting. Unlike calling <code>get_obj(x)[["gr"]](get_opt(x)[["par"
 this function is safe to call after <code><a href="Cpp_functions.html">clear()</a></code> because it reads
 from a stored R vector rather than the compiled C++ objective function.</p>
 <p><code>get_sdreport()</code> returns the list from <code><a href="https://rdrr.io/pkg/TMB/man/sdreport.html" class="external-link">TMB::sdreport()</a></code>.</p>
+<p><code>get_convergence()</code> returns a tibble with one row per convergence check
+run by <code><a href="fit_fims.html">fit_fims()</a></code>: <code>check</code>, <code>severity</code> (<code>"OK"</code>, <code>"NOTE"</code> for a check that
+did not run, <code>"WARN"</code>, or <code>"FAIL"</code>), <code>value</code>, <code>threshold</code>, <code>parameter</code>,
+and <code>message</code>. It has no rows when the model was not optimized.</p>
 <p><code>get_estimates()</code> returns a tibble of parameter values and their
-uncertainties from a fitted model.</p>
+uncertainties from a fitted model. The <code>year_i</code> column is a position that
+starts at 1, and the <code>age</code> and <code>length</code> columns are the ages and length bins
+from the data. <code>age</code> is <code>NA</code> if populations have different ages, and both
+are <code>NA</code> for fits saved before they were added to the output.</p>
 <p><code>get_number_of_parameters()</code> returns a vector of integers specifying the
 number of fixed-effect parameters and the number of random-effect parameters
 in the model.</p>
@@ -187,7 +200,7 @@ the model.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

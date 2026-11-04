@@ -27,11 +27,7 @@ request](https://github.com/NOAA-FIMS/FIMS/issues/new?template=feature_request.y
 Before submitting either of these tickets, please search the [existing
 issues](https://github.com/NOAA-FIMS/FIMS/issues?q=is%3Aissue) to see if
 something identical or similar has already been submitted. Once created,
-Issues are automatically tagged with the `status: triage_needed` tag and
-placed on the [Issue Triage
-Board](https://github.com/orgs/NOAA-FIMS/projects/21) where they will be
-labeled, given an assignee, and given a milestone by those in charge of
-the triage process.
+Issues are automatically tagged with the `status: triage_needed` tag.
 
 ## Contributing code
 
@@ -63,7 +59,7 @@ guide](https://github.com/NOAA-FIMS/noaa-fims.github.io/blob/main/CONTRIBUTING.m
 If you are adding a new C++ module to FIMS (e.g., a new selectivity
 function, recruitment model, or other population dynamics component),
 start with the guide titled [Adding a New C++
-Module](https://NOAA-FIMS.github.io/FIMS/vignettes/adding-new-module.Rmd).
+Module](https://noaa-fims.github.io/FIMS/articles/adding-new-module.html).
 
 That guide explains the current architecture in detail. The quick
 checklist below is intended to help you keep track of the files and
@@ -115,9 +111,6 @@ Register the class in `src/fims_modules.hpp`.
 Export the class in `R/FIMS-package.R` and run
 [`devtools::document()`](https://devtools.r-lib.org/reference/document.html).
 
-Update `R/create_default_configurations.R` if the new module type should
-appear in the default configuration workflow.
-
 Update `R/setup_default_parameters.R` so default values and estimation
 types are generated correctly.
 
@@ -142,7 +135,7 @@ Complete the tasks found in the [Standard contributor
 checks](#standard-contributor-checks) section
 
 Update the [Adding a New C++ Module
-vignette](https://NOAA-FIMS.github.io/FIMS/vignettes/adding-new-module.Rmd)
+vignette](https://noaa-fims.github.io/FIMS/articles/adding-new-module.html)
 itself if your changes alter the recommended workflow.
 
 Provide feedback to the developers on how helpful the vignette was to
@@ -189,8 +182,8 @@ checks to follow so that the code is ready for a pull request:
 - Spell check the package using [cspell](https://cspell.org/). Install
   with `npm install -g cspell` and run
   `cspell "**/*.{cpp,hpp,h,R,Rmd,md}"` from the package root. Add any
-  project-specific terms to `inst/WORDLIST` (used as the cspell
-  dictionary).
+  terms needed to
+  [`NOAA-FIMS/.github/cspell.json`](https://github.com/NOAA-FIMS/.github/blob/main/cspell.json).
 - Build the roxygen documentation using
   [`devtools::document()`](https://devtools.r-lib.org/reference/document.html).
   See the [r-lib](https://roxygen2.r-lib.org/) for all available tags

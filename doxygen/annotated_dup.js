@@ -19,14 +19,15 @@ var annotated_dup =
     [ "fims_info", null, [
       [ "Information", "classfims__info_1_1Information.html", "classfims__info_1_1Information" ]
     ] ],
-    [ "fims_model", null, [
-      [ "Model", "classfims__model_1_1Model.html", "classfims__model_1_1Model" ]
-    ] ],
     [ "fims_model_object", null, [
       [ "FIMSMemoryTracker", "structfims__model__object_1_1FIMSMemoryTracker.html", "structfims__model__object_1_1FIMSMemoryTracker" ],
       [ "FIMSObject", "structfims__model__object_1_1FIMSObject.html", "structfims__model__object_1_1FIMSObject" ]
     ] ],
     [ "fims_popdy", "namespacefims__popdy.html", [
+      [ "AgeSpecificSelectivity", "structfims__popdy_1_1AgeSpecificSelectivity.html", "structfims__popdy_1_1AgeSpecificSelectivity" ],
+      [ "AgeToLengthConversionBase", "structfims__popdy_1_1AgeToLengthConversionBase.html", "structfims__popdy_1_1AgeToLengthConversionBase" ],
+      [ "AgeToLengthConversionDerived", "structfims__popdy_1_1AgeToLengthConversionDerived.html", "structfims__popdy_1_1AgeToLengthConversionDerived" ],
+      [ "AgeToLengthConversionFixed", "structfims__popdy_1_1AgeToLengthConversionFixed.html", "structfims__popdy_1_1AgeToLengthConversionFixed" ],
       [ "CatchAtAge", "classfims__popdy_1_1CatchAtAge.html", "classfims__popdy_1_1CatchAtAge" ],
       [ "DimensionInfo", "structfims__popdy_1_1DimensionInfo.html", "structfims__popdy_1_1DimensionInfo" ],
       [ "DoubleLogisticSelectivity", "structfims__popdy_1_1DoubleLogisticSelectivity.html", "structfims__popdy_1_1DoubleLogisticSelectivity" ],
@@ -34,6 +35,11 @@ var annotated_dup =
       [ "FisheryModelBase", "classfims__popdy_1_1FisheryModelBase.html", "classfims__popdy_1_1FisheryModelBase" ],
       [ "Fleet", "structfims__popdy_1_1Fleet.html", "structfims__popdy_1_1Fleet" ],
       [ "GrowthBase", "structfims__popdy_1_1GrowthBase.html", "structfims__popdy_1_1GrowthBase" ],
+      [ "GrowthDerivedObservationBase", "classfims__popdy_1_1GrowthDerivedObservationBase.html", "classfims__popdy_1_1GrowthDerivedObservationBase" ],
+      [ "GrowthDerivedSizeProvider", "classfims__popdy_1_1GrowthDerivedSizeProvider.html", "classfims__popdy_1_1GrowthDerivedSizeProvider" ],
+      [ "GrowthModel", "classfims__popdy_1_1GrowthModel.html", "classfims__popdy_1_1GrowthModel" ],
+      [ "GrowthModelBase", "classfims__popdy_1_1GrowthModelBase.html", "classfims__popdy_1_1GrowthModelBase" ],
+      [ "GrowthProducts", "structfims__popdy_1_1GrowthProducts.html", "structfims__popdy_1_1GrowthProducts" ],
       [ "LogDevs", "structfims__popdy_1_1LogDevs.html", "structfims__popdy_1_1LogDevs" ],
       [ "LogisticMaturity", "structfims__popdy_1_1LogisticMaturity.html", "structfims__popdy_1_1LogisticMaturity" ],
       [ "LogisticSelectivity", "structfims__popdy_1_1LogisticSelectivity.html", "structfims__popdy_1_1LogisticSelectivity" ],
@@ -42,10 +48,18 @@ var annotated_dup =
       [ "Population", "structfims__popdy_1_1Population.html", "structfims__popdy_1_1Population" ],
       [ "RecruitmentBase", "structfims__popdy_1_1RecruitmentBase.html", "structfims__popdy_1_1RecruitmentBase" ],
       [ "SelectivityBase", "structfims__popdy_1_1SelectivityBase.html", "structfims__popdy_1_1SelectivityBase" ],
+      [ "SizeBinMapping", "structfims__popdy_1_1SizeBinMapping.html", null ],
+      [ "SizeDistributionProviderBase", "classfims__popdy_1_1SizeDistributionProviderBase.html", "classfims__popdy_1_1SizeDistributionProviderBase" ],
+      [ "SizeGrid", "structfims__popdy_1_1SizeGrid.html", "structfims__popdy_1_1SizeGrid" ],
+      [ "SizeGridBuilder", "structfims__popdy_1_1SizeGridBuilder.html", null ],
+      [ "SizeProducts", "structfims__popdy_1_1SizeProducts.html", "structfims__popdy_1_1SizeProducts" ],
       [ "SRBevertonHolt", "structfims__popdy_1_1SRBevertonHolt.html", "structfims__popdy_1_1SRBevertonHolt" ],
-      [ "Subpopulation", "classfims__popdy_1_1Subpopulation.html", null ]
+      [ "Subpopulation", "classfims__popdy_1_1Subpopulation.html", null ],
+      [ "VonBertalanffySchnuteGrowth", "structfims__popdy_1_1VonBertalanffySchnuteGrowth.html", "structfims__popdy_1_1VonBertalanffySchnuteGrowth" ],
+      [ "VonBertalanffySchnuteGrowthModelAdapter", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter" ]
     ] ],
     [ "AgeCompDataInterface", "classAgeCompDataInterface.html", "classAgeCompDataInterface" ],
+    [ "AgeSpecificSelectivityInterface", "classAgeSpecificSelectivityInterface.html", "classAgeSpecificSelectivityInterface" ],
     [ "BevertonHoltRecruitmentInterface", "classBevertonHoltRecruitmentInterface.html", "classBevertonHoltRecruitmentInterface" ],
     [ "CatchAtAgeInterface", "classCatchAtAgeInterface.html", "classCatchAtAgeInterface" ],
     [ "CatchDataInterface", "classCatchDataInterface.html", "classCatchDataInterface" ],
@@ -60,6 +74,7 @@ var annotated_dup =
     [ "FisheryModelInterfaceBase", "classFisheryModelInterfaceBase.html", "classFisheryModelInterfaceBase" ],
     [ "FleetInterface", "classFleetInterface.html", "classFleetInterface" ],
     [ "FleetInterfaceBase", "classFleetInterfaceBase.html", "classFleetInterfaceBase" ],
+    [ "GrowthDerivedObservationInterfaceBase", "classGrowthDerivedObservationInterfaceBase.html", "classGrowthDerivedObservationInterfaceBase" ],
     [ "GrowthInterfaceBase", "classGrowthInterfaceBase.html", "classGrowthInterfaceBase" ],
     [ "IndexDataInterface", "classIndexDataInterface.html", "classIndexDataInterface" ],
     [ "LengthCompDataInterface", "classLengthCompDataInterface.html", "classLengthCompDataInterface" ],
@@ -78,5 +93,6 @@ var annotated_dup =
     [ "SharedReal", "classSharedReal.html", "classSharedReal" ],
     [ "SharedString", "classSharedString.html", "classSharedString" ],
     [ "Variable", "classVariable.html", "classVariable" ],
-    [ "VariableVector", "classVariableVector.html", "classVariableVector" ]
+    [ "VariableVector", "classVariableVector.html", "classVariableVector" ],
+    [ "VonBertalanffySchnuteGrowthInterface", "classVonBertalanffySchnuteGrowthInterface.html", "classVonBertalanffySchnuteGrowthInterface" ]
 ];

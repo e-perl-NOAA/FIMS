@@ -4,15 +4,15 @@
 
 library(FIMS)
 packageVersion("FIMS")
-#> [1] '0.10.0.9000'
+#> [1] '0.11.0.9000'
 clear()
 ```
 
 ## Set up FIMS model
 
-Following the [minimal FIMS demo
-vignette](https://noaa-fims.github.io/FIMS/articles/fims-demo-minimal.html),
-we will set up a FIMS model and run it. This model will contain the all
+Following the [FIMS demo
+vignette](https://noaa-fims.github.io/FIMS/articles/fims-demo.html), we
+will set up a FIMS model and run it. This model will contain the all
 years of data and will be our reference model (see section below for
 more information about reference models). We need to run it initially to
 get the MLE parameter estimates. For this example we are using the
@@ -28,6 +28,7 @@ data_4_model <- FIMSFrame(data_big)
 
 # Create parameters
 parameters <- setup_default_parameters(data = data_4_model)
+#> Empirical weight-at-age rows found. Growth defaults to "EWAA".
 
 # Run the  model with optimization
 base_model <- parameters |>
@@ -35,17 +36,38 @@ base_model <- parameters |>
   fit_fims(optimize = TRUE)
 #> ✔ Starting optimization ...
 #> ℹ Restarting optimizer 3 times to improve gradient.
-#> ℹ Maximum gradient went from 0.00388 to 0.00028 after 3 steps.
+#> ℹ Maximum gradient went from 0.00683 to 0.00041 after 3 steps.
 #> ✔ Finished optimization
 #> ✔ Finished sdreport
-#> ℹ FIMS model version: 0.10.0.9000
-#> ℹ Total run time was 1.42775 minutes
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> ✔ Convergence: "OK"
+#> ℹ FIMS model version: 0.11.0.9000
+#> ℹ Total run time was 1.07123 minutes
 #> ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-#> ℹ Maximum gradient= 0.00028
+#> ℹ Maximum gradient= 0.00041
 #> ℹ Negative log likelihood (NLL):
 #> • Marginal NLL= 3231.28735
 #> • Total NLL= 3164.86339
-#> ℹ Terminal SB= 1728.68274
+#> ℹ Terminal SB= 1728.6764
 
 # Clear memory post-run
 clear()
@@ -183,47 +205,86 @@ retro_fit <- run_fims_retrospective(
 #> ℹ running model with 0 years of data removed
 #> ✔ Starting optimization ...
 #> ℹ Restarting optimizer 3 times to improve gradient.
-#> ℹ Maximum gradient went from 0.00388 to 0.00028 after 3 steps.
+#> ℹ Maximum gradient went from 0.00683 to 0.00041 after 3 steps.
 #> ✔ Finished optimization
 #> ✔ Finished sdreport
-#> ℹ FIMS model version: 0.10.0.9000
-#> ℹ Total run time was 1.45955 minutes
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> ✔ Convergence: "OK"
+#> ℹ FIMS model version: 0.11.0.9000
+#> ℹ Total run time was 1.12688 minutes
 #> ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-#> ℹ Maximum gradient= 0.00028
+#> ℹ Maximum gradient= 0.00041
 #> ℹ Negative log likelihood (NLL):
 #> • Marginal NLL= 3231.28735
 #> • Total NLL= 3164.86339
-#> ℹ Terminal SB= 1728.68274
+#> ℹ Terminal SB= 1728.6764
 #> ℹ running model with 1 years of data removed
 #> 
 #> ✔ Starting optimization ...
 #> ℹ Restarting optimizer 3 times to improve gradient.
-#> ℹ Maximum gradient went from 0.00505 to 0.00155 after 3 steps.
+#> ℹ Maximum gradient went from 0.00786 to 0.00031 after 3 steps.
 #> ✔ Finished optimization
 #> ✔ Finished sdreport
-#> ℹ FIMS model version: 0.10.0.9000
-#> ℹ Total run time was 1.36241 minutes
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> ✔ Convergence: "OK"
+#> ℹ FIMS model version: 0.11.0.9000
+#> ℹ Total run time was 1.14574 minutes
 #> ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-#> ℹ Maximum gradient= 0.00155
+#> ℹ Maximum gradient= 0.00031
 #> ℹ Negative log likelihood (NLL):
 #> • Marginal NLL= 3132.00827
 #> • Total NLL= 3066.98892
-#> ℹ Terminal SB= 1654.15106
+#> ℹ Terminal SB= 1654.16298
 #> ℹ running model with 2 years of data removed
 #> 
 #> ✔ Starting optimization ...
 #> ℹ Restarting optimizer 3 times to improve gradient.
-#> ℹ Maximum gradient went from 0.00432 to 0.00036 after 3 steps.
+#> ℹ Maximum gradient went from 0.00366 to 0.00039 after 3 steps.
 #> ✔ Finished optimization
 #> ✔ Finished sdreport
-#> ℹ FIMS model version: 0.10.0.9000
-#> ℹ Total run time was 1.34349 minutes
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+#> 
+#> Also defined by 'tibble'
+#> 
+#> ✔ Convergence: "OK"
+#> ℹ FIMS model version: 0.11.0.9000
+#> ℹ Total run time was 1.068 minutes
 #> ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-#> ℹ Maximum gradient= 0.00036
+#> ℹ Maximum gradient= 0.00039
 #> ℹ Negative log likelihood (NLL):
 #> • Marginal NLL= 3036.85438
-#> • Total NLL= 2973.27389
-#> ℹ Terminal SB= 1500.19621
+#> • Total NLL= 2973.27387
+#> ℹ Terminal SB= 1500.15838
 ```
 
 ### Mohn’s Rho
@@ -247,7 +308,7 @@ axes labels and the legend title.
 
 ``` r
 
-fig_retrospective_ssb <- stockplotr::plot_spawning_biomass(
+fig_retrospective_sb <- stockplotr::plot_spawning_biomass(
   retro_fit$estimates |>
     dplyr::rename(
       year = year_i,
@@ -258,7 +319,7 @@ fig_retrospective_ssb <- stockplotr::plot_spawning_biomass(
     ),
   group = "retrospective_peel"
 )
-print(fig_retrospective_ssb)
+print(fig_retrospective_sb)
 ```
 
 ![Plot of spawning biomass showing a small negative bias with removed

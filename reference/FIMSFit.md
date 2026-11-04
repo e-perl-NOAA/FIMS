@@ -15,7 +15,8 @@ FIMSFit(
   opt = list(),
   sdreport = list(),
   run_time = c(time_total = as.difftime(0, units = "secs")),
-  version = utils::packageVersion("FIMS")
+  version = utils::packageVersion("FIMS"),
+  convergence = convergence_tibble(character(0), character(0))
 )
 ```
 
@@ -25,6 +26,16 @@ FIMSFit(
 
   Input list as returned by
   [`initialize_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/initialize_fims.md).
+  An optional `map` entry is a named list of factors for `p` (fixed
+  effects) and/or `re` (random effects), in the order of the
+  corresponding `parameters` vector. Each factor must have one entry per
+  parameter. `NA` holds a parameter at its starting value; repeated
+  levels share one estimated value. Shared entries must have identical
+  starting values; otherwise, the error lists each parameter's name,
+  1-based index in `p` or `re`, and initial value. Factor levels
+  determine the reduced parameter order; unused levels are dropped.
+  Levels in `p` and `re` are independent; sharing across these vectors
+  is not supported.
 
 - obj:
 
@@ -58,6 +69,13 @@ FIMSFit(
   [`fit_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/fit_fims.md)
   was not used to optimize the model, then the default is to use the
   current version of the package that is loaded.
+
+- convergence:
+
+  A data frame with one row per convergence check, as returned by
+  [`get_convergence()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md).
+  [`fit_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/fit_fims.md)
+  fills it in. The default has no rows, which means no checks were run.
 
 ## Value
 
@@ -105,3 +123,8 @@ have the following slots:
 - `model_output`::
 
   The FIMS model output as a JSON string.
+
+- `convergence`::
+
+  A tibble with the result of each convergence check. See
+  [`get_convergence()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md).

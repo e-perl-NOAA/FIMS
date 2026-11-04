@@ -670,9 +670,9 @@ RCPP_MODULE(shape) {
 ```
 
 We can load this code, which is stored in
-[`cpp/my_polymorphism.cpp`](NA) using
-[`Rcpp::sourceCpp()`](https://rdrr.io/pkg/Rcpp/man/sourceCpp.html) and
-[`Rcpp::loadModule()`](https://rdrr.io/pkg/Rcpp/man/loadModule.html)
+[`cpp/my_polymorphism.cpp`](https://github.com/NOAA-FIMS/FIMS/blob/main/vignettes/cpp/my_polymorphism.cpp)
+using [`Rcpp::sourceCpp()`](https://rdrr.io/pkg/Rcpp/man/sourceCpp.html)
+and [`Rcpp::loadModule()`](https://rdrr.io/pkg/Rcpp/man/loadModule.html)
 where the second argument is `TRUE` so that all objects are loaded into
 the R environment.
 [`methods::new()`](https://rdrr.io/r/methods/new.html) is used to create
@@ -738,8 +738,8 @@ pointer()
 ```
 
     ## x is equal to the address of y
-    ## x is: 0x7fffec1736f4
-    ## The address of y is: 0x7fffec1736f4
+    ## x is: 0x7fff47549fe4
+    ## The address of y is: 0x7fff47549fe4
     ## *x returns the value of y: 3.1459
 
     ## [1] 0
@@ -780,8 +780,8 @@ reference()
 
     ## x is: 3
     ## y is: 3
-    ## The memory address of x is: 0x7fffec1736f4
-    ## The memory address of y is: 0x7fffec1736f4
+    ## The memory address of x is: 0x7fff47549fe4
+    ## The memory address of y is: 0x7fff47549fe4
 
     ## [1] 0
 
@@ -854,9 +854,9 @@ reassign_pointer()
 ```
 
     ## c now equals the address of b
-    ## &a = 0x7fffec1736f0
-    ## &b = 0x7fffec1736f4
-    ## c = 0x7fffec1736f4
+    ## &a = 0x7fff47549fe0
+    ## &b = 0x7fff47549fe4
+    ## c = 0x7fff47549fe4
     ## a = 100
     ## b = 10
     ## *c = 10
@@ -989,8 +989,8 @@ shared_pointer()
 
     ## ptr1: 42
     ## ptr2: 24
-    ## ptr1 = 0x5574bfc6ca40
-    ## ptr2 = 0x5574bec10370
-    ## ptr3 = 0x5574bfc6ca40
+    ## ptr1 = 0x5653f169b790
+    ## ptr2 = 0x5653f10b2c00
+    ## ptr3 = 0x5653f169b790
 
     ## [1] 0

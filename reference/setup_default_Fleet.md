@@ -6,7 +6,8 @@ natural log of catchability coefficients (log_q) and fishing mortality
 estimation type of "constant" with a default value of 0, while log_Fmort
 is set to "fixed_effects". For survey fleets, log_q is set to
 "fixed_effects" and log_Fmort is set to "constant" with a default value
-of -200.
+of -200. For a year with a catch of 0, log_Fmort is also set to
+"constant" at -200, so fishing mortality is effectively 0 that year.
 
 ## Usage
 
@@ -39,6 +40,11 @@ for data, fleet, selectivity, recruitment, maturity, growth, and
 population components, then combines those defaults into one tibble. You
 can modify the returned tibble before fitting a model (for example,
 updating maturity and selectivity parameter values).
+
+Growth defaults are chosen from the data. Models with empirical
+weight-at-age data default to `"EWAA"`. Models without empirical
+weight-at-age data but with length-composition data default to
+`"VonBertalanffySchnute"`.
 
 To create the default initial numbers at age, this function uses the
 defaults from

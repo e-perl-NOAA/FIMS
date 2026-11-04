@@ -1,7 +1,11 @@
 var searchData=
 [
-  ['log_5fdevs_2ehpp_0',['log_devs.hpp',['../log__devs_8hpp.html',1,'']]],
-  ['log_5fr_2ehpp_1',['log_r.hpp',['../log__r_8hpp.html',1,'']]],
-  ['logistic_2ehpp_2',['logistic.hpp',['../maturity_2functors_2logistic_8hpp.html',1,'(Global Namespace)'],['../selectivity_2functors_2logistic_8hpp.html',1,'(Global Namespace)']]],
-  ['lognormal_5flpdf_2ehpp_3',['lognormal_lpdf.hpp',['../lognormal__lpdf_8hpp.html',1,'']]]
+  ['growth_2ecpp_0',['growth.cpp',['../growth_8cpp.html',1,'']]],
+  ['growth_2ehpp_1',['growth.hpp',['../growth_8hpp.html',1,'']]],
+  ['growth_5fbase_2ehpp_2',['growth_base.hpp',['../growth__base_8hpp.html',1,'']]],
+  ['growth_5fderived_5fsize_5fprovider_2ehpp_3',['growth_derived_size_provider.hpp',['../growth__derived__size__provider_8hpp.html',1,'']]],
+  ['growth_5fmodel_2ehpp_4',['growth_model.hpp',['../growth__model_8hpp.html',1,'']]],
+  ['growth_5fmodel_5fadapter_2ehpp_5',['growth_model_adapter.hpp',['../growth__model__adapter_8hpp.html',1,'']]],
+  ['growth_5fmodel_5fbase_2ehpp_6',['growth_model_base.hpp',['../growth__model__base_8hpp.html',1,'']]],
+  ['growth_5fproducts_2ehpp_7',['growth_products.hpp',['../growth__products_8hpp.html',1,'']]]
 ];

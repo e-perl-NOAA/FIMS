@@ -84,10 +84,11 @@ MathJax.Hub.Config({
               <li><h6 class="dropdown-header" data-toc-skip>intro to fims</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo.html">introducing the fisheries integrated modeling system (fims)</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-input-data.html">introducing FIMS input data</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-growth-vonb-schnute.html">FIMS Growth with VonBertalanffySchnute</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-logging.html">introducing the fims logging system</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-user-setup-guide.html">fims user setup guide</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo-projections.html">simple projections using fims</a></li>
-              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">Running diagnostics on a FIMS model</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">running diagnostics on a FIMS model</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><h6 class="dropdown-header" data-toc-skip>developer</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/adding-new-module.html">adding a new c++ module</a></li>
@@ -225,6 +226,18 @@ Directories</h2></td></tr>
 Files</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top"><a href="growth_8hpp_source.html"><span class="icondoc"></span></a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="growth_8hpp.html">growth.hpp</a></td></tr>
 <tr class="memdesc:growth_8hpp"><td class="mdescLeft">&#160;</td><td class="mdescRight">Includes any .hpp files within the subfolders so that only this file needs to included in include statements to use all functions within this folder. <br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top"><a href="growth__model_8hpp_source.html"><span class="icondoc"></span></a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="growth__model_8hpp.html">growth_model.hpp</a></td></tr>
+<tr class="memdesc:growth__model_8hpp"><td class="mdescLeft">&#160;</td><td class="mdescRight">Concrete growth model implementation (Phase 1). <br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top"><a href="growth__model__adapter_8hpp_source.html"><span class="icondoc"></span></a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="growth__model__adapter_8hpp.html">growth_model_adapter.hpp</a></td></tr>
+<tr class="memdesc:growth__model__adapter_8hpp"><td class="mdescLeft">&#160;</td><td class="mdescRight">adapts product-style growth models to the GrowthBase interface used by caa. <br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top"><a href="growth__model__base_8hpp_source.html"><span class="icondoc"></span></a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="growth__model__base_8hpp.html">growth_model_base.hpp</a></td></tr>
+<tr class="memdesc:growth__model__base_8hpp"><td class="mdescLeft">&#160;</td><td class="mdescRight">Declares the GrowthModelBase interface. This is the growth module boundary that downstream code consumes, not the curve functors. <br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top"><a href="growth__products_8hpp_source.html"><span class="icondoc"></span></a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="growth__products_8hpp.html">growth_products.hpp</a></td></tr>
+<tr class="memdesc:growth__products_8hpp"><td class="mdescLeft">&#160;</td><td class="mdescRight">Declares the GrowthProducts struct holding growth "products" that downstream population dynamics code consumes (year, age, sex). <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 </div><!-- contents -->

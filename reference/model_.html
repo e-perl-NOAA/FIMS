@@ -16,7 +16,7 @@ indexing."><meta property="og:image" content="https://NOAA-FIMS.github.io/FIMS/l
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,6 +34,7 @@ indexing."><meta property="og:image" content="https://NOAA-FIMS.github.io/FIMS/l
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -116,21 +117,21 @@ indexing.</p>
 <span><span class="co"># S4 method for class 'data.frame'</span></span>
 <span><span class="fu">model_length_comp</span><span class="op">(</span><span class="va">x</span>, <span class="va">fleet</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">model_weight_at_age</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span><span class="fu">model_weight_at_age</span><span class="op">(</span><span class="va">x</span>, fleet <span class="op">=</span> <span class="cn">NA_character_</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S4 method for class 'FIMSFrame'</span></span>
-<span><span class="fu">model_weight_at_age</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span><span class="fu">model_weight_at_age</span><span class="op">(</span><span class="va">x</span>, fleet <span class="op">=</span> <span class="cn">NA_character_</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S4 method for class 'data.frame'</span></span>
-<span><span class="fu">model_weight_at_age</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span><span class="fu">model_weight_at_age</span><span class="op">(</span><span class="va">x</span>, fleet <span class="op">=</span> <span class="cn">NA_character_</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">model_age_to_length_conversion</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span><span class="fu">model_age_to_length_conversion</span><span class="op">(</span><span class="va">x</span>, fleet <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S4 method for class 'FIMSFrame'</span></span>
-<span><span class="fu">model_age_to_length_conversion</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span><span class="fu">model_age_to_length_conversion</span><span class="op">(</span><span class="va">x</span>, fleet <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S4 method for class 'data.frame'</span></span>
-<span><span class="fu">model_age_to_length_conversion</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">model_age_to_length_conversion</span><span class="op">(</span><span class="va">x</span>, fleet <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -196,21 +197,41 @@ conversion data are present in the <code>FIMSFrame</code> object.</p>
 <h3 id="model-weight-at-age-"><code>model_weight_at_age()</code><a class="anchor" aria-label="anchor" href="#model-weight-at-age-"></a></h3>
 
 
-<p>Returns a numeric vector of weight-at-age observations (type
-<code>"weight_at_age"</code>), ordered by age and year (plus one additional year) and
-using <code>-999</code> to indicate missing observations When multiple fleets are
-present, values are averaged across fleets.</p>
+<p>Returns a numeric vector of weight at age (type <code>"weight_at_age"</code>), ordered
+by year and then age. Rows with <code>timing = NA</code> apply to every year and rows
+with a <code>timing</code> replace that default for that year. With the default <code>fleet = NA</code>, the function returns the population weight at age from <code>fleet = NA</code>
+rows, including the year after the last modeled year. For the population,
+this additional year is needed to calculate biomass after all fishing for
+the terminal year has occurred. When users specify <code>fleet = NA</code> but no
+population-level information exists and information is only supplied for a
+single fleet, then this fleet-level information will be used for both the
+population and the fleet. The function will error though if population-level
+information is absent and information for more than one fleet exists. When a
+fleet name is specified, the function returns that fleet's weight at age for
+the model years if available. For years without fleet- and year-specific
+information, then the fleet-specific information without any timing attached
+to it is returned. If no fleet-specific information is available for the
+missing years, then the population's rows for that year will be returned;
+and, finally population-level information with <code>timing = NA</code> rows is
+returned for all other missing rows.</p>
 </div>
 
 <div class="section">
 <h3 id="model-age-to-length-conversion-"><code>model_age_to_length_conversion()</code><a class="anchor" aria-label="anchor" href="#model-age-to-length-conversion-"></a></h3>
 
 
-<p>Returns a numeric vector of age-to-length conversion observations.
-Observations are ordered by age and length in the order defined by
-<code><a href="FIMSFrame.html">FIMSFrame()</a></code>. When multiple observations are present across a single age
-and length, they are averaged because <code>age_to_length_conversion</code> data cannot
-vary across fleets or time.</p>
+<p>Returns a numeric vector of age-to-length conversion observations for 1
+<code>fleet</code>, or for the shared rows (<code>fleet = NA</code>) by default. For each year, a
+fleet uses its own rows for that year, then its own rows with
+<code>timing = NA</code>, then the shared rows for that year, then the shared rows with
+<code>timing = NA</code>. If every year uses the same rows, 1 table ordered by age and
+length is returned. Otherwise 1 table per year is returned, ordered by year,
+age, and length. The values for each age are rescaled to sum to 1 over all
+conversion lengths. For each fleet, the model adds probability for lengths
+below the first and above the last of the fleet's length bins to those bins,
+with a warning. Length is conditional on age, so length probabilities can be
+added together, but rows for ages outside the model ages are dropped by
+<code><a href="FIMSFrame.html">FIMSFrame()</a></code> with a warning.</p>
 </div>
 
     </div>
@@ -220,7 +241,7 @@ vary across fleets or time.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

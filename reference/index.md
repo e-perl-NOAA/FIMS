@@ -6,6 +6,12 @@ Example datasets used in demonstrations and other package data.
 
 - [`data_big`](https://NOAA-FIMS.github.io/FIMS/reference/data_big.md) :
   FIMS input data frame
+- [`parameters_big`](https://NOAA-FIMS.github.io/FIMS/reference/parameters_big.md)
+  : FIMS parameter tibble
+- [`estimates_big_optimized`](https://NOAA-FIMS.github.io/FIMS/reference/estimates_big_optimized.md)
+  : FIMS estimates for the example data
+- [`fit_big_optimized`](https://NOAA-FIMS.github.io/FIMS/reference/fit_big_optimized.md)
+  : FIMS fit using the example data
 - [`fims_input_types`](https://NOAA-FIMS.github.io/FIMS/reference/fims_input_types.md)
   : Vector of acceptable FIMS input types
 - [`fims_distributions`](https://NOAA-FIMS.github.io/FIMS/reference/fims_distributions.md)
@@ -95,6 +101,7 @@ Primary functions used when setting up or running a FIMS model.
   [`get_max_gradient()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_gradient()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_sdreport()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
+  [`get_convergence()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_estimates()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_number_of_parameters()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
   [`get_run_time()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
@@ -104,6 +111,9 @@ Primary functions used when setting up or running a FIMS model.
 
 - [`is.FIMSFit()`](https://NOAA-FIMS.github.io/FIMS/reference/is.FIMSFit.md)
   : Check if an object is of class FIMSFit
+
+- [`sanity_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/sanity_fims.md)
+  : Check whether a fitted FIMS model is ready to use
 
 - [`is_fims_verbose()`](https://NOAA-FIMS.github.io/FIMS/reference/is_fims_verbose.md)
   : Should FIMS be verbose?
@@ -167,6 +177,7 @@ Links to the relevant doxygen documentation for the C++ code.
   [`DnormDistribution`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`DoubleLogisticSelectivity`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`EWAAGrowth`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
+  [`VonBertalanffySchnuteGrowth`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`Fleet`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`Index`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)
   [`Catch`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_classes.md)

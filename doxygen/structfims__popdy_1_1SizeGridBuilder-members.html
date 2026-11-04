@@ -84,10 +84,11 @@ MathJax.Hub.Config({
               <li><h6 class="dropdown-header" data-toc-skip>intro to fims</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo.html">introducing the fisheries integrated modeling system (fims)</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-input-data.html">introducing FIMS input data</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-growth-vonb-schnute.html">FIMS Growth with VonBertalanffySchnute</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-logging.html">introducing the fims logging system</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-user-setup-guide.html">fims user setup guide</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo-projections.html">simple projections using fims</a></li>
-              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">Running diagnostics on a FIMS model</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">running diagnostics on a FIMS model</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><h6 class="dropdown-header" data-toc-skip>developer</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/adding-new-module.html">adding a new c++ module</a></li>
@@ -186,7 +187,7 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&amp;dn=expat.txt MIT */
-$(document).ready(function(){initNavTree('classfims__model_1_1Model.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('structfims__popdy_1_1SizeGridBuilder.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -212,18 +213,16 @@ $(document).ready(function(){initNavTree('classfims__model_1_1Model.html',''); i
 </div>
 
 <div class="header">
-  <div class="headertitle"><div class="title">fims_model::Model&lt; Type &gt; Member List</div></div>
+  <div class="headertitle"><div class="title">fims_popdy::SizeGridBuilder Member List</div></div>
 </div><!--header-->
 <div class="contents">
 
-<p>This is the complete list of members for <a class="el" href="classfims__model_1_1Model.html">fims_model::Model&lt; Type &gt;</a>, including all inherited members.</p>
+<p>This is the complete list of members for <a class="el" href="structfims__popdy_1_1SizeGridBuilder.html">fims_popdy::SizeGridBuilder</a>, including all inherited members.</p>
 <table class="directory">
-  <tr class="even"><td class="entry"><a class="el" href="classfims__model_1_1Model.html#ad90b8d1d3de83cd359cca7982518f28d">Evaluate</a>()</td><td class="entry"><a class="el" href="classfims__model_1_1Model.html">fims_model::Model&lt; Type &gt;</a></td><td class="entry"><span class="mlabel">inline</span></td></tr>
-  <tr class="odd"><td class="entry"><a class="el" href="classfims__model_1_1Model.html#addfa06809f60c7b5ef64c03c4cd204a9">fims_information</a></td><td class="entry"><a class="el" href="classfims__model_1_1Model.html">fims_model::Model&lt; Type &gt;</a></td><td class="entry"></td></tr>
-  <tr class="even"><td class="entry"><a class="el" href="classfims__model_1_1Model.html#a9b1e4383331085750c40db5bbc5590e6">fims_model</a></td><td class="entry"><a class="el" href="classfims__model_1_1Model.html">fims_model::Model&lt; Type &gt;</a></td><td class="entry"><span class="mlabel">static</span></td></tr>
-  <tr class="odd"><td class="entry"><a class="el" href="classfims__model_1_1Model.html#aa1648bf1cc5adc5cacc43b0dbc7fb7aa">GetInstance</a>()</td><td class="entry"><a class="el" href="classfims__model_1_1Model.html">fims_model::Model&lt; Type &gt;</a></td><td class="entry"><span class="mlabel">inline</span><span class="mlabel">static</span></td></tr>
-  <tr class="even"><td class="entry"><a class="el" href="classfims__model_1_1Model.html#a4538641e7f150147bf85aa0d4515e03d">Model</a>()</td><td class="entry"><a class="el" href="classfims__model_1_1Model.html">fims_model::Model&lt; Type &gt;</a></td><td class="entry"><span class="mlabel">inline</span></td></tr>
-  <tr class="odd"><td class="entry"><a class="el" href="classfims__model_1_1Model.html#a893676693cfab4577c8f6458680d417b">~Model</a>()</td><td class="entry"><a class="el" href="classfims__model_1_1Model.html">fims_model::Model&lt; Type &gt;</a></td><td class="entry"><span class="mlabel">inline</span></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structfims__popdy_1_1SizeGridBuilder.html#ad2804bc5d08e4daa32a17ffb345a3007">BuildDefaultFromFleetEdges</a>(const fims::Vector&lt; fims::Vector&lt; double &gt; &gt; &amp;fleet_edges)</td><td class="entry"><a class="el" href="structfims__popdy_1_1SizeGridBuilder.html">fims_popdy::SizeGridBuilder</a></td><td class="entry"><span class="mlabel">inline</span><span class="mlabel">static</span></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structfims__popdy_1_1SizeGridBuilder.html#a58eeabb72ee2f2871b3a17cf8456fc17">BuildFromEdges</a>(const fims::Vector&lt; double &gt; &amp;edges)</td><td class="entry"><a class="el" href="structfims__popdy_1_1SizeGridBuilder.html">fims_popdy::SizeGridBuilder</a></td><td class="entry"><span class="mlabel">inline</span><span class="mlabel">static</span></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structfims__popdy_1_1SizeGridBuilder.html#a51245098aaff3c7f421da801e77bbf1c">BuildObservationEdgesFromLowerEdges</a>(const fims::Vector&lt; double &gt; &amp;lower_edges)</td><td class="entry"><a class="el" href="structfims__popdy_1_1SizeGridBuilder.html">fims_popdy::SizeGridBuilder</a></td><td class="entry"><span class="mlabel">inline</span><span class="mlabel">static</span></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structfims__popdy_1_1SizeGridBuilder.html#a8c41cec68337d0583f9726967df87c90">BuildRegularGrid</a>(double lower_edge, double upper_edge, double bin_width)</td><td class="entry"><a class="el" href="structfims__popdy_1_1SizeGridBuilder.html">fims_popdy::SizeGridBuilder</a></td><td class="entry"><span class="mlabel">inline</span><span class="mlabel">static</span></td></tr>
 </table></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->

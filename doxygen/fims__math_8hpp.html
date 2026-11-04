@@ -84,10 +84,11 @@ MathJax.Hub.Config({
               <li><h6 class="dropdown-header" data-toc-skip>intro to fims</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo.html">introducing the fisheries integrated modeling system (fims)</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-input-data.html">introducing FIMS input data</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-growth-vonb-schnute.html">FIMS Growth with VonBertalanffySchnute</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-logging.html">introducing the fims logging system</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-user-setup-guide.html">fims user setup guide</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo-projections.html">simple projections using fims</a></li>
-              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">Running diagnostics on a FIMS model</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">running diagnostics on a FIMS model</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><h6 class="dropdown-header" data-toc-skip>developer</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/adding-new-module.html">adding a new c++ module</a></li>
@@ -225,41 +226,46 @@ $(document).ready(function(){initNavTree('fims__math_8hpp.html',''); initResizab
 <code>#include &lt;sstream&gt;</code><br />
 <code>#include &quot;<a class="el" href="interface_8hpp_source.html">../interface/interface.hpp</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="fims__vector_8hpp_source.html">fims_vector.hpp</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="def_8hpp_source.html">def.hpp</a>&quot;</code><br />
 </div>
 <p><a href="fims__math_8hpp_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:ae8d003754148800ba87fbf228bc7d062" id="r_ae8d003754148800ba87fbf228bc7d062"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </td></tr>
-<tr class="memitem:ae8d003754148800ba87fbf228bc7d062"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#ae8d003754148800ba87fbf228bc7d062">fims_math::logistic</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;inflection_point, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;slope, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">x</a>)</td></tr>
+<tr class="memitem:ae8d003754148800ba87fbf228bc7d062" id="r_ae8d003754148800ba87fbf228bc7d062"><td class="memTemplParams" colspan="2">template&lt;class Type &gt; </td></tr>
+<tr class="memitem:ae8d003754148800ba87fbf228bc7d062"><td class="memTemplItemLeft" align="right" valign="top">const Type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#ae8d003754148800ba87fbf228bc7d062">fims_math::logistic</a> (const Type &amp;inflection_point, const Type &amp;slope, const Type &amp;x)</td></tr>
 <tr class="memdesc:ae8d003754148800ba87fbf228bc7d062"><td class="mdescLeft">&#160;</td><td class="mdescRight">The general logistic function.  <br /></td></tr>
 <tr class="separator:ae8d003754148800ba87fbf228bc7d062"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0fef2c2ffd54b4d023d194653ebeb1f0" id="r_a0fef2c2ffd54b4d023d194653ebeb1f0"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </td></tr>
-<tr class="memitem:a0fef2c2ffd54b4d023d194653ebeb1f0"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a0fef2c2ffd54b4d023d194653ebeb1f0">fims_math::logit</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">a</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">b</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">x</a>)</td></tr>
+<tr class="memitem:a0fef2c2ffd54b4d023d194653ebeb1f0" id="r_a0fef2c2ffd54b4d023d194653ebeb1f0"><td class="memTemplParams" colspan="2">template&lt;class Type &gt; </td></tr>
+<tr class="memitem:a0fef2c2ffd54b4d023d194653ebeb1f0"><td class="memTemplItemLeft" align="right" valign="top">const Type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a0fef2c2ffd54b4d023d194653ebeb1f0">fims_math::logit</a> (const Type &amp;a, const Type &amp;b, const Type &amp;x)</td></tr>
 <tr class="memdesc:a0fef2c2ffd54b4d023d194653ebeb1f0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A logit function for bounding of parameters.  <br /></td></tr>
 <tr class="separator:a0fef2c2ffd54b4d023d194653ebeb1f0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab0329c7a64173d4612e7a1d0ddb3f3e6" id="r_ab0329c7a64173d4612e7a1d0ddb3f3e6"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </td></tr>
-<tr class="memitem:ab0329c7a64173d4612e7a1d0ddb3f3e6"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#ab0329c7a64173d4612e7a1d0ddb3f3e6">fims_math::inv_logit</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">a</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">b</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">logit_x</a>)</td></tr>
+<tr class="memitem:ab0329c7a64173d4612e7a1d0ddb3f3e6" id="r_ab0329c7a64173d4612e7a1d0ddb3f3e6"><td class="memTemplParams" colspan="2">template&lt;class Type &gt; </td></tr>
+<tr class="memitem:ab0329c7a64173d4612e7a1d0ddb3f3e6"><td class="memTemplItemLeft" align="right" valign="top">const Type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#ab0329c7a64173d4612e7a1d0ddb3f3e6">fims_math::inv_logit</a> (const Type &amp;a, const Type &amp;b, const Type &amp;logit_x)</td></tr>
 <tr class="memdesc:ab0329c7a64173d4612e7a1d0ddb3f3e6"><td class="mdescLeft">&#160;</td><td class="mdescRight">An inverse logit function for bounding of parameters.  <br /></td></tr>
 <tr class="separator:ab0329c7a64173d4612e7a1d0ddb3f3e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4f55d4bf901b546a57ed3a626a445e52" id="r_a4f55d4bf901b546a57ed3a626a445e52"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </td></tr>
-<tr class="memitem:a4f55d4bf901b546a57ed3a626a445e52"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a4f55d4bf901b546a57ed3a626a445e52">fims_math::double_logistic</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;inflection_point_asc, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;slope_asc, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;inflection_point_desc, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;slope_desc, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">x</a>)</td></tr>
+<tr class="memitem:a4f55d4bf901b546a57ed3a626a445e52" id="r_a4f55d4bf901b546a57ed3a626a445e52"><td class="memTemplParams" colspan="2">template&lt;class Type &gt; </td></tr>
+<tr class="memitem:a4f55d4bf901b546a57ed3a626a445e52"><td class="memTemplItemLeft" align="right" valign="top">const Type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a4f55d4bf901b546a57ed3a626a445e52">fims_math::double_logistic</a> (const Type &amp;inflection_point_asc, const Type &amp;slope_asc, const Type &amp;inflection_point_desc, const Type &amp;slope_desc, const Type &amp;x)</td></tr>
 <tr class="memdesc:a4f55d4bf901b546a57ed3a626a445e52"><td class="mdescLeft">&#160;</td><td class="mdescRight">The general double logistic function.  <br /></td></tr>
 <tr class="separator:a4f55d4bf901b546a57ed3a626a445e52"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abda4b1b8b7ea34fcde2a05e78217d522" id="r_abda4b1b8b7ea34fcde2a05e78217d522"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </td></tr>
-<tr class="memitem:abda4b1b8b7ea34fcde2a05e78217d522"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#abda4b1b8b7ea34fcde2a05e78217d522">fims_math::ad_fabs</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">x</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">C</a>=1<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">e</a>-5)</td></tr>
+<tr class="memitem:abda4b1b8b7ea34fcde2a05e78217d522" id="r_abda4b1b8b7ea34fcde2a05e78217d522"><td class="memTemplParams" colspan="2">template&lt;class Type &gt; </td></tr>
+<tr class="memitem:abda4b1b8b7ea34fcde2a05e78217d522"><td class="memTemplItemLeft" align="right" valign="top">const Type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#abda4b1b8b7ea34fcde2a05e78217d522">fims_math::ad_fabs</a> (const Type &amp;x, Type C=1e-5)</td></tr>
 <tr class="separator:abda4b1b8b7ea34fcde2a05e78217d522"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4c3897f03cbc7860a4b73b21f58558f6" id="r_a4c3897f03cbc7860a4b73b21f58558f6"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">typename</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </td></tr>
-<tr class="memitem:a4c3897f03cbc7860a4b73b21f58558f6"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a4c3897f03cbc7860a4b73b21f58558f6">fims_math::ad_min</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">a</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">b</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">C</a>=1<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">e</a>-5)</td></tr>
+<tr class="memitem:a4c3897f03cbc7860a4b73b21f58558f6" id="r_a4c3897f03cbc7860a4b73b21f58558f6"><td class="memTemplParams" colspan="2">template&lt;typename Type &gt; </td></tr>
+<tr class="memitem:a4c3897f03cbc7860a4b73b21f58558f6"><td class="memTemplItemLeft" align="right" valign="top">const Type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a4c3897f03cbc7860a4b73b21f58558f6">fims_math::ad_min</a> (const Type &amp;a, const Type &amp;b, Type C=1e-5)</td></tr>
 <tr class="separator:a4c3897f03cbc7860a4b73b21f58558f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a54cfbb09833fa0de10e18203526e8321" id="r_a54cfbb09833fa0de10e18203526e8321"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">typename</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </td></tr>
-<tr class="memitem:a54cfbb09833fa0de10e18203526e8321"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a54cfbb09833fa0de10e18203526e8321">fims_math::ad_max</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">a</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">b</a>, <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">C</a>=1<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">e</a>-5)</td></tr>
+<tr class="memitem:a54cfbb09833fa0de10e18203526e8321" id="r_a54cfbb09833fa0de10e18203526e8321"><td class="memTemplParams" colspan="2">template&lt;typename Type &gt; </td></tr>
+<tr class="memitem:a54cfbb09833fa0de10e18203526e8321"><td class="memTemplItemLeft" align="right" valign="top">const Type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a54cfbb09833fa0de10e18203526e8321">fims_math::ad_max</a> (const Type &amp;a, const Type &amp;b, Type C=1e-5)</td></tr>
 <tr class="separator:a54cfbb09833fa0de10e18203526e8321"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2f6d3a9290062d44590350c1bc739217" id="r_a2f6d3a9290062d44590350c1bc739217"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> &gt; </td></tr>
-<tr class="memitem:a2f6d3a9290062d44590350c1bc739217"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a2f6d3a9290062d44590350c1bc739217">fims_math::sum</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::vector&lt; <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> &gt; &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">v</a>)</td></tr>
+<tr class="memitem:a15e62e8fcb8c7f077c332030ee04e70f" id="r_a15e62e8fcb8c7f077c332030ee04e70f"><td class="memTemplParams" colspan="2">template&lt;typename Type &gt; </td></tr>
+<tr class="memitem:a15e62e8fcb8c7f077c332030ee04e70f"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; Type &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a15e62e8fcb8c7f077c332030ee04e70f">fims_math::apply_ageing_error</a> (const <a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; Type &gt; &amp;proportion_at_true_age, const <a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; Type &gt; &amp;ageing_error, size_t year=0)</td></tr>
+<tr class="memdesc:a15e62e8fcb8c7f077c332030ee04e70f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts values at true age, proportions or expected numbers, to values at observed age using an ageing error matrix.  <br /></td></tr>
+<tr class="separator:a15e62e8fcb8c7f077c332030ee04e70f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2f6d3a9290062d44590350c1bc739217" id="r_a2f6d3a9290062d44590350c1bc739217"><td class="memTemplParams" colspan="2">template&lt;class T &gt; </td></tr>
+<tr class="memitem:a2f6d3a9290062d44590350c1bc739217"><td class="memTemplItemLeft" align="right" valign="top">T&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a2f6d3a9290062d44590350c1bc739217">fims_math::sum</a> (const std::vector&lt; T &gt; &amp;v)</td></tr>
 <tr class="separator:a2f6d3a9290062d44590350c1bc739217"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a60f8fb42e9a4786ca5e30b9fad43afed" id="r_a60f8fb42e9a4786ca5e30b9fad43afed"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> &gt; </td></tr>
-<tr class="memitem:a60f8fb42e9a4786ca5e30b9fad43afed"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a60f8fb42e9a4786ca5e30b9fad43afed">fims_math::sum</a> (<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> &gt; &amp;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">v</a>)</td></tr>
+<tr class="memitem:a60f8fb42e9a4786ca5e30b9fad43afed" id="r_a60f8fb42e9a4786ca5e30b9fad43afed"><td class="memTemplParams" colspan="2">template&lt;class T &gt; </td></tr>
+<tr class="memitem:a60f8fb42e9a4786ca5e30b9fad43afed"><td class="memTemplItemLeft" align="right" valign="top">T&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="fims__math_8hpp.html#a60f8fb42e9a4786ca5e30b9fad43afed">fims_math::sum</a> (const <a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; T &gt; &amp;v)</td></tr>
 <tr class="separator:a60f8fb42e9a4786ca5e30b9fad43afed"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
@@ -272,19 +278,19 @@ Functions</h2></td></tr>
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </div>
+template&lt;class Type &gt; </div>
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> fims_math::ad_fabs </td>
+          <td class="memname">const Type fims_math::ad_fabs </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>x</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td>
-          <td class="paramname"><em>C</em> = <code>1<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">e</a>-5</code>&#160;</td>
+          <td class="paramtype">Type&#160;</td>
+          <td class="paramname"><em>C</em> = <code>1e-5</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -313,28 +319,28 @@ template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e34
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">typename</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </div>
+template&lt;typename Type &gt; </div>
 <table class="mlabels">
   <tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> fims_math::ad_max </td>
+          <td class="memname">const Type fims_math::ad_max </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>a</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>b</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td>
-          <td class="paramname"><em>C</em> = <code>1<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">e</a>-5</code>&#160;</td>
+          <td class="paramtype">Type&#160;</td>
+          <td class="paramname"><em>C</em> = <code>1e-5</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -368,28 +374,28 @@ template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e34
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">typename</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </div>
+template&lt;typename Type &gt; </div>
 <table class="mlabels">
   <tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> fims_math::ad_min </td>
+          <td class="memname">const Type fims_math::ad_min </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>a</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>b</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a>&#160;</td>
-          <td class="paramname"><em>C</em> = <code>1<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">e</a>-5</code>&#160;</td>
+          <td class="paramtype">Type&#160;</td>
+          <td class="paramname"><em>C</em> = <code>1e-5</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -418,45 +424,109 @@ template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e34
 
 </div>
 </div>
+<a id="a15e62e8fcb8c7f077c332030ee04e70f" name="a15e62e8fcb8c7f077c332030ee04e70f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a15e62e8fcb8c7f077c332030ee04e70f">&#9670;&#160;</a></span>apply_ageing_error()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename Type &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; Type &gt; fims_math::apply_ageing_error </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; Type &gt; &amp;&#160;</td>
+          <td class="paramname"><em>proportion_at_true_age</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; Type &gt; &amp;&#160;</td>
+          <td class="paramname"><em>ageing_error</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>year</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Converts values at true age, proportions or expected numbers, to values at observed age using an ageing error matrix. </p>
+<p>Ageing error spreads fish of one true age across several observed ages, so the expected composition of observed ages is</p>
+<p>\( p^{obs}_{a&#39;} = \sum_{a} p_{a} E_{a,a&#39;} \)</p>
+<p>where \( E_{a,a&#39;} \) is the probability that a fish of true age \( a \) is read as age \( a&#39; \). Each row of \( E \) sums to 1, so the total is unchanged. The caller checks the length of <code>ageing_error</code>.</p>
+<dl class="tparams"><dt>Template Parameters</dt><dd>
+  <table class="tparams">
+    <tr><td class="paramname">Type</td><td>The scalar type, a TMB AD type or double. </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">proportion_at_true_age</td><td>Values at true age, 1 per model age. </td></tr>
+    <tr><td class="paramname">ageing_error</td><td>1 matrix for all years or 1 per year, with true age as rows and observed age varying fastest. </td></tr>
+    <tr><td class="paramname">year</td><td>Year index, used only when there is 1 matrix per year. </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Values at observed age, 1 per model age. </dd></dl>
+
+</div>
+</div>
 <a id="a4f55d4bf901b546a57ed3a626a445e52" name="a4f55d4bf901b546a57ed3a626a445e52"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a4f55d4bf901b546a57ed3a626a445e52">&#9670;&#160;</a></span>double_logistic()</h2>
 
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </div>
+template&lt;class Type &gt; </div>
 <table class="mlabels">
   <tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> fims_math::double_logistic </td>
+          <td class="memname">const Type fims_math::double_logistic </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>inflection_point_asc</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>slope_asc</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>inflection_point_desc</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>slope_desc</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>x</em>&#160;</td>
         </tr>
         <tr>
@@ -474,8 +544,8 @@ template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e34
 
 <p>The general double logistic function. </p>
 <p>\( \frac{1.0}{ 1.0 + exp(-1.0 * slope_{asc} (x - inflection_point_{asc}))}
-\left(1-\frac{1.0}{ 1.0 + exp(-1.0 * slope_{desc} (x -
-inflection_point_{desc}))} \right)\)</p>
+\frac{1.0}{ 1.0 + exp(slope_{desc} (x - inflection_point_{desc}))}\)</p>
+<p>The descending limb is written as \(1 / (1 + exp(z))\), with \( z = slope_desc (x - inflection_point_desc) \), so it stays above 0 in double precision until \( exp(z) \) overflows.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">inflection_point_asc</td><td>the inflection point of the ascending limb of the double logistic function </td></tr>
@@ -496,27 +566,27 @@ inflection_point_{desc}))} \right)\)</p>
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </div>
+template&lt;class Type &gt; </div>
 <table class="mlabels">
   <tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> fims_math::inv_logit </td>
+          <td class="memname">const Type fims_math::inv_logit </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>a</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>b</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>logit_x</em>&#160;</td>
         </tr>
         <tr>
@@ -551,27 +621,27 @@ template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e34
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </div>
+template&lt;class Type &gt; </div>
 <table class="mlabels">
   <tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> fims_math::logistic </td>
+          <td class="memname">const Type fims_math::logistic </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>inflection_point</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>slope</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>x</em>&#160;</td>
         </tr>
         <tr>
@@ -608,27 +678,27 @@ template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e34
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &gt; </div>
+template&lt;class Type &gt; </div>
 <table class="mlabels">
   <tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> fims_math::logit </td>
+          <td class="memname">const Type fims_math::logit </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>a</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>b</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">Type</a> &amp;&#160;</td>
+          <td class="paramtype">const Type &amp;&#160;</td>
           <td class="paramname"><em>x</em>&#160;</td>
         </tr>
         <tr>
@@ -663,12 +733,12 @@ template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e34
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> &gt; </div>
+template&lt;class T &gt; </div>
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> fims_math::sum </td>
+          <td class="memname">T fims_math::sum </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> <a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> &gt; &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="classfims_1_1Vector.html">fims::Vector</a>&lt; T &gt; &amp;&#160;</td>
           <td class="paramname"><em>v</em></td><td>)</td>
           <td></td>
         </tr>
@@ -691,12 +761,12 @@ template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e34
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
-template&lt;<a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">class</a> <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> &gt; </div>
+template&lt;class T &gt; </div>
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> fims_math::sum </td>
+          <td class="memname">T fims_math::sum </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">const</a> std::vector&lt; <a class="el" href="rcpp__interface_8hpp.html#a9f5a235582e7cc0f29e3431fc89ef10d">T</a> &gt; &amp;&#160;</td>
+          <td class="paramtype">const std::vector&lt; T &gt; &amp;&#160;</td>
           <td class="paramname"><em>v</em></td><td>)</td>
           <td></td>
         </tr>

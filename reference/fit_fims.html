@@ -6,7 +6,7 @@
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,6 +24,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -77,7 +78,8 @@
 <span>  optimize <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  number_of_newton_steps <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>eval.max <span class="op">=</span> <span class="fl">10000</span>, iter.max <span class="op">=</span> <span class="fl">10000</span>, trace <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>,</span>
-<span>  filename <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  filename <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  getReportCovariance <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -86,12 +88,23 @@
 
 
 <dl><dt id="arg-input">input<a class="anchor" aria-label="anchor" href="#arg-input"></a></dt>
-<dd><p>Input list as returned by <code><a href="initialize_fims.html">initialize_fims()</a></code>.</p></dd>
+<dd><p>Input list as returned by <code><a href="initialize_fims.html">initialize_fims()</a></code>. An optional
+<code>map</code> entry is a named list of factors for <code>p</code> (fixed effects) and/or <code>re</code>
+(random effects), in the order of the corresponding <code>parameters</code> vector.
+Each factor must have one entry per parameter. <code>NA</code> holds a parameter at
+its starting value; repeated levels share one estimated value. Shared
+entries must have identical starting values; otherwise, the error lists
+each parameter's name, 1-based index in <code>p</code> or <code>re</code>, and initial value.
+Factor levels determine the
+reduced parameter order; unused levels are dropped. Levels in <code>p</code> and <code>re</code>
+are independent; sharing
+across these vectors is not supported.</p></dd>
 
 
 <dt id="arg-get-sd">get_sd<a class="anchor" aria-label="anchor" href="#arg-get-sd"></a></dt>
 <dd><p>A boolean specifying if the <code><a href="https://rdrr.io/pkg/TMB/man/sdreport.html" class="external-link">TMB::sdreport()</a></code> should be
-calculated?</p></dd>
+calculated? It is skipped when the maximum gradient is above 0.01 or not
+finite, because standard errors far from the optimum are not meaningful.</p></dd>
 
 
 <dt id="arg-save-sd">save_sd<a class="anchor" aria-label="anchor" href="#arg-save-sd"></a></dt>
@@ -128,17 +141,37 @@ object as an RDS object. Defaults to 'fit.RDS', and a value of NULL
 indicates not to save it. If specified, it must end in .RDS. The file is
 written to folder given by <code>input[["path"]]</code>. Not yet implemented.</p></dd>
 
+
+<dt id="arg-getreportcovariance">getReportCovariance<a class="anchor" aria-label="anchor" href="#arg-getreportcovariance"></a></dt>
+<dd><p>A logical passed to <code><a href="https://rdrr.io/pkg/TMB/man/sdreport.html" class="external-link">TMB::sdreport()</a></code>, with the
+default <code>FALSE</code>. Standard errors of all parameters and derived quantities
+are calculated either way. If <code>TRUE</code>, the full covariance matrix of the
+derived quantities is also calculated and stored as <code>cov</code> in the
+<code>sdreport</code>; it grows with the square of the number of derived quantities
+and can use several GB of memory. If <code>FALSE</code>, <code>cov</code> is <code>NA</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class <code>FIMSFit</code> is returned, where the structure is the same
 regardless if <code>optimize = TRUE</code> or not. Uncertainty information is only
-included in the <code>estimates</code> slot if <code>get_sd = TRUE</code>.</p>
+included in the <code>estimates</code> slot if <code>get_sd = TRUE</code>. The result of each
+convergence check is stored on the object and returned by
+<code><a href="get_FIMSFit.html">get_convergence()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>This function is a beta version still and subject to change
-without warning.</p>
+without warning.
+Mapped parameters are expanded to their full FIMS vectors for reporting.
+Shared parameters receive the same estimate and standard error in
+<code><a href="get_FIMSFit.html">get_estimates()</a></code>. Mapped-off parameters retain their starting values and
+have <code>NA</code> standard errors. Gradients describe reduced fixed-effect
+optimization variables and are reported only on the first full parameter
+in each shared level. Parameter counts describe the reduced vectors.
+With no active fixed effects, TMB evaluates the random-effects model without
+running an outer optimizer. If no parameters remain active, use
+<code>optimize = FALSE</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -152,7 +185,7 @@ without warning.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

@@ -28,7 +28,7 @@
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,6 +50,7 @@
 <li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -139,10 +140,10 @@ the first entry is always the call to this function, e.g.,</p>
 <span><span class="va">log_data_frame</span> <span class="op">&lt;-</span> <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">fromJSON</a></span><span class="op">(</span><span class="va">log_string</span><span class="op">)</span></span>
 <span><span class="va">log_data_frame</span></span></code></pre></div>
 <pre><code><span><span class="co">##                  timestamp level</span></span>
-<span><span class="co">## 1 Wed Oct 28 14:33:31 2026  info</span></span>
-<span><span class="co">## 2 Wed Oct 28 14:33:31 2026  info</span></span>
-<span><span class="co">## 3 Wed Oct 28 14:33:31 2026  info</span></span>
-<span><span class="co">## 4 Wed Oct 28 14:33:31 2026  info</span></span>
+<span><span class="co">## 1 Wed Nov  4 21:49:30 2026  info</span></span>
+<span><span class="co">## 2 Wed Nov  4 21:49:30 2026  info</span></span>
+<span><span class="co">## 3 Wed Nov  4 21:49:30 2026  info</span></span>
+<span><span class="co">## 4 Wed Nov  4 21:49:30 2026  info</span></span>
 <span><span class="co">##                                                  message id   user</span></span>
 <span><span class="co">## 1 Creating model and checking for required components...  0 runner</span></span>
 <span><span class="co">## 2                            Model successfully created.  1 runner</span></span>
@@ -164,10 +165,10 @@ the first entry is always the call to this function, e.g.,</p>
 <span><span class="co">## 3 bool fims_info::Information&lt;Type&gt;::CreateModel() [with Type = TMBad::global::ad_aug]</span></span>
 <span><span class="co">## 4 bool fims_info::Information&lt;Type&gt;::CreateModel() [with Type = TMBad::global::ad_aug]</span></span>
 <span><span class="co">##   line</span></span>
-<span><span class="co">## 1  851</span></span>
-<span><span class="co">## 2  868</span></span>
-<span><span class="co">## 3  851</span></span>
-<span><span class="co">## 4  868</span></span></code></pre>
+<span><span class="co">## 1 1152</span></span>
+<span><span class="co">## 2 1169</span></span>
+<span><span class="co">## 3 1152</span></span>
+<span><span class="co">## 4 1169</span></span></code></pre>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/Cpp_functions.html">clear</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>This particular log entry originates from the use of
@@ -197,8 +198,8 @@ adding log entries from R.</p>
 <span><span class="fu"><a href="../reference/Cpp_functions.html">log_warning</a></span><span class="op">(</span><span class="st">"warning entry from R script"</span><span class="op">)</span></span>
 <span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">fromJSON</a></span><span class="op">(</span><span class="fu"><a href="../reference/Cpp_functions.html">get_log</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">##                  timestamp   level                     message id   user</span></span>
-<span><span class="co">## 1 Wed Oct 28 14:33:31 2026    info    info entry from R script  0 runner</span></span>
-<span><span class="co">## 2 Wed Oct 28 14:33:31 2026 warning warning entry from R script  1 runner</span></span>
+<span><span class="co">## 1 Wed Nov  4 21:49:30 2026    info    info entry from R script  0 runner</span></span>
+<span><span class="co">## 2 Wed Nov  4 21:49:30 2026 warning warning entry from R script  1 runner</span></span>
 <span><span class="co">##                                      wd</span></span>
 <span><span class="co">## 1 /home/runner/work/FIMS/FIMS/vignettes</span></span>
 <span><span class="co">## 2 /home/runner/work/FIMS/FIMS/vignettes</span></span>
@@ -240,7 +241,7 @@ users call <code><a href="https://rdrr.io/r/methods/show.html" class="external-l
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Get documentation for log_error</span></span>
 <span><span class="fu">methods</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/methods/show.html" class="external-link">show</a></span><span class="op">(</span><span class="va">log_error</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## internal C++ function &lt;0x55d4dc427550&gt;</span></span>
+<pre><code><span><span class="co">## internal C++ function &lt;0x56309e95a3f0&gt;</span></span>
 <span><span class="co">##     docstring : See https://noaa-fims.github.io/FIMS/doxygen/rcpp__interface_8hpp.html.</span></span>
 <span><span class="co">##     signature : void log_error(std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;)</span></span></code></pre>
 <p>Another useful option is <code>set_throw_on_error()</code>. If this
@@ -258,7 +259,7 @@ will be written before FIMS terminates the session.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

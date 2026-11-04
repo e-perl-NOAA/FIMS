@@ -26,7 +26,7 @@ the value from the base model at that same year."><meta property="og:image" cont
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,6 +44,7 @@ the value from the base model at that same year."><meta property="og:image" cont
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -120,8 +121,10 @@ Mohn's rho for (e.g., "spawning_biomass", "expected_recruitment")</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A numeric value representing Mohn's rho. Values close to zero indicate
-minimal retrospective bias. Positive values suggest the model retrospectively
-underestimates the quantity, while negative values suggest overestimation.</p>
+minimal retrospective bias. Positive values mean that, on average, each
+peel's terminal-year estimate is higher than the reference model's estimate
+for the same year (retrospective overestimation), while negative values mean
+retrospective underestimation.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -158,7 +161,7 @@ https://doi.org/10.1093/icesjms/fsu198.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calculate Mohn's rho for spawning biomass</span></span></span>
-<span class="r-in"><span><span class="va">rho_ssb</span> <span class="op">&lt;-</span> <span class="fu">calculate_mohns_rho</span><span class="op">(</span><span class="va">retro_fit</span>, quantity <span class="op">=</span> <span class="st">"spawning_biomass"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">rho_sb</span> <span class="op">&lt;-</span> <span class="fu">calculate_mohns_rho</span><span class="op">(</span><span class="va">retro_fit</span>, quantity <span class="op">=</span> <span class="st">"spawning_biomass"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calculate Mohn's rho for recruitment</span></span></span>
 <span class="r-in"><span><span class="va">rho_rec</span> <span class="op">&lt;-</span> <span class="fu">calculate_mohns_rho</span><span class="op">(</span><span class="va">retro_fit</span>, quantity <span class="op">=</span> <span class="st">"expected_recruitment"</span><span class="op">)</span></span></span>
@@ -170,7 +173,7 @@ https://doi.org/10.1093/icesjms/fsu198.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

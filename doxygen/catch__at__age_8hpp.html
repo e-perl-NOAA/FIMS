@@ -84,10 +84,11 @@ MathJax.Hub.Config({
               <li><h6 class="dropdown-header" data-toc-skip>intro to fims</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo.html">introducing the fisheries integrated modeling system (fims)</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-input-data.html">introducing FIMS input data</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-growth-vonb-schnute.html">FIMS Growth with VonBertalanffySchnute</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-logging.html">introducing the fims logging system</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-user-setup-guide.html">fims user setup guide</a></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-demo-projections.html">simple projections using fims</a></li>
-              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">Running diagnostics on a FIMS model</a></li>
+              <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/fims-diagnostics.html">running diagnostics on a FIMS model</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><h6 class="dropdown-header" data-toc-skip>developer</h6></li>
               <li><a class="dropdown-item" href="https://noaa-fims.github.io/FIMS/articles/adding-new-module.html">adding a new c++ module</a></li>
@@ -221,9 +222,13 @@ $(document).ready(function(){initNavTree('catch__at__age_8hpp.html',''); initRes
 
 <p>Code to specify the catch-at-age model.  
 <a href="#details">More...</a></p>
-<div class="textblock"><code>#include &lt;set&gt;</code><br />
+<div class="textblock"><code>#include &lt;algorithm&gt;</code><br />
+<code>#include &lt;cmath&gt;</code><br />
+<code>#include &lt;set&gt;</code><br />
 <code>#include &lt;regex&gt;</code><br />
+<code>#include &lt;stdexcept&gt;</code><br />
 <code>#include &quot;<a class="el" href="fishery__model__base_8hpp_source.html">fishery_model_base.hpp</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="runtime_8hpp_source.html">population_dynamics/age_to_length_conversion/functors/runtime.hpp</a>&quot;</code><br />
 </div>
 <p><a href="catch__at__age_8hpp_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">

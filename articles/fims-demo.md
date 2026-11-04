@@ -86,7 +86,7 @@ The length data have since been added
 based on an age-length conversion matrix.
 
 To see how this example data frame was created, see the R script here
-[R/data_big.R](https://github.com/NOAA-FIMS/FIMS/blob/main/R/data_big.R).
+[data-raw/data_big.R](https://github.com/NOAA-FIMS/FIMS/blob/main/data-raw/data_big.R).
 To find out more about the columns that are present use
 [`?data_big`](https://NOAA-FIMS.github.io/FIMS/reference/data_big.md).
 
@@ -131,7 +131,7 @@ methods::show(data_4_model)
 
     ## tbl_df of class 'FIMSFrame'
 
-    ## with the following 'types': age_comp, catch, length_comp, weight_at_age, index, age_to_length_conversion
+    ## with the following 'types': age_comp, catch, length_comp, index, age_to_length_conversion, weight_at_age
 
     ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
 
@@ -201,8 +201,8 @@ get_data(data_4_model) |>
 
 The data contains the following fleets:
 
-- A single fishery fleet with age- and length-composition,
-  weight-at-age, and catch data
+- A single fishery fleet with age- and length-composition and catch
+  data, plus population weight at age
 - A single survey with age- and length-composition and index data
 
 You can use the base R function `plot(data_4_model)` to see the data
@@ -251,6 +251,11 @@ growth, and maturity modules can be created. For example,
 
 # Set up default parameters based on data
 default_parameters <- setup_default_parameters(data = data_4_model)
+```
+
+    ## Empirical weight-at-age rows found. Growth defaults to "EWAA".
+
+``` r
 
 default_parameters
 ```
@@ -275,8 +280,135 @@ default_parameters
 
 ### Update parameters
 
-Functions (e.g., `rows_*()`) from [dplyr](https://dplyr.tidyverse.org)
-can be used to update the default parameters as needed.
+The default parameters created above include a mix of parameters that
+are fixed at their starting values, i.e., “constant”; estimated as fixed
+effects, i.e., “fixed_effects”; and estimated as random effects, i.e.,
+“random_effects”. Additionally, the parameter table can include
+specifications for empirical relationships that actually are not
+parameters at all, such as empirical weight at age. These empirical
+relationships will have an “estimation_type” of `NA`. Below is a summary
+of how many fall into each category.
+
+``` r
+
+dplyr::count(default_parameters, estimation_type)
+```
+
+    ## # A tibble: 4 × 2
+    ##   estimation_type     n
+    ##   <chr>           <int>
+    ## 1 constant          395
+    ## 2 fixed_effects      49
+    ## 3 random_effects     29
+    ## 4 <NA>                1
+
+Using
+[`dplyr::count()`](https://dplyr.tidyverse.org/reference/count.html) to
+summarize parameter labels by module names is a good way to understand
+what default parameters have been defined based on the data in your
+FIMSFrame. Because there is empirical weight-at-age data in `data_big`,
+the default is to model growth empirically rather than with parameters,
+and thus, the label for the growth module is `NA`. See the [vignette on
+growth](https://NOAA-FIMS.github.io/FIMS/articles/fims-growth-vonb-schnute.md)
+for an example of how to estimate growth internally.
+
+``` r
+
+dplyr::count(default_parameters, module_name, label)
+```
+
+    ## # A tibble: 14 × 3
+    ##    module_name label                 n
+    ##    <chr>       <chr>             <int>
+    ##  1 Fleet       log_Fmort            60
+    ##  2 Fleet       log_q                 2
+    ##  3 Growth      weight_at_age         1
+    ##  4 Maturity    inflection_point      1
+    ##  5 Maturity    slope                 1
+    ##  6 Population  log_M               360
+    ##  7 Population  log_init_naa         12
+    ##  8 Population  proportion_female     1
+    ##  9 Recruitment log_devs             29
+    ## 10 Recruitment log_rzero             1
+    ## 11 Recruitment log_sd                1
+    ## 12 Recruitment logit_steep           1
+    ## 13 Selectivity inflection_point      2
+    ## 14 Selectivity slope                 2
+
+The most important parameters to update will typically be those which
+are constant rather than estimated because, at this point, the default
+values are generic and not tailored to the species being modeled. For
+example, maturity parameters are assumed to follow a logistic
+relationship with a slope of 1.0 and an inflection point of 2.0. In the
+future, species-specific defaults may be available thanks to the
+[`{fishprior}` project](https://github.com/NOAA-FIMS/fishprior).
+
+Counting the constant parameters by `module_name`, `fleet`, `label`, and
+`value` helps identify which parameters to focus on first. Knowing how
+many years and ages are in your data will help you make sense of the
+parameter counts.
+
+``` r
+
+(n_years <- FIMS::get_n_years(data_4_model))
+```
+
+    ## [1] 30
+
+``` r
+
+(n_ages <- FIMS::get_n_ages(data_4_model))
+```
+
+    ## [1] 12
+
+``` r
+
+default_parameters |>
+  dplyr::filter(estimation_type == "constant") |>
+  dplyr::count(module_name, fleet, label, value)
+```
+
+    ## # A tibble: 7 × 5
+    ##   module_name fleet   label                value     n
+    ##   <chr>       <chr>   <chr>                <dbl> <int>
+    ## 1 Fleet       fleet1  log_q                0         1
+    ## 2 Fleet       survey1 log_Fmort         -200        30
+    ## 3 Maturity    <NA>    inflection_point     2         1
+    ## 4 Maturity    <NA>    slope                1         1
+    ## 5 Population  <NA>    log_M               -1.61    360
+    ## 6 Population  <NA>    proportion_female    0.5       1
+    ## 7 Recruitment <NA>    logit_steep          0.788     1
+
+Here we can see that the defaults for the constant parameters include
+`log_M` values (by age and time step, so for the 12 ages and 30 years we
+get n = 360) which are all equal to `log(0.2) =` -1.61, maturity
+intercept and slope values with values of 2.0 and 1.0, respectively, and
+the stock-recruit parameter `logit_steepness = 0.788`. These are all
+parameters which would be good to update to species- or stock-specific
+values in a real-world application.
+
+There are helper functions in FIMS to do the logit
+(`FIMS::logit(0.2, 1.0, 0.75)`, i.e.,
+`-log(1.0 - 0.75) + log(0.75 - 0.2) = 0.788`) and the inverse-logit
+transformation (`FIMS::inv_logit(0.2, 1.0, 0.788)`, i.e.,
+`(exp(0.788) + 0.2)/(1 + exp(0.788)) = 0.75`) for you. The first and
+second arguments of both functions are the lower and upper bounds of the
+transformation, which for steepness are 0.2 and 1.0, respectively.
+
+Other constant parameters will likely be fine at the default values for
+most models, including in this case the `log_Fmort = -200` parameters
+for the `survey1` fleet which has no associated catch for all of 30
+years in the model, where a tiny value is used to effectively set the
+fishing mortality to zero. Likewise `log_q = 0` parameter for the
+`fleet1` fishing fleet, which does not have an index of abundance, is
+also fine as a default. And for many stocks, a default of
+`proportion_female = 0.5` will be fine.
+
+Users can modify any of the default parameters as needed, including the
+initial values and the choice of which parameters are constant or
+estimated. Functions (e.g., `rows_*()`) from
+[dplyr](https://dplyr.tidyverse.org) can be used to make these updates.
 
 In the code below, `rows_update()` is used to adjust the fishing
 mortality, selectivity, maturity, and population parameters from their
@@ -290,7 +422,7 @@ parameters_4_model <- default_parameters |>
     tibble::tibble(
       fleet = "fleet1",
       label = "log_Fmort",
-      timing = seq(get_n_years(data_4_model)),
+      timing = seq(FIMS::get_n_years(data_4_model)),
       value = log(c(
         0.009459165, 0.027288858, 0.045063639,
         0.061017825, 0.048600752, 0.087420554,
@@ -306,7 +438,7 @@ parameters_4_model <- default_parameters |>
     ),
     by = c("fleet", "label", "timing")
   ) |>
-  # Update selectivity parameters and log_q for survey1
+  # Update log_q for survey1
   dplyr::rows_update(
     tibble::tibble(
       fleet = "survey1",
@@ -319,7 +451,7 @@ parameters_4_model <- default_parameters |>
   dplyr::rows_update(
     tibble::tibble(
       label = "log_devs",
-      timing = 2:get_n_years(data_4_model),
+      timing = 2:FIMS::get_n_years(data_4_model),
       value = c(
         0.43787763, -0.13299042, -0.43251973, 0.64861200, 0.50640852,
         -0.06958319, 0.30246260, -0.08257384, 0.20740372, 0.15289604,
@@ -353,7 +485,7 @@ parameters_4_model <- default_parameters |>
   dplyr::rows_update(
     tibble::tibble(
       label = "log_init_naa",
-      age = seq(get_n_ages(data_4_model)),
+      age = seq(FIMS::get_n_ages(data_4_model)),
       value = c(
         13.80944, 13.60690, 13.40217, 13.19525, 12.98692, 12.77791,
         12.56862, 12.35922, 12.14979, 11.94034, 11.73088, 13.18755
@@ -362,6 +494,73 @@ parameters_4_model <- default_parameters |>
     by = c("label", "age")
   )
 ```
+
+If you are unsure of starting values to use for the initial
+numbers-at-age parameters you can use our internal helper function to
+calculate them based on natural mortality and unfished recruitment.
+
+``` r
+
+FIMS:::setup_default_log_init_naa(
+  n_ages = n_ages,
+  log_rzero = dplyr::filter(default_parameters, label == "log_rzero") |>
+    dplyr::pull(value),
+  log(0.2)
+)
+```
+
+    ##  [1] 13.81551 13.61551 13.41551 13.21551 13.01551 12.81551 12.61551 12.41551
+    ##  [9] 12.21551 12.01551 11.81551 13.32328
+
+### Time-varying parameters
+
+Catchability (`log_q`) can vary by year, with 1 value specified for each
+year instead of using a single value for all years. Give 1 row per year,
+in year order, because FIMS uses the rows in the order they appear
+rather than sorting by `timing`. Years without index data for that fleet
+do not inform `log_q`, so set those rows to
+`estimation_type = "constant"`. The value does not change the fit,
+because `log_q` in a year without index data is not included in the
+likelihood. It only affects the expected index for that year. Estimating
+them would make the Hessian singular, and then no parameter gets a
+standard error. In the output from
+[`get_estimates()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md),
+each `log_q` value is labeled with its year. A TMB parameter map can
+share 1 estimated value across a block of years, as described below.
+
+``` r
+
+# 1 log_q per year for survey1, estimated only in years with index data
+years <- FIMS::get_start_year(data_4_model):FIMS::get_end_year(data_4_model)
+index_years <- FIMS::get_data(data_4_model) |>
+  dplyr::filter(type == "index", fleet == "survey1", observed != -999) |>
+  dplyr::pull(timing)
+log_q_by_year <- parameters_4_model |>
+  dplyr::filter(fleet == "survey1", label == "log_q") |>
+  dplyr::slice(rep(1, length(years))) |>
+  dplyr::mutate(
+    timing = years,
+    estimation_type = dplyr::if_else(
+      timing %in% index_years, "fixed_effects", "constant"
+    )
+  ) |>
+  dplyr::arrange(timing)
+parameters_time_varying_q <- parameters_4_model |>
+  dplyr::filter(!(fleet == "survey1" & label == "log_q")) |>
+  dplyr::bind_rows(log_q_by_year)
+parameters_time_varying_q |>
+  dplyr::filter(label == "log_q") |>
+  dplyr::count(fleet, estimation_type)
+```
+
+    ## # A tibble: 2 × 3
+    ##   fleet   estimation_type     n
+    ##   <chr>   <chr>           <int>
+    ## 1 fleet1  constant            1
+    ## 2 survey1 fixed_effects      30
+
+In `data_big` the survey has index data in every year, so every `log_q`
+for `survey1` is estimated.
 
 ## Fit
 
@@ -393,6 +592,49 @@ a viable model. When `optimize = TRUE`, the model will be fit using
 [`stats::nlminb()`](https://rdrr.io/r/stats/nlminb.html) and an object
 of the class `FIMSFit` will be returned.
 
+### Parameter maps
+
+Add a named `map` list to the initialized input to fix or share
+parameters using TMB’s factor maps. The `p` map applies to fixed effects
+and the `re` map applies to random effects. Each factor must have the
+same length and order as its corresponding vector in
+`input[["parameters"]]`. Missing maps leave that vector unchanged. An
+`NA` entry holds a parameter at its starting value; repeated levels
+share one estimated value. Shared entries must have identical starting
+values. Levels are independent between the fixed and random vectors.
+
+For example, share the first two estimated fishing-mortality parameters:
+
+``` r
+
+mapped_input <- initialize_fims(parameters_4_model, data = data_4_model)
+fixed_names <- names(get_parameter_names(
+  as.list(mapped_input[["parameters"]][["p"]])
+))
+shared <- utils::head(which(grepl("log_Fmort", fixed_names)), 2)
+fixed_map <- seq_along(fixed_names)
+fixed_map[shared[2]] <- fixed_map[shared[1]]
+mapped_input[["parameters"]][["p"]][shared[2]] <-
+  mapped_input[["parameters"]][["p"]][shared[1]]
+mapped_input[["map"]] <- list(p = factor(fixed_map))
+mapped_fit <- fit_fims(mapped_input)
+```
+
+Use the same approach with `re` to map random effects. Mapping holds or
+shares parameters but does not remove their likelihood contributions.
+For example, fixing every recruitment deviation at zero while estimating
+its process variance can make the variance estimate degenerate; fix the
+variance too if it is not informed by other data.
+
+[`get_estimates()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
+retains all original parameter rows and gives shared parameters the same
+estimate and standard error. Mapped-off parameters have `NA` standard
+errors. Gradients are reported only on the first parameter in each
+shared fixed-effect level; parameter counts refer to the reduced vectors
+optimized by TMB. If all fixed effects are mapped off, TMB evaluates the
+random-effects model without an outer optimizer. If every fixed and
+random effect is mapped off, use `optimize = FALSE`.
+
 ### Example
 
 ``` r
@@ -408,24 +650,104 @@ fit <- parameters_4_model |>
   fit_fims(optimize = TRUE)
 ```
 
-    ## ✔ Starting optimization ...
-    ## ℹ Restarting optimizer 3 times to improve gradient.
-    ## ℹ Maximum gradient went from 0.00394 to 0.00098 after 3 steps.
-    ## ✔ Finished optimization
-    ## ✔ Finished sdreport
-    ## ℹ FIMS model version: 0.10.0.9000
-    ## ℹ Total run time was 1.26047 minutes
-    ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-    ## ℹ Maximum gradient= 0.00098
-    ## ℹ Negative log likelihood (NLL):
-    ## • Marginal NLL= 3231.25994
-    ## • Total NLL= 3164.83637
-    ## ℹ Terminal SB= 1791.60147
+### Model sanity check
 
-### Logging system
+[`fit_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/fit_fims.md)
+checks the fit and warns about any problem it finds.
+[`sanity_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/sanity_fims.md)
+prints the result of every check in one place, similar to
+`sdmTMB::sanity()`:
 
-You can look at the log file in R or write it to the disk but you must
-run
+- `optimizer`: the [`nlminb()`](https://rdrr.io/r/stats/nlminb.html)
+  convergence code is 0.
+- `max_gradient`: the maximum absolute gradient is below 0.001. It fails
+  above 0.01, and then the standard errors are not calculated.
+- `nll`: the negative log-likelihood and each of its components are
+  finite. Components that are not finite are named, e.g.,
+  `fleet1_catch`.
+- `hessian`, `standard_errors`, and `large_standard_errors`: the Hessian
+  is positive definite, no standard error is `NA`, and no fixed or
+  random effect has a standard error above 1000.
+- `condition_number`: the condition number of the Hessian is at or below
+  1e5. Larger values mean some parameters are weakly identified.
+
+``` r
+
+sanity <- sanity_fims(fit)
+```
+
+    ## ── FIMS sanity check ───────────────────────────────────────────────────────────
+
+    ## ✔ optimizer: relative convergence (4)
+
+    ## ✔ max_gradient: Maximum absolute gradient is below 0.001.
+
+    ## ✔ nll: Negative log-likelihood and its components are finite.
+
+    ## ✔ hessian: Hessian is positive definite.
+
+    ## ✔ standard_errors: No standard errors are NA.
+
+    ## ✔ large_standard_errors: No fixed or random effect has a standard error above
+    ##   the threshold.
+
+    ## ✔ condition_number: Condition number of the Hessian is at or below the
+    ##   threshold.
+
+    ## ────────────────────────────────────────────────────────────────────────────────
+
+    ## ✔ All 7 checks are OK.
+
+``` r
+
+sanity[["all_ok"]]
+```
+
+    ## [1] TRUE
+
+The same checks are stored on the fit and returned as a tibble by
+[`get_convergence()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md).
+Each row is 1 check, with its `severity` (`"OK"`, `"NOTE"` for a check
+that did not run, `"WARN"`, or `"FAIL"`), the `value` that was checked,
+the `threshold` it was compared with, the `parameter` it points to, and
+a `message`. Because the tibble is stored on the fit, it can be
+collected across many fits, e.g., in a simulation.
+
+``` r
+
+get_convergence(fit)
+```
+
+    ## # A tibble: 7 × 6
+    ##   check                 severity       value  threshold parameter        message
+    ##   <chr>                 <chr>          <dbl>      <dbl> <chr>            <chr>  
+    ## 1 optimizer             OK          0             0     <NA>             relati…
+    ## 2 max_gradient          OK          0.000246      0.001 Population.1.lo… Maximu…
+    ## 3 nll                   OK       3231.           NA     <NA>             Negati…
+    ## 4 hessian               OK         NA            NA     <NA>             Hessia…
+    ## 5 standard_errors       OK          0             0     <NA>             No sta…
+    ## 6 large_standard_errors OK          0          1000     <NA>             No fix…
+    ## 7 condition_number      OK         89.3      100000     Recruitment.1.l… Condit…
+
+### Oh no! My model didn’t converge! 😨 HELP‼️
+
+If you find yourself in the unfortunate situation where your model
+didn’t converge, start with `sanity_fims(fit)`. It names the parameters
+with the largest gradients and any negative log-likelihood components
+that are not finite. See [Checking a fit that did not
+converge](#checking-a-fit-that-did-not-converge) below for an example.
+
+To dig further, `get_report(fit)[["nll_components"]]` shows each
+negative log-likelihood component, and `names(get_report(fit))` lists
+everything else in the report. You can also look through
+`View(get_estimates(fit))` to identify problem data. See the [Viewing
+results](#viewing-results) section for how to view and filter the
+results.
+
+#### Logging system
+
+Another thing is that you can look at the log file in R or write it to
+the disk but you must run
 [`get_log()`](https://NOAA-FIMS.github.io/FIMS/reference/Cpp_functions.md)
 before you run clear to obtain information about the model because clear
 removes everything from memory, including the log.
@@ -448,67 +770,127 @@ for more information.
 log_json_string <- get_log()
 log_data_frame <- jsonlite::fromJSON(log_json_string)
 log_data_frame[1, ]
-```
-
-    ##                  timestamp   level
-    ## 1 Wed Oct 28 14:16:54 2026 warning
-    ##                                                                   message id
-    ## 1 The log_f_multiplier vector is not of size n_years. Filling with zeros.  0
-    ##     user                                    wd
-    ## 1 runner /home/runner/work/FIMS/FIMS/vignettes
-    ##                                                                                       file
-    ## 1 /home/runner/work/FIMS/FIMS/inst/include/interface/rcpp/rcpp_objects/rcpp_population.hpp
-    ##                                                                     routine
-    ## 1 bool PopulationInterface::add_to_fims_tmb_internal() [with Type = double]
-    ##   line
-    ## 1  440
-
-``` r
-
 dim(log_data_frame)
-```
-
-    ## [1] 127   9
-
-``` r
-
 # Print how many log entries there are of each type
 dplyr::count(log_data_frame, level)
+# Subset for just the warnings
+log_data_frame |> dplyr::filter(level == "warning")
+
+clear()
 ```
 
-    ##     level   n
-    ## 1    info 125
-    ## 2 warning   2
+#### Checking a fit that did not converge
+
+To see what the checks look like for a model that did not converge, the
+model below is fit again but
+[`nlminb()`](https://rdrr.io/r/stats/nlminb.html) is stopped after 5
+iterations.
+[`fit_fims()`](https://NOAA-FIMS.github.io/FIMS/reference/fit_fims.md)
+warns that the optimization failed, and because the maximum gradient is
+above 0.01, the standard errors are not calculated.
 
 ``` r
 
-# Subset for just the warnings
-log_data_frame |> dplyr::filter(level == "warning")
+unconverged_fit <- parameters_4_model |>
+  initialize_fims(data = data_4_model) |>
+  fit_fims(
+    optimize = TRUE,
+    control = list(eval.max = 5, iter.max = 5, trace = 0)
+  )
 ```
 
-    ##                  timestamp   level
-    ## 1 Wed Oct 28 14:16:54 2026 warning
-    ## 2 Wed Oct 28 14:16:54 2026 warning
-    ##                                                                   message id
-    ## 1 The log_f_multiplier vector is not of size n_years. Filling with zeros.  0
-    ## 2              Setting spawning_biomass_ratio vector to size n_years + 1.  1
-    ##     user                                    wd
-    ## 1 runner /home/runner/work/FIMS/FIMS/vignettes
-    ## 2 runner /home/runner/work/FIMS/FIMS/vignettes
-    ##                                                                                       file
-    ## 1 /home/runner/work/FIMS/FIMS/inst/include/interface/rcpp/rcpp_objects/rcpp_population.hpp
-    ## 2 /home/runner/work/FIMS/FIMS/inst/include/interface/rcpp/rcpp_objects/rcpp_population.hpp
-    ##                                                                     routine
-    ## 1 bool PopulationInterface::add_to_fims_tmb_internal() [with Type = double]
-    ## 2 bool PopulationInterface::add_to_fims_tmb_internal() [with Type = double]
-    ##   line
-    ## 1  440
-    ## 2  456
+    ## ✔ Starting optimization ...
+    ## ℹ Restarting optimizer 3 times to improve gradient.
+    ## ℹ Maximum gradient went from 57.15698 to 27.41724 after 3 steps.
+    ## ✔ Finished optimization
+
+    ## Warning: ✖ Optimization failed convergence checks.
+    ## ℹ Convergence code = 1.
+    ## ℹ Message = "function evaluation limit reached without convergence (9)".
+    ## ℹ Maximum absolute gradient ("2.741724e+01") is higher than 0.01 or not finite.
+    ##   Model does not seem converged.
+    ## ℹ Largest absolute gradients are on "dnorm.7.log_sd.763",
+    ##   "Population.1.log_init_naa.1210", and "Fleet.1.log_Fmort.4".
+    ## ℹ Skipping sdreport. Consider adjusting control parameters (eval.max, iter.max)
+    ##   or model structure.
+    ## ℹ Model fit returned for diagnostic purposes only. Results are not reliable.
+
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## Also defined by 'tibble'
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## Also defined by 'tibble'
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## Also defined by 'tibble'
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## Also defined by 'tibble'
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## Also defined by 'tibble'
+    ## ✖ Convergence: "FAIL" from "optimizer", "max_gradient", and "sdreport". Use
+    ##   `sanity_fims(fit)` to see each check.
+    ## ℹ FIMS model version: 0.11.0.9000
+    ## ℹ Total run time was 2.7383 seconds
+    ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
+    ## ℹ Maximum gradient= 27.41724
+    ## ℹ Negative log likelihood (NLL):
+    ## • Marginal NLL= 3262.81027
+    ## • Total NLL= 3196.75596
+    ## ℹ Terminal SB= 1618.3345
+
+[`get_convergence()`](https://NOAA-FIMS.github.io/FIMS/reference/get_FIMSFit.md)
+shows that the optimizer and maximum gradient checks failed and that the
+Hessian was not checked. The `parameter` column of `max_gradient` names
+the 3 parameters with the largest gradients, which are a good place to
+start looking.
+
+``` r
+
+get_convergence(unconverged_fit)
+```
+
+    ## # A tibble: 4 × 6
+    ##   check        severity  value threshold parameter                       message
+    ##   <chr>        <chr>     <dbl>     <dbl> <chr>                           <chr>  
+    ## 1 optimizer    FAIL        1       0     <NA>                            functi…
+    ## 2 max_gradient FAIL       27.4     0.001 dnorm.7.log_sd.763, Population… Maximu…
+    ## 3 nll          OK       3263.     NA     <NA>                            Negati…
+    ## 4 sdreport     NOTE       NA      NA     <NA>                            Hessia…
+
+``` r
+
+sanity <- sanity_fims(unconverged_fit)
+```
+
+    ## ── FIMS sanity check ───────────────────────────────────────────────────────────
+
+    ## ✖ optimizer: function evaluation limit reached without convergence (9)
+
+    ## ✖ max_gradient: Maximum absolute gradient is above 0.01 or not finite.
+    ##   (dnorm.7.log_sd.763, Population.1.log_init_naa.1210, Fleet.1.log_Fmort.4)
+
+    ## ✔ nll: Negative log-likelihood and its components are finite.
+
+    ## ℹ sdreport: Hessian not checked because the maximum gradient failed.
+
+    ## ────────────────────────────────────────────────────────────────────────────────
+
+    ## ✖ 2 of 4 checks need attention:
+    ## "optimizer" and "max_gradient".
+
+    ## ℹ 1 check did not run: "sdreport".
+
+``` r
+
+sanity[["all_ok"]]
+```
+
+    ## [1] FALSE
 
 ``` r
 
 clear()
 ```
+
+### Viewing results
 
 The results can be plotted with either base R, {ggplot2}, or
 {stockplotr}. Where, we recommend using {stockplotr} where possible.
@@ -649,17 +1031,30 @@ high_slope_fit <- parameters_high_slope |>
 
     ## ✔ Starting optimization ...
     ## ℹ Restarting optimizer 3 times to improve gradient.
-    ## ℹ Maximum gradient went from 0.00516 to 3e-04 after 3 steps.
+    ## ℹ Maximum gradient went from 0.00199 to 0.00025 after 3 steps.
     ## ✔ Finished optimization
     ## ✔ Finished sdreport
-    ## ℹ FIMS model version: 0.10.0.9000
-    ## ℹ Total run time was 1.18586 minutes
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## ✔ Convergence: "OK"
+    ## ℹ FIMS model version: 0.11.0.9000
+    ## ℹ Total run time was 57.91917 seconds
     ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-    ## ℹ Maximum gradient= 3e-04
+    ## ℹ Maximum gradient= 0.00025
     ## ℹ Negative log likelihood (NLL):
     ## • Marginal NLL= 3231.25994
     ## • Total NLL= 3164.83637
-    ## ℹ Terminal SB= 1791.59107
+    ## ℹ Terminal SB= 1791.5912
 
 ``` r
 
@@ -672,17 +1067,180 @@ low_slope_fit <- parameters_low_slope |>
 
     ## ✔ Starting optimization ...
     ## ℹ Restarting optimizer 3 times to improve gradient.
-    ## ℹ Maximum gradient went from 0.00353 to 0.00057 after 3 steps.
+    ## ℹ Maximum gradient went from 0.00316 to 0.00034 after 3 steps.
     ## ✔ Finished optimization
     ## ✔ Finished sdreport
-    ## ℹ FIMS model version: 0.10.0.9000
-    ## ℹ Total run time was 1.21818 minutes
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## ✔ Convergence: "OK"
+    ## ℹ FIMS model version: 0.11.0.9000
+    ## ℹ Total run time was 58.69427 seconds
     ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-    ## ℹ Maximum gradient= 0.00057
+    ## ℹ Maximum gradient= 0.00034
     ## ℹ Negative log likelihood (NLL):
     ## • Marginal NLL= 3231.25994
     ## • Total NLL= 3164.83637
-    ## ℹ Terminal SB= 1791.58654
+    ## ℹ Terminal SB= 1791.58086
+
+``` r
+
+clear()
+```
+
+#### Age-specific selectivity
+
+One could also change the default selectivity configuration for the
+survey, update default parameterization, and evaluate the ability to
+estimate a small number of age-specific parameter values.
+
+``` r
+
+# Update "survey1" selectivity from "Logistic" to "AgeSpecificSelectivity"
+# This function is also used by setup_default_parameters()
+age_specific_selectivity_default <- setup_default_Selectivity(
+  data = data_4_model,
+  fleet = "survey1",
+  module_type = "AgeSpecific"
+)
+age_specific_selectivity_default
+```
+
+    ## # A tibble: 12 × 11
+    ##    module_name fleet module_type label   age length timing value estimation_type
+    ##    <chr>       <chr> <chr>       <chr> <int>  <dbl>  <int> <dbl> <chr>          
+    ##  1 Selectivity surv… AgeSpecific logi…     1     NA     NA -1    fixed_effects  
+    ##  2 Selectivity surv… AgeSpecific logi…     2     NA     NA  0    fixed_effects  
+    ##  3 Selectivity surv… AgeSpecific logi…     3     NA     NA  1    fixed_effects  
+    ##  4 Selectivity surv… AgeSpecific logi…     4     NA     NA  2.00 fixed_effects  
+    ##  5 Selectivity surv… AgeSpecific logi…     5     NA     NA  3.00 fixed_effects  
+    ##  6 Selectivity surv… AgeSpecific logi…     6     NA     NA  4    fixed_effects  
+    ##  7 Selectivity surv… AgeSpecific logi…     7     NA     NA  5.00 fixed_effects  
+    ##  8 Selectivity surv… AgeSpecific logi…     8     NA     NA  6.00 fixed_effects  
+    ##  9 Selectivity surv… AgeSpecific logi…     9     NA     NA  7.00 fixed_effects  
+    ## 10 Selectivity surv… AgeSpecific logi…    10     NA     NA  8.00 fixed_effects  
+    ## 11 Selectivity surv… AgeSpecific logi…    11     NA     NA  9.00 fixed_effects  
+    ## 12 Selectivity surv… AgeSpecific logi…    12     NA     NA 10.0  constant       
+    ## # ℹ 2 more variables: distribution_type <chr>, distribution <chr>
+
+``` r
+
+parameters_age_specific_selectivity <- parameters_4_model |>
+  dplyr::filter(!(fleet == "survey1" & module_name == "Selectivity")) |>
+  dplyr::bind_rows(age_specific_selectivity_default)
+
+# Look at updated default parameters
+parameters_age_specific_selectivity |>
+  dplyr::filter(fleet == "survey1", module_name == "Selectivity") |>
+  dplyr::select(module_type, fleet, label, age, value, estimation_type)
+```
+
+    ## # A tibble: 12 × 6
+    ##    module_type fleet   label              age value estimation_type
+    ##    <chr>       <chr>   <chr>            <dbl> <dbl> <chr>          
+    ##  1 AgeSpecific survey1 logit_sel_at_age     1 -1    fixed_effects  
+    ##  2 AgeSpecific survey1 logit_sel_at_age     2  0    fixed_effects  
+    ##  3 AgeSpecific survey1 logit_sel_at_age     3  1    fixed_effects  
+    ##  4 AgeSpecific survey1 logit_sel_at_age     4  2.00 fixed_effects  
+    ##  5 AgeSpecific survey1 logit_sel_at_age     5  3.00 fixed_effects  
+    ##  6 AgeSpecific survey1 logit_sel_at_age     6  4    fixed_effects  
+    ##  7 AgeSpecific survey1 logit_sel_at_age     7  5.00 fixed_effects  
+    ##  8 AgeSpecific survey1 logit_sel_at_age     8  6.00 fixed_effects  
+    ##  9 AgeSpecific survey1 logit_sel_at_age     9  7.00 fixed_effects  
+    ## 10 AgeSpecific survey1 logit_sel_at_age    10  8.00 fixed_effects  
+    ## 11 AgeSpecific survey1 logit_sel_at_age    11  9.00 fixed_effects  
+    ## 12 AgeSpecific survey1 logit_sel_at_age    12 10.0  constant
+
+``` r
+
+# Update the age-specific selectivity parameterization to facilitate estimation
+# Values for first two ages are set to generic initial values and estimated
+# using "fixed_effects"
+# Other values are fixed to true approximate values used in generating demo data
+parameters_age_specific_selectivity <- parameters_age_specific_selectivity |>
+  dplyr::rows_update(
+    tibble::tibble(
+      fleet = "survey1",
+      label = "logit_sel_at_age",
+      age = seq(get_n_ages(data_4_model)),
+      value = c(
+        0, 0, 2.999999, 4.999993, 6.999946,
+        8.999956, 11.000085, 12.982599, 15.019483, 18.420681,
+        18.420681, 18.420681
+      ),
+      estimation_type = c(rep("fixed_effects", 2), rep("constant", 10))
+    ),
+    by = c("fleet", "label", "age")
+  )
+
+# Run the model and look at estimated parameter values
+# True parameter values for the first two ages are -1 and 1, respectively
+age_specific_selectivity_fit <- parameters_age_specific_selectivity |>
+  initialize_fims(data = data_4_model) |>
+  fit_fims(optimize = TRUE)
+```
+
+    ## ✔ Starting optimization ...
+    ## ℹ Restarting optimizer 3 times to improve gradient.
+    ## ℹ Maximum gradient went from 0.00331 to 0.00033 after 3 steps.
+    ## ✔ Finished optimization
+    ## ✔ Finished sdreport
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## ✔ Convergence: "OK"
+    ## ℹ FIMS model version: 0.11.0.9000
+    ## ℹ Total run time was 57.35983 seconds
+    ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
+    ## ℹ Maximum gradient= 0.00033
+    ## ℹ Negative log likelihood (NLL):
+    ## • Marginal NLL= 3231.29832
+    ## • Total NLL= 3164.88132
+    ## ℹ Terminal SB= 1791.0122
+
+``` r
+
+get_estimates(age_specific_selectivity_fit) |>
+  dplyr::filter(module_name == "Selectivity", module_type == "AgeSpecific")
+```
+
+    ## # A tibble: 12 × 24
+    ##    module_name module_id module_type label      type  type_id parameter_id fleet
+    ##    <chr>           <int> <chr>       <chr>      <chr>   <int>        <int> <chr>
+    ##  1 Selectivity         2 AgeSpecific logit_sel… vect…      31          364 surv…
+    ##  2 Selectivity         2 AgeSpecific logit_sel… vect…      31          365 surv…
+    ##  3 Selectivity         2 AgeSpecific logit_sel… vect…      31          366 surv…
+    ##  4 Selectivity         2 AgeSpecific logit_sel… vect…      31          367 surv…
+    ##  5 Selectivity         2 AgeSpecific logit_sel… vect…      31          368 surv…
+    ##  6 Selectivity         2 AgeSpecific logit_sel… vect…      31          369 surv…
+    ##  7 Selectivity         2 AgeSpecific logit_sel… vect…      31          370 surv…
+    ##  8 Selectivity         2 AgeSpecific logit_sel… vect…      31          371 surv…
+    ##  9 Selectivity         2 AgeSpecific logit_sel… vect…      31          372 surv…
+    ## 10 Selectivity         2 AgeSpecific logit_sel… vect…      31          373 surv…
+    ## 11 Selectivity         2 AgeSpecific logit_sel… vect…      31          374 surv…
+    ## 12 Selectivity         2 AgeSpecific logit_sel… vect…      31          375 surv…
+    ## # ℹ 16 more variables: year_i <int>, age <dbl>, length <dbl>, input <dbl>,
+    ## #   estimated <dbl>, expected <dbl>, observed <dbl>, estimation_type <chr>,
+    ## #   uncertainty <dbl>, distribution <chr>, input_type <chr>, lpdf <dbl>,
+    ## #   likelihood <dbl>, log_sd <dbl>, log_like_cv <dbl>, gradient <dbl>
 
 ``` r
 
@@ -745,17 +1303,30 @@ age_only_fit <- parameters_4_model |>
 
     ## ✔ Starting optimization ...
     ## ℹ Restarting optimizer 3 times to improve gradient.
-    ## ℹ Maximum gradient went from 0.0024 to 0.00021 after 3 steps.
+    ## ℹ Maximum gradient went from 0.00197 to 0.00048 after 3 steps.
     ## ✔ Finished optimization
     ## ✔ Finished sdreport
-    ## ℹ FIMS model version: 0.10.0.9000
-    ## ℹ Total run time was 11.36554 seconds
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## ✔ Convergence: "OK"
+    ## ℹ FIMS model version: 0.11.0.9000
+    ## ℹ Total run time was 9.77396 seconds
     ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-    ## ℹ Maximum gradient= 0.00021
+    ## ℹ Maximum gradient= 0.00048
     ## ℹ Negative log likelihood (NLL):
     ## • Marginal NLL= 1627.76704
     ## • Total NLL= 1564.08529
-    ## ℹ Terminal SB= 1740.95134
+    ## ℹ Terminal SB= 1740.95
 
 ``` r
 
@@ -783,19 +1354,38 @@ length_only_fit <- parameters_4_model |>
 
     ## Also defined by 'tibble'
 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+
+    ## Also defined by 'tibble'
+
     ## ✔ Starting optimization ...
     ## ℹ Restarting optimizer 3 times to improve gradient.
-    ## ℹ Maximum gradient went from 0.01122 to 3e-04 after 3 steps.
+    ## ℹ Maximum gradient went from 0.01823 to 0.00018 after 3 steps.
     ## ✔ Finished optimization
     ## ✔ Finished sdreport
-    ## ℹ FIMS model version: 0.10.0.9000
-    ## ℹ Total run time was 1.14424 minutes
+
+    ## Warning: ! 1 fixed or random effect has a standard error above 1000:
+    ##   "Population.1.log_init_naa.1205".
+    ## ℹ The data may not inform these parameters. Consider fixing them, adding a
+    ##   prior, or simplifying the model.
+    ## ℹ Run `sanity_fims(fit)` to see every convergence check.
+
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## Also defined by 'tibble'
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## Also defined by 'tibble'
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## Also defined by 'tibble'
+    ## ! Convergence: "WARN" from "large_standard_errors". Use `sanity_fims(fit)` to
+    ##   see each check.
+    ## ℹ FIMS model version: 0.11.0.9000
+    ## ℹ Total run time was 1.27564 minutes
     ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-    ## ℹ Maximum gradient= 3e-04
+    ## ℹ Maximum gradient= 0.00018
     ## ℹ Negative log likelihood (NLL):
     ## • Marginal NLL= 1568.32685
     ## • Total NLL= 1518.62643
-    ## ℹ Terminal SB= 1722.35617
+    ## ℹ Terminal SB= 1722.36062
 
 ``` r
 

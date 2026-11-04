@@ -10,7 +10,7 @@ user if they have used their own bespoke code to fit a FIMS model."><meta proper
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -28,6 +28,7 @@ user if they have used their own bespoke code to fit a FIMS model."><meta proper
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -81,7 +82,8 @@ user if they have used their own bespoke code to fit a FIMS model.</p>
 <span>  opt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  sdreport <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  run_time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>time_total <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/difftime.html" class="external-link">as.difftime</a></span><span class="op">(</span><span class="fl">0</span>, units <span class="op">=</span> <span class="st">"secs"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  version <span class="op">=</span> <span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">"FIMS"</span><span class="op">)</span></span>
+<span>  version <span class="op">=</span> <span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">"FIMS"</span><span class="op">)</span>,</span>
+<span>  convergence <span class="op">=</span> <span class="fu">convergence_tibble</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -90,7 +92,17 @@ user if they have used their own bespoke code to fit a FIMS model.</p>
 
 
 <dl><dt id="arg-input">input<a class="anchor" aria-label="anchor" href="#arg-input"></a></dt>
-<dd><p>Input list as returned by <code><a href="initialize_fims.html">initialize_fims()</a></code>.</p></dd>
+<dd><p>Input list as returned by <code><a href="initialize_fims.html">initialize_fims()</a></code>. An optional
+<code>map</code> entry is a named list of factors for <code>p</code> (fixed effects) and/or <code>re</code>
+(random effects), in the order of the corresponding <code>parameters</code> vector.
+Each factor must have one entry per parameter. <code>NA</code> holds a parameter at
+its starting value; repeated levels share one estimated value. Shared
+entries must have identical starting values; otherwise, the error lists
+each parameter's name, 1-based index in <code>p</code> or <code>re</code>, and initial value.
+Factor levels determine the
+reduced parameter order; unused levels are dropped. Levels in <code>p</code> and <code>re</code>
+are independent; sharing
+across these vectors is not supported.</p></dd>
 
 
 <dt id="arg-obj">obj<a class="anchor" aria-label="anchor" href="#arg-obj"></a></dt>
@@ -119,6 +131,12 @@ by subtracting two <code><a href="https://rdrr.io/r/base/Sys.time.html" class="e
 <dd><p>The version of FIMS that was used to optimize the model. If
 <code><a href="fit_fims.html">fit_fims()</a></code> was not used to optimize the model, then the default is to
 use the current version of the package that is loaded.</p></dd>
+
+
+<dt id="arg-convergence">convergence<a class="anchor" aria-label="anchor" href="#arg-convergence"></a></dt>
+<dd><p>A data frame with one row per convergence check, as
+returned by <code><a href="get_FIMSFit.html">get_convergence()</a></code>. <code><a href="fit_fims.html">fit_fims()</a></code> fills it in. The default has
+no rows, which means no checks were run.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -155,6 +173,10 @@ if you are running this function yourself.</p></dd>
 <dt><code>model_output</code>:</dt>
 <dd><p>The FIMS model output as a JSON string.</p></dd>
 
+<dt><code>convergence</code>:</dt>
+<dd><p>A tibble with the result of each convergence check. See
+<code><a href="get_FIMSFit.html">get_convergence()</a></code>.</p></dd>
+
 
 </dl></div>
 
@@ -163,7 +185,7 @@ if you are running this function yourself.</p></dd>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

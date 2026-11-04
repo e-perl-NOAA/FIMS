@@ -6,7 +6,7 @@
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,6 +24,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -77,6 +78,27 @@
 
         </dt>
         <dd>FIMS input data frame</dd>
+
+        <dt>
+
+          <code><a href="parameters_big.html">parameters_big</a></code>
+
+        </dt>
+        <dd>FIMS parameter tibble</dd>
+
+        <dt>
+
+          <code><a href="estimates_big_optimized.html">estimates_big_optimized</a></code>
+
+        </dt>
+        <dd>FIMS estimates for the example data</dd>
+
+        <dt>
+
+          <code><a href="fit_big_optimized.html">fit_big_optimized</a></code>
+
+        </dt>
+        <dd>FIMS fit using the example data</dd>
 
         <dt>
 
@@ -222,7 +244,7 @@
 
         <dt>
 
-          <code><a href="get_FIMSFit.html">get_input()</a></code> <code><a href="get_FIMSFit.html">get_report()</a></code> <code><a href="get_FIMSFit.html">get_obj()</a></code> <code><a href="get_FIMSFit.html">get_opt()</a></code> <code><a href="get_FIMSFit.html">get_max_gradient()</a></code> <code><a href="get_FIMSFit.html">get_gradient()</a></code> <code><a href="get_FIMSFit.html">get_sdreport()</a></code> <code><a href="get_FIMSFit.html">get_estimates()</a></code> <code><a href="get_FIMSFit.html">get_number_of_parameters()</a></code> <code><a href="get_FIMSFit.html">get_run_time()</a></code> <code><a href="get_FIMSFit.html">get_version()</a></code> <code><a href="get_FIMSFit.html">get_model_output()</a></code>
+          <code><a href="get_FIMSFit.html">get_input()</a></code> <code><a href="get_FIMSFit.html">get_report()</a></code> <code><a href="get_FIMSFit.html">get_obj()</a></code> <code><a href="get_FIMSFit.html">get_opt()</a></code> <code><a href="get_FIMSFit.html">get_max_gradient()</a></code> <code><a href="get_FIMSFit.html">get_gradient()</a></code> <code><a href="get_FIMSFit.html">get_sdreport()</a></code> <code><a href="get_FIMSFit.html">get_convergence()</a></code> <code><a href="get_FIMSFit.html">get_estimates()</a></code> <code><a href="get_FIMSFit.html">get_number_of_parameters()</a></code> <code><a href="get_FIMSFit.html">get_run_time()</a></code> <code><a href="get_FIMSFit.html">get_version()</a></code> <code><a href="get_FIMSFit.html">get_model_output()</a></code>
 
         </dt>
         <dd>Get a slot in a FIMSFit object</dd>
@@ -233,6 +255,13 @@
 
         </dt>
         <dd>Check if an object is of class FIMSFit</dd>
+
+        <dt>
+
+          <code><a href="sanity_fims.html">sanity_fims()</a></code>
+
+        </dt>
+        <dd>Check whether a fitted FIMS model is ready to use</dd>
 
         <dt>
 
@@ -389,7 +418,7 @@
 
       <dl><dt>
 
-          <code><a href="Cpp_classes.html">Cpp_classes</a></code> <code><a href="Cpp_classes.html">AgeComp</a></code> <code><a href="Cpp_classes.html">BevertonHoltRecruitment</a></code> <code><a href="Cpp_classes.html">CatchAtAge</a></code> <code><a href="Cpp_classes.html">DlnormDistribution</a></code> <code><a href="Cpp_classes.html">DmultinomDistribution</a></code> <code><a href="Cpp_classes.html">DnormDistribution</a></code> <code><a href="Cpp_classes.html">DoubleLogisticSelectivity</a></code> <code><a href="Cpp_classes.html">EWAAGrowth</a></code> <code><a href="Cpp_classes.html">Fleet</a></code> <code><a href="Cpp_classes.html">Index</a></code> <code><a href="Cpp_classes.html">Catch</a></code> <code><a href="Cpp_classes.html">LengthComp</a></code> <code><a href="Cpp_classes.html">LogDevsRecruitmentProcess</a></code> <code><a href="Cpp_classes.html">LogRRecruitmentProcess</a></code> <code><a href="Cpp_classes.html">LogisticMaturity</a></code> <code><a href="Cpp_classes.html">LogisticSelectivity</a></code> <code><a href="Cpp_classes.html">Variable</a></code> <code><a href="Cpp_classes.html">VariableVector</a></code> <code><a href="Cpp_classes.html">Population</a></code> <code><a href="Cpp_classes.html">RealVector</a></code> <code><a href="Cpp_classes.html">SharedInt</a></code> <code><a href="Cpp_classes.html">SharedReal</a></code> <code><a href="Cpp_classes.html">SharedString</a></code>
+          <code><a href="Cpp_classes.html">Cpp_classes</a></code> <code><a href="Cpp_classes.html">AgeComp</a></code> <code><a href="Cpp_classes.html">BevertonHoltRecruitment</a></code> <code><a href="Cpp_classes.html">CatchAtAge</a></code> <code><a href="Cpp_classes.html">DlnormDistribution</a></code> <code><a href="Cpp_classes.html">DmultinomDistribution</a></code> <code><a href="Cpp_classes.html">DnormDistribution</a></code> <code><a href="Cpp_classes.html">DoubleLogisticSelectivity</a></code> <code><a href="Cpp_classes.html">EWAAGrowth</a></code> <code><a href="Cpp_classes.html">VonBertalanffySchnuteGrowth</a></code> <code><a href="Cpp_classes.html">Fleet</a></code> <code><a href="Cpp_classes.html">Index</a></code> <code><a href="Cpp_classes.html">Catch</a></code> <code><a href="Cpp_classes.html">LengthComp</a></code> <code><a href="Cpp_classes.html">LogDevsRecruitmentProcess</a></code> <code><a href="Cpp_classes.html">LogRRecruitmentProcess</a></code> <code><a href="Cpp_classes.html">LogisticMaturity</a></code> <code><a href="Cpp_classes.html">LogisticSelectivity</a></code> <code><a href="Cpp_classes.html">Variable</a></code> <code><a href="Cpp_classes.html">VariableVector</a></code> <code><a href="Cpp_classes.html">Population</a></code> <code><a href="Cpp_classes.html">RealVector</a></code> <code><a href="Cpp_classes.html">SharedInt</a></code> <code><a href="Cpp_classes.html">SharedReal</a></code> <code><a href="Cpp_classes.html">SharedString</a></code>
 
         </dt>
         <dd>C++ Classes Exported via Rcpp</dd>
@@ -450,7 +479,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

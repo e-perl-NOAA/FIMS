@@ -28,7 +28,7 @@
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,6 +50,7 @@
 <li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -142,11 +143,13 @@ looking at the raw data frame. To meet this second challenge, the FIMS
 team is working on functions to summarize, visualize, and check for
 errors in the input data.</p>
 <p>The currently available values for the <code>type</code> column are
-“age_comp”, “age_to_length_conversion”, “index”, “catch”, “length_comp”,
-and “weight_at_age”. The “weight_at_age” and “age_to_length_conversion”
-types are not currently treated as data in the sense that they are not
-included in the likelihood, just used within the population dynamics
-calculations.</p>
+“age_comp”, “age_to_length_conversion”, “ageing_error”, “index”,
+“catch”, “length_bin”, “length_comp”, and “weight_at_age”. The
+“weight_at_age”, “ageing_error”, and “age_to_length_conversion” types
+are not currently treated as data in the sense that they are not
+included in the likelihood. They are used in the population dynamics
+calculations or, for “ageing_error”, in the expected age
+compositions.</p>
 <p>The individual data types are described in more detail below after
 introducing the example data set that is included in the package.</p>
 </div>
@@ -173,7 +176,10 @@ stores the input data frame and several other slots that store summary
 information about the object, e.g., the fleet names, the number of age
 bins, etc. All of this information can be accessed using
 <code>get_*()</code> functions, e.g., <code><a href="../reference/get_FIMSFrame.html">get_n_years()</a></code>,
-<code><a href="../reference/get_FIMSFrame.html">get_fleets()</a></code>.</p>
+<code><a href="../reference/get_FIMSFrame.html">get_fleets()</a></code>. Every fleet named in the data must have
+catch, index, or composition data. <code><a href="../reference/FIMSFrame.html">FIMSFrame()</a></code> returns an
+error otherwise, so a misspelled fleet name in other rows does not add a
+fleet to the model.</p>
 <p>When you execute <code><a href="../reference/FIMSFrame.html">FIMSFrame()</a></code> on a long data frame, such
 as <code>data_big</code>, the function executes several error checks to
 help ensure that your data is ready for a FIMS model. For example, until
@@ -189,7 +195,7 @@ overview vignette</a> for more information.</p>
 <code class="sourceCode R"><span><span class="va">data_4_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/FIMSFrame.html">FIMSFrame</a></span><span class="op">(</span><span class="va">data_big</span><span class="op">)</span></span>
 <span><span class="va">data_4_model</span></span></code></pre></div>
 <pre><code><span><span class="co">## tbl_df of class 'FIMSFrame'</span></span></code></pre>
-<pre><code><span><span class="co">## with the following 'types': age_comp, catch, length_comp, weight_at_age, index, age_to_length_conversion</span></span></code></pre>
+<pre><code><span><span class="co">## with the following 'types': age_comp, catch, length_comp, index, age_to_length_conversion, weight_at_age</span></span></code></pre>
 <pre><code><span><span class="co">## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'</span></span></code></pre>
 <pre><code><span><span class="co">## Also defined by 'tibble'</span></span></code></pre>
 <pre><code><span><span class="co">## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'</span></span></code></pre>
@@ -224,18 +230,33 @@ overview vignette</a> for more information.</p>
 <div class="section level2">
 <h2 id="catch-type-catch">Catch (<code>type == "catch"</code>)<a class="anchor" aria-label="anchor" href="#catch-type-catch"></a>
 </h2>
-<p>The catch data type contains the total catch in weight for each time
-step. FIMS does not yet include the option to model discards internally,
-so “catch” should account for all catch. The catch are not associated
-with an age or length so those columns should only contain
-<code>NA</code> values. The <code>unit</code> column should currently
-always be <code>mt</code>. The <code>uncertainty</code> column should be
-the standard deviation of the logged observations if you are using the
-lognormal distribution to fit your data. <code>log_Fmort</code>
-parameters for each fleet and time step with catch can be estimated to
-fit the model to the catch data, informed by the uncertainty values.
-Common practice is to set the uncertainty to a small number, like 0.001,
-so the catch data are fit closely.</p>
+<p>The catch data type contains the total catch in weight or numbers for
+each time step. FIMS does not yet include the option to model discards
+internally, so “catch” should account for all catch. The catch are not
+associated with an age or length so those columns should only contain
+<code>NA</code> values. The <code>unit</code> column should be
+<code>mt</code> for catch in weight or <code>number</code> for catch in
+numbers, and all catch rows of a fleet must use the same unit. FIMS fits
+<code>mt</code> catch to the expected catch in weight and
+<code>number</code> catch to the expected catch in numbers. FIMS does
+not rescale catch, so catch in numbers must be on the same scale as
+numbers at age in the model. For example, when weight at age is in mt
+per fish, catch in numbers is the number of fish, not thousands of fish.
+The <code>uncertainty</code> column should be the standard deviation of
+the logged observations if you are using the lognormal distribution to
+fit your data. <code>log_Fmort</code> parameters for each fleet and time
+step with catch can be estimated to fit the model to the catch data,
+informed by the uncertainty values. Common practice is to set the
+uncertainty to a small number, like 0.001, so the catch data are fit
+closely. A catch of 0 means the fleet did not fish in that time step.
+<code><a href="../reference/setup_default_parameters.html">setup_default_parameters()</a></code> fixes <code>log_Fmort</code> for
+that fleet and year at -200, so fishing mortality is effectively 0, and
+the 0 is left out of the likelihood. It is reported as -999 in the
+output, the same as missing data. If you estimate <code>log_Fmort</code>
+in that year instead, <code><a href="../reference/initialize_fims.html">initialize_fims()</a></code> warns, because
+nothing in the data informs it. A fleet with a catch of 0 in every year
+and no composition data gives no information on its selectivity. Use
+-999, not 0, for a missing catch.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># first three rows of the catch data</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
@@ -264,9 +285,12 @@ so the catch data are fit closely.</p>
 </h2>
 <p>The index data type contains the relative or absolute abundance index
 for each time step. The inputs are similar to catch, in having
-<code>NA</code> values for age and length, <code>mt</code> for
-<code>unit</code>, and index uncertainty as the standard deviation of
-the logged observations.</p>
+<code>NA</code> values for age and length, <code>mt</code> or
+<code>number</code> for <code>unit</code> (1 unit for all index rows of
+a fleet), and index uncertainty as the standard deviation of the logged
+observations. An index of 0 or less cannot be fit with the lognormal
+distribution, and <code><a href="../reference/FIMSFrame.html">FIMSFrame()</a></code> returns an error for it. Use
+-999 for a missing index, or a distribution that allows 0.</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># first three rows of the index data</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
@@ -322,7 +346,9 @@ column should be either “number” or “proportion”. If “proportion” is
 used, the observations are checked at a later step to confirm that they
 sum to 1.0. The <code>uncertainty</code> column should be the input
 sample size for the time step (equal across all ages within that time
-step).</p>
+step). When the unit is set to a proportion, the sample size is
+multiplied by the proportion; however, when it is set to a number, the
+sample size is ignored.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># first three rows of the age composition data</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
@@ -356,10 +382,28 @@ step).</p>
 </h2>
 <p>The length-composition data are similar to the age compositions,
 except with values in the <code>length</code> column and
-<code>age = NA</code>. FIMS does not yet have parametric growth
-implemented so the length bins can be any values as long as the
-distribution of each age among those bins is provided by the
-<code>age_to_length_conversion</code> data type described below.</p>
+<code>age = NA</code>. The <code>length</code> column identifies the
+length bin for each observation by its lower edge. A bin holds lengths
+from its lower edge up to the next lower edge. For example, with
+<code>length</code> values of 0, 50, …, 1100, the bin labeled
+<code>250</code> includes fish measuring at least 250 mm but less than
+300 mm (250–299 mm for whole-number measurements). The next bin, labeled
+<code>300</code>, includes fish measuring at least 300 mm but less than
+350 mm (i.e. <code>[300, 350)</code> in interval notation). When growth
+is estimated in FIMS, the first bin also holds all smaller fish and the
+last bin holds all larger fish. With fixed
+<code>age_to_length_conversion</code> rows, those rows set what each bin
+holds. The <code>observed</code> column contains either the number or
+the proportion of fish in each length bin. The <code>unit</code> column
+should be either “number” or “proportion”. The <code>uncertainty</code>
+column should be the input sample size for the time step, repeated
+across all length bins in that time step. When the unit is set to a
+proportion, the sample size is multiplied by the proportion; however,
+when it is set to a number, the sample size is ignored.</p>
+<p>When length compositions are included, FIMS needs a way to convert
+numbers at age into numbers at length. This can come from fixed
+<code>age_to_length_conversion</code> rows or from a growth-derived
+age-to-length conversion using the VonB-Schnute Growth module.</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># first three rows of the length composition data</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
@@ -388,42 +432,68 @@ distribution of each age among those bins is provided by the
 <p><img src="fims-input-data_files/figure-html/data_big-length_comp-plot-1.png" class="r-plt" alt="Barplot showing length comp by time step with a mode around 450 mm which declines and becomes more sharply peaked over time." width="700"></p>
 </div>
 <div class="section level2">
+<h2 id="length-bins-type-length_bin">Length bins (<code>type == "length_bin"</code>)<a class="anchor" aria-label="anchor" href="#length-bins-type-length_bin"></a>
+</h2>
+<p>The <code>length_bin</code> data type defines length bins without
+providing length-composition observations. These rows are useful when a
+model needs length-bin geometry for a growth-derived age-to-length
+conversion, but the user is not fitting length-composition data for that
+fleet.</p>
+<p>For <code>length_bin</code> rows, the <code>length</code> column
+contains the lower edge of each length bin, the same as for length
+compositions. The <code>observed</code>, <code>age</code>, and
+<code>uncertainty</code> columns should usually be <code>NA</code>. The
+<code>fleet</code> column identifies which fleet or survey the length
+bins apply to, and <code>timing</code> can be <code>NA</code> unless
+fleet-specific timing is needed.</p>
+</div>
+<div class="section level2">
 <h2 id="weight-at-age-data-type-weight_at_age">Weight-at-age data (<code>type == "weight_at_age"</code>)<a class="anchor" aria-label="anchor" href="#weight-at-age-data-type-weight_at_age"></a>
 </h2>
 <p>The weight-at-age data are not currently included in the likelihood
 and are just used for converting from numbers to biomass in the
 population dynamics. The <code>unit</code> column should be
 <code>mt</code> and the uncertainty should be <code>NA</code>.</p>
-<p>Two key features of the weight-at-age data are</p>
-<ol style="list-style-type: decimal">
-<li>these data are required for the one additional time step (final
-observation for timing + 1), and</li>
-<li>the observations are currently shared among fleets and throughout
-the dynamics (so only need to be provided once).</li>
-</ol>
-<p>The final timing + 1 observations are required because FIMS reports
-spawning biomass at the beginning of the year for every year, including
-the year after the last catches are removed from the population.</p>
+<p>The population weight at age has <code>fleet = NA</code>. It is used
+for biomass and spawning biomass, and for the catch and index weight of
+any fleet without its own weight at age. Rows with a fleet name are that
+fleet’s weight at age for its catch and index weight, for example from
+port samples or survey samples. For each year, a fleet uses its own rows
+for that year, then its own <code>timing = NA</code> rows, then the
+population weight at age, so a fleet only needs rows for the years that
+differ. If there are no <code>fleet = NA</code> rows and only 1 fleet
+has weight rows, those rows are used as the population weight at age,
+with a warning.</p>
+<p>Rows with <code>timing = NA</code> are the default for every year,
+and rows with a <code>timing</code> replace that default for that year
+only. Timings outside the model years and the year after the last are an
+error. Every timing that is used needs 1 row for each model age, and
+rows are never averaged. Without <code>timing = NA</code> rows, every
+model year needs its own rows, plus the year after the last model year,
+because FIMS reports spawning biomass at the beginning of the year for
+every year, including the year after the last catches are removed from
+the population.</p>
 <p>The weight-at-age observations for the <code>data_big</code> are
-identical across time steps, and are provided for timing = 1 to 31 and
-associated with name = “fleet1”.</p>
+identical across time steps and are provided for timing = 1 to 31 with
+<code>fleet = NA</code>. The same weights could be given as 1 set of
+rows with <code>timing = NA</code>.</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># first and last entries  of the weight-at-age data</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">type</span> <span class="op">==</span> <span class="st">"weight_at_age"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">##            type  fleet age length timing     observed unit uncertainty</span></span>
-<span><span class="co">## 1 weight_at_age fleet1   1     NA      1 0.0005306555   mt        &lt;NA&gt;</span></span>
-<span><span class="co">## 2 weight_at_age fleet1   1     NA      2 0.0005306555   mt        &lt;NA&gt;</span></span>
-<span><span class="co">## 3 weight_at_age fleet1   1     NA      3 0.0005306555   mt        &lt;NA&gt;</span></span></code></pre>
+<pre><code><span><span class="co">##            type fleet age length timing     observed unit uncertainty</span></span>
+<span><span class="co">## 1 weight_at_age  &lt;NA&gt;   1     NA      1 0.0005306555   mt        &lt;NA&gt;</span></span>
+<span><span class="co">## 2 weight_at_age  &lt;NA&gt;   1     NA      2 0.0005306555   mt        &lt;NA&gt;</span></span>
+<span><span class="co">## 3 weight_at_age  &lt;NA&gt;   1     NA      3 0.0005306555   mt        &lt;NA&gt;</span></span></code></pre>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">type</span> <span class="op">==</span> <span class="st">"weight_at_age"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">tail</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">##              type  fleet age length timing    observed unit uncertainty</span></span>
-<span><span class="co">## 370 weight_at_age fleet1  12     NA     29 0.009636695   mt        &lt;NA&gt;</span></span>
-<span><span class="co">## 371 weight_at_age fleet1  12     NA     30 0.009636695   mt        &lt;NA&gt;</span></span>
-<span><span class="co">## 372 weight_at_age fleet1  12     NA     31 0.009636695   mt        &lt;NA&gt;</span></span></code></pre>
+<pre><code><span><span class="co">##              type fleet age length timing    observed unit uncertainty</span></span>
+<span><span class="co">## 370 weight_at_age  &lt;NA&gt;  12     NA     29 0.009636695   mt        &lt;NA&gt;</span></span>
+<span><span class="co">## 371 weight_at_age  &lt;NA&gt;  12     NA     30 0.009636695   mt        &lt;NA&gt;</span></span>
+<span><span class="co">## 372 weight_at_age  &lt;NA&gt;  12     NA     31 0.009636695   mt        &lt;NA&gt;</span></span></code></pre>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># check that the observations are identical across time steps within each age</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
@@ -462,23 +532,185 @@ associated with name = “fleet1”.</p>
 <p><img src="fims-input-data_files/figure-html/data_big-weight_at_age-plot-1.png" class="r-plt" alt="Line plot showing weight at age showing identical monotonically increasing weight-at-age observations ages that are the same across time steps." width="700"></p>
 </div>
 <div class="section level2">
+<h2 id="ageing-error-type-ageing_error">Ageing error (<code>type == "ageing_error"</code>)<a class="anchor" aria-label="anchor" href="#ageing-error-type-ageing_error"></a>
+</h2>
+<p>Ageing error data are optional. Age readers do not always assign the
+true age, which spreads a strong year class across neighboring ages.
+With ageing error rows, each fleet’s expected age composition is moved
+from true age to observed age before it is compared to the data. Length
+compositions, catch, and indices still use true age, and ageing error is
+not part of the likelihood.</p>
+<p>Each row gives the probability that a fish of one true age is read as
+one observed age. The observed age goes in <code>age</code>, the true
+age in <code>uncertainty</code>, and the probability in
+<code>observed</code>, with <code>unit = "proportion"</code>. The
+<code>uncertainty</code> column holds formulas for other data types, so
+true ages are stored as text, e.g.,
+<code>uncertainty = as.character(true_age)</code>.</p>
+<p>Each set of rows is a full matrix over the model ages, and the
+probabilities for each true age must sum to 1. Sums within 1e-3 of 1 are
+rescaled to exactly 1, with a warning, and larger differences are an
+error. If a matrix was rounded to fewer than 3 decimal places, first
+check that <code>uncertainty</code> holds the true age and
+<code>age</code> the observed age, then divide each true age’s
+probabilities by their total before adding it. Probability on observed
+ages below the youngest model age is added to that age, and above the
+oldest model age to the plus group, with a warning. Every observed age
+needs a total probability, summed across true ages, of at least 1e-3,
+because an expected proportion of 0 makes the likelihood undefined.</p>
+<p>Every model age needs rows as a true age, in
+<code>uncertainty</code>. Rows for true ages outside the model ages are
+not used, with a warning. Each row is the probability of each observed
+age given one true age, so probabilities for observed ages within a row
+can be added, but combining rows for different true ages needs the
+number of fish at each true age, which is unknown. The model has no fish
+below the youngest age, e.g., true age 0 in a model that starts at age
+1, so dropping those rows changes nothing. Above the plus group, the row
+for the plus-group true age is used for every fish in the plus
+group.</p>
+<p>Ageing error can vary by fleet and year. For each fleet and year, the
+most specific rows are used:</p>
+<ol style="list-style-type: decimal">
+<li>rows for that fleet and that <code>timing</code>,</li>
+<li>rows for that fleet with <code>timing = NA</code>,</li>
+<li>rows with <code>fleet = NA</code> and that <code>timing</code>,
+and</li>
+<li>rows with <code>fleet = NA</code> and <code>timing = NA</code>.</li>
+</ol>
+<p>Rows with <code>fleet = NA</code> apply to every fleet with
+age-composition data. A <code>timing</code> applies to that year only.
+Without a <code>timing = NA</code> default, every model year needs its
+own rows, including projection years. A fleet with no rows that apply to
+it has no ageing error, which is also the default.</p>
+<p>With ageing error, the reported <code>agecomp_proportion</code> and
+<code>agecomp_expected</code> are at observed age, while
+<code>catch_numbers_at_age</code> and <code>index_numbers_at_age</code>
+stay at true age.</p>
+<p><code>data_big</code> does not include ageing error. The example
+below adds a matrix where each age is read 1 year too young or too old
+with probability 0.1.</p>
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">ageing_error_ages</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/get_FIMSFrame.html">get_ages</a></span><span class="op">(</span><span class="va">data_4_model</span><span class="op">)</span></span>
+<span><span class="va">n_ageing_error_ages</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">ageing_error_ages</span><span class="op">)</span></span>
+<span><span class="va">ageing_error_matrix</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fl">0.8</span>, <span class="va">n_ageing_error_ages</span><span class="op">)</span></span>
+<span><span class="va">ageing_error_matrix</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span></span>
+<span>  <span class="fl">1</span><span class="op">:</span><span class="op">(</span><span class="va">n_ageing_error_ages</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span>,</span>
+<span>  <span class="fl">2</span><span class="op">:</span><span class="va">n_ageing_error_ages</span></span>
+<span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0.1</span></span>
+<span><span class="va">ageing_error_matrix</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span></span>
+<span>  <span class="fl">2</span><span class="op">:</span><span class="va">n_ageing_error_ages</span>,</span>
+<span>  <span class="fl">1</span><span class="op">:</span><span class="op">(</span><span class="va">n_ageing_error_ages</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0.1</span></span>
+<span><span class="va">ageing_error_matrix</span><span class="op">[</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0.9</span></span>
+<span><span class="va">ageing_error_matrix</span><span class="op">[</span><span class="va">n_ageing_error_ages</span>, <span class="va">n_ageing_error_ages</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0.9</span></span>
+<span><span class="va">ageing_error</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="fu">::</span><span class="fu"><a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tibble</a></span><span class="op">(</span></span>
+<span>  type <span class="op">=</span> <span class="st">"ageing_error"</span>,</span>
+<span>  fleet <span class="op">=</span> <span class="cn">NA_character_</span>,</span>
+<span>  age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="va">ageing_error_ages</span>, times <span class="op">=</span> <span class="va">n_ageing_error_ages</span><span class="op">)</span>,</span>
+<span>  length <span class="op">=</span> <span class="cn">NA_real_</span>,</span>
+<span>  timing <span class="op">=</span> <span class="cn">NA_real_</span>,</span>
+<span>  <span class="co"># Rows of the matrix are true ages, so t() lists observed ages within each</span></span>
+<span>  <span class="co"># true age.</span></span>
+<span>  observed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/vector.html" class="external-link">as.vector</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">ageing_error_matrix</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  unit <span class="op">=</span> <span class="st">"proportion"</span>,</span>
+<span>  uncertainty <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="va">ageing_error_ages</span>, each <span class="op">=</span> <span class="va">n_ageing_error_ages</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">data_with_ageing_error</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/FIMSFrame.html">FIMSFrame</a></span><span class="op">(</span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="va">data_big</span>, <span class="va">ageing_error</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/get_FIMSFrame.html">get_data</a></span><span class="op">(</span><span class="va">data_with_ageing_error</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">type</span> <span class="op">==</span> <span class="st">"ageing_error"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span></span></code></pre></div>
+<pre><code><span><span class="co">## # A tibble: 3 × 8</span></span>
+<span><span class="co">##   type         fleet   age length timing observed unit       uncertainty</span></span>
+<span><span class="co">##   &lt;chr&gt;        &lt;chr&gt; &lt;int&gt;  &lt;dbl&gt;  &lt;dbl&gt;    &lt;dbl&gt; &lt;chr&gt;      &lt;chr&gt;      </span></span>
+<span><span class="co">## 1 ageing_error &lt;NA&gt;      1     NA     NA      0.9 proportion 1          </span></span>
+<span><span class="co">## 2 ageing_error &lt;NA&gt;      1     NA     NA      0.1 proportion 2          </span></span>
+<span><span class="co">## 3 ageing_error &lt;NA&gt;      1     NA     NA      0   proportion 3</span></span></code></pre>
+<p><a href="https://nmfs-ost.github.io/ss3-website/" class="external-link">Stock Synthesis</a>
+and the <a href="https://pfmc-assessments.github.io/AgeingError/" class="external-link">AgeingError
+package</a> describe ageing error by the mean and standard deviation of
+observed age at each true age, from age 0 to the population maximum age.
+In that convention an observed age covers the year from that age to the
+next, so unbiased readers have a mean of true age + 0.5 (entered as -1
+in Stock Synthesis), and a standard deviation of 0.001 means almost no
+ageing error. The probability of each observed age is the normal
+probability over its year. The first and last observed ages collect the
+tails, as FIMS does when it folds observed ages outside the model ages,
+so each row sums to 1. The example below uses this convention, so
+vectors from Stock Synthesis or the AgeingError package can be used
+directly.</p>
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Rows are true ages and columns are observed ages. Here readers are unbiased</span></span>
+<span><span class="co"># and the standard deviation grows with age.</span></span>
+<span><span class="va">n_ages</span> <span class="op">&lt;-</span> <span class="va">n_ageing_error_ages</span></span>
+<span><span class="va">mean_observed_age</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="va">ageing_error_ages</span> <span class="op">+</span> <span class="fl">0.5</span>, <span class="va">n_ages</span>, <span class="va">n_ages</span><span class="op">)</span></span>
+<span><span class="va">sd_observed_age</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">0.1</span> <span class="op">*</span> <span class="va">ageing_error_ages</span>, <span class="va">n_ages</span>, <span class="va">n_ages</span><span class="op">)</span></span>
+<span><span class="va">observed_age</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="va">ageing_error_ages</span>, <span class="va">n_ages</span>, <span class="va">n_ages</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co"># The first observed age starts at -Inf and the last ends at Inf so they</span></span>
+<span><span class="co"># collect the tails.</span></span>
+<span><span class="va">lower_bound</span> <span class="op">&lt;-</span> <span class="va">observed_age</span></span>
+<span><span class="va">lower_bound</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="op">-</span><span class="cn">Inf</span></span>
+<span><span class="va">upper_bound</span> <span class="op">&lt;-</span> <span class="va">observed_age</span> <span class="op">+</span> <span class="fl">1</span></span>
+<span><span class="va">upper_bound</span><span class="op">[</span>, <span class="va">n_ages</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="cn">Inf</span></span>
+<span><span class="va">ageing_error_matrix</span> <span class="op">&lt;-</span></span>
+<span>  <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">pnorm</a></span><span class="op">(</span><span class="va">upper_bound</span>, <span class="va">mean_observed_age</span>, <span class="va">sd_observed_age</span><span class="op">)</span> <span class="op">-</span></span>
+<span>  <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">pnorm</a></span><span class="op">(</span><span class="va">lower_bound</span>, <span class="va">mean_observed_age</span>, <span class="va">sd_observed_age</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ageing_error_matrix</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">4</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
+<pre><code><span><span class="co">##       [,1]  [,2]  [,3]  [,4]</span></span>
+<span><span class="co">## [1,] 1.000 0.000 0.000 0.000</span></span>
+<span><span class="co">## [2,] 0.006 0.988 0.006 0.000</span></span>
+<span><span class="co">## [3,] 0.000 0.048 0.904 0.048</span></span>
+<span><span class="co">## [4,] 0.000 0.000 0.106 0.789</span></span></code></pre>
+<p>The <a href="https://pfmc-assessments.github.io/AgeingError/" class="external-link">AgeingError
+package</a> estimates ageing error from double reads and returns it as
+<code>ageing_error</code> rows. <code>AgeingError::run()</code> stores 1
+table per reader in <code>ageing_error_fims</code>, and
+<code>AgeingError::ageing_error_matrix_to_fims()</code> converts any
+matrix with true ages as rows. Bind the table for 1 reader, not
+<code>ageing_error_fims</code> itself, which holds every reader. The
+tables use <code>fleet = NA</code> and <code>timing = NA</code>, so to
+use different readers for different fleets or years, set
+<code>fleet</code> or <code>timing</code> in each table first. The
+tables start at true age 0 and run to the oldest age read, so FIMS drops
+true ages outside the model ages and adds observed ages outside them to
+the end ages, with warnings.</p>
+<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># out is the result of AgeingError::run() on double-read data.</span></span>
+<span><span class="va">reader1</span> <span class="op">&lt;-</span> <span class="va">out</span><span class="op">[[</span><span class="st">"output"</span><span class="op">]</span><span class="op">]</span><span class="op">[[</span><span class="st">"ageing_error_fims"</span><span class="op">]</span><span class="op">]</span><span class="op">[[</span><span class="st">"reader1"</span><span class="op">]</span><span class="op">]</span></span>
+<span><span class="va">reader2</span> <span class="op">&lt;-</span> <span class="va">out</span><span class="op">[[</span><span class="st">"output"</span><span class="op">]</span><span class="op">]</span><span class="op">[[</span><span class="st">"ageing_error_fims"</span><span class="op">]</span><span class="op">]</span><span class="op">[[</span><span class="st">"reader2"</span><span class="op">]</span><span class="op">]</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>fleet <span class="op">=</span> <span class="st">"survey1"</span><span class="op">)</span></span>
+<span><span class="va">data_with_ageing_error</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/FIMSFrame.html">FIMSFrame</a></span><span class="op">(</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="va">data_big</span>, <span class="va">reader1</span>, <span class="va">reader2</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="age-to-length-conversion-type-age_to_length_conversion">Age-to-length conversion
 (<code>type == "age_to_length_conversion"</code>)<a class="anchor" aria-label="anchor" href="#age-to-length-conversion-type-age_to_length_conversion"></a>
 </h2>
-<p>The age-to-length conversion data type contains the distribution of
-lengths for each age. The <code>age</code> and <code>length</code>
-columns contain all the combinations of age and length bins, and the
-<code>observed</code> column contains the proportion of fish at each age
-that are in each length bin. The <code>unit</code> column should be
-“proportion”. A single set of the age-to-length conversion data is
-required, rather than separate copies for each fleet (name) or time
-step. The age-to-length conversion data are not currently included in
-the likelihood but are used to convert numbers at age to numbers at
-length for the population dynamics calculations when length compositions
-are included in the model.</p>
+<p>The age-to-length conversion data describe how individuals at each
+age are distributed across length bins. In this table, the
+<code>age</code> and <code>length</code> columns define every age-length
+bin combination, and the <code>observed</code> column gives the
+proportion (<code>unit = "proportion"</code>) or count
+(<code>unit = "number"</code>) of individuals at that age in each length
+bin. For each age, FIMS rescales the observed values so they sum to 1,
+and it warns when proportion inputs do not already sum to 1.</p>
+<p>These data can be shared across fleets and years, or specified
+individually. Rows with <code>fleet = NA</code> are treated as shared
+across fleets that do not have fleet-specific information, while rows
+with <code>timing = NA</code> are treated as defaults across years that
+do not have their own timing. For a given fleet and year, FIMS uses rows
+in this order: (1) that fleet and year, (2) that fleet with
+<code>timing = NA</code>, (3) shared rows with <code>fleet = NA</code>
+for that year, and (4) shared rows with both <code>fleet = NA</code> and
+<code>timing = NA</code>. Each fleet-timing-age-length combination must
+appear at most once.</p>
+<p>Age-to-length conversion data are not part of the likelihood.
+Instead, they are used in the population dynamics calculations to
+convert numbers at age to numbers at length when length-composition data
+are included and growth is not estimated internally.</p>
 <p>Note: purely age-based models which have no length-composition data
 can omit the age-to-length conversion data as well.</p>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># first and last entries in the age-to-length conversion data type</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">type</span> <span class="op">==</span> <span class="st">"age_to_length_conversion"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -491,7 +723,7 @@ can omit the age-to-length conversion data as well.</p>
 <span><span class="co">## 1        &lt;NA&gt;</span></span>
 <span><span class="co">## 2        &lt;NA&gt;</span></span>
 <span><span class="co">## 3        &lt;NA&gt;</span></span></code></pre>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">type</span> <span class="op">==</span> <span class="st">"age_to_length_conversion"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">tail</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span></span></code></pre></div>
@@ -503,17 +735,17 @@ can omit the age-to-length conversion data as well.</p>
 <span><span class="co">## 274        &lt;NA&gt;</span></span>
 <span><span class="co">## 275        &lt;NA&gt;</span></span>
 <span><span class="co">## 276        &lt;NA&gt;</span></span></code></pre>
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># show that the number of rows in the age-to-length conversion data type is equal to the product of the number of unique combinations of age and length</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">type</span> <span class="op">==</span> <span class="st">"age_to_length_conversion"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## [1] 276</span></span></code></pre>
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># 12 ages, 23 length bins:</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/na.fail.html" class="external-link">na.omit</a></span><span class="op">(</span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span><span class="op">$</span><span class="va">age</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/na.fail.html" class="external-link">na.omit</a></span><span class="op">(</span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span><span class="op">$</span><span class="va">length</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## [1] 276</span></span></code></pre>
-<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># plot of age-to-length conversion observations for the data_big example data set</span></span>
 <span><span class="fu">FIMS</span><span class="fu">::</span><span class="va"><a href="../reference/data_big.html">data_big</a></span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">type</span> <span class="op">==</span> <span class="st">"age_to_length_conversion"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -540,7 +772,7 @@ can omit the age-to-length conversion data as well.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

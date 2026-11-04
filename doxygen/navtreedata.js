@@ -52,7 +52,11 @@ var NAVTREE =
       ] ]
     ] ],
     [ "Namespaces", "namespaces.html", [
-      [ "Namespace List", "namespaces.html", "namespaces_dup" ]
+      [ "Namespace List", "namespaces.html", "namespaces_dup" ],
+      [ "Namespace Members", "namespacemembers.html", [
+        [ "All", "namespacemembers.html", null ],
+        [ "Functions", "namespacemembers_func.html", null ]
+      ] ]
     ] ],
     [ "Classes", "annotated.html", [
       [ "Class List", "annotated.html", "annotated_dup" ],
@@ -63,6 +67,7 @@ var NAVTREE =
         [ "Functions", "functions_func.html", "functions_func" ],
         [ "Variables", "functions_vars.html", "functions_vars" ],
         [ "Typedefs", "functions_type.html", null ],
+        [ "Enumerations", "functions_enum.html", null ],
         [ "Related Symbols", "functions_rela.html", null ]
       ] ]
     ] ],
@@ -81,12 +86,13 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "TMB_8cpp.html",
-"classLengthCompDataInterface.html#a949bcdec10a0339dddce1583208d5709",
-"classSharedReal.html#ae33e28e15fedf7fbaaf00e4e5df0c955",
-"classfims__popdy_1_1CatchAtAge.html#a6270771e42f11407eb87b099087b1b55",
-"functions_vars_c.html",
-"structfims__data__object_1_1DataObject.html#adeac7e86caf7ed8b6bd891eff87abeb6",
-"structfims__popdy_1_1RecruitmentBase.html#ab2f2bf3011857f26ae17f8b30809863f"
+"classFleetInterfaceBase.html#ac9b1c7f3becc53284f7d6e977979e414",
+"classSharedReal.html#a67a9b97cee17f1240b6b2b99d10c68cf",
+"classfims__info_1_1Information.html#ad07784f2c8952afd95d5bdffa6d5dcff",
+"classfims__popdy_1_1SizeDistributionProviderBase.html#a08d3c78a8c9fec839c459b173131b27a",
+"functions_vars_w.html",
+"structfims__data__object_1_1DataObject.html#a5470cadac16a5928af44aca733013257",
+"structfims__popdy_1_1GrowthProducts.html#a8c00ca40796b8afba1c803f86b09cfea"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

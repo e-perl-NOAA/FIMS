@@ -28,7 +28,7 @@
     <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
     <img class="navlogo" src="https://noaa-fims.github.io/images/FIMS_logo3.png" alt="FIMS logo with a fish" width="60" align="left"><a class="navbar-brand me-2" href="../index.html">FIMS</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,6 +50,7 @@
 <li><h6 class="dropdown-header" data-toc-skip>Intro to FIMS</h6></li>
     <li><a class="dropdown-item" href="../articles/fims-demo.html">Introducing the Fisheries Integrated Modeling System (FIMS)</a></li>
     <li><a class="dropdown-item" href="../articles/fims-input-data.html">Introducing FIMS Input Data</a></li>
+    <li><a class="dropdown-item" href="../articles/fims-growth-vonb-schnute.html">FIMS Growth With VonBertalanffySchnute</a></li>
     <li><a class="dropdown-item" href="../articles/fims-logging.html">Introducing the FIMS Logging System</a></li>
     <li><a class="dropdown-item" href="../articles/fims-user-setup-guide.html">FIMS User Setup Guide</a></li>
     <li><a class="dropdown-item" href="../articles/fims-demo-projections.html">Simple projections using FIMS</a></li>
@@ -186,7 +187,7 @@ C++ code in <code><a href="https://rdrr.io/pkg/Rcpp/man/cppFunction.html" class=
 <span><span class="co"># after compiling, add works like a regular R function</span></span>
 <span><span class="va">add</span></span></code></pre></div>
 <pre><code><span><span class="co">## function (x, y, z) </span></span>
-<span><span class="co">## .Call(&lt;pointer: 0x7f08529043f0&gt;, x, y, z)</span></span></code></pre>
+<span><span class="co">## .Call(&lt;pointer: 0x7f67b73f53f0&gt;, x, y, z)</span></span></code></pre>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">add</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## [1] 6</span></span></code></pre>
@@ -291,9 +292,9 @@ compiled <code>meanC</code> function against the R function
 <span>  <span class="fu">meanC</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## Unit: microseconds</span></span>
-<span><span class="co">##      expr     min       lq     mean  median       uq       max neval</span></span>
-<span><span class="co">##   mean(x) 421.176 432.0365 438.5301 436.345 443.4530   504.782   100</span></span>
-<span><span class="co">##  meanC(x)  94.156  94.3160 196.2826  94.637  95.1825 10112.881   100</span></span></code></pre>
+<span><span class="co">##      expr     min       lq     mean   median       uq      max neval</span></span>
+<span><span class="co">##   mean(x) 372.081 380.9750 383.7811 382.2420 385.3460  454.754   100</span></span>
+<span><span class="co">##  meanC(x)  82.212  82.4375 171.3561  82.8125  83.2985 8856.809   100</span></span></code></pre>
 </details>
 </div>
 <div class="section level3">
@@ -569,12 +570,12 @@ functions.</p>
 <div class="section level3">
 <h3 id="modules-in-fims">Modules in FIMS<a class="anchor" aria-label="anchor" href="#modules-in-fims"></a>
 </h3>
-<p>Within FIMS, we first use <code>RCPP_EXPOSED_CLASS()</code> to expose
-all of our new type classes, e.g.,
-<code>RCPP_EXPOSED_CLASS(Variable)</code> in <a href="https://github.com/NOAA-FIMS/FIMS/blob/main/src/fims_modules.hpp" class="external-link"><code>src/fims_modules.hpp</code></a>.
-Once all of the type classes are exposed, we then use a single instance
-of <code>RCPP_MODULE</code> to expose the C++ to R in that same
-file.</p>
+<p>Within FIMS, classes and functions are exposed through
+module-specific registration functions, such as
+<code>register_variable()</code> in <a href="https://github.com/NOAA-FIMS/FIMS/blob/main/src/rcpp_variable.cpp" class="external-link"><code>src/rcpp_variable.cpp</code></a>.
+The central <a href="https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/interface/rcpp/fims_modules.hpp" class="external-link"><code>inst/include/interface/rcpp/fims_modules.hpp</code></a>
+defines <code>RCPP_MODULE(fims)</code> and calls these registration
+functions to expose the C++ to R.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -584,7 +585,7 @@ file.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
+  <p>Developed by Kelli F. Johnson, Grant D. Adams, Jon K. T. Brodziak, Kathryn L. Doering, Daniel R. Goethel, Andrea M. Havron, Alexander J. Jensen, Ronald Klasky, Peter T. Kuriyama, Emily M. Liljestrand, Christopher M. Legault, Bai Li, Timothy J. Miller, Cole C. Monnahan, Elizabeth F. Perl, Megumi C. Oshima, Kyle W. Shertzer, Christine C. Stawitz, Jane Y. Sullivan, Matthew Supernaw, Ian G. Taylor, Nathan R. Vaughan, Erik H. Williams, Adrianne T. Wilson.</p>
 </div>
 
 <div class="pkgdown-footer-right">

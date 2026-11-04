@@ -15,7 +15,7 @@ quantities for each region, we encourage you to join the [FIMS
 Discussion Board](https://github.com/orgs/NOAA-FIMS/discussions) to
 voice your thoughts about quantities that should be included. Second,
 please report bugs in the code to our [Issues
-page](https://github.com/NOAA-FIMS/FIMS/Issues).
+page](https://github.com/NOAA-FIMS/FIMS/issues).
 
 ``` r
 
@@ -91,7 +91,7 @@ data_big_with_extra_year <- dplyr::add_row(
     !(type == "age_to_length_conversion" | type == "length_comp")
   )
 data_4_projections <- data_big_with_extra_year |>
-  # Add on weight_at_age because you don't want these filled with -999
+  # Add weight_at_age for the projection years, which are now model years
   dplyr::bind_rows(
     dplyr::filter(
       data_big,
@@ -100,7 +100,7 @@ data_4_projections <- data_big_with_extra_year |>
     ) |>
       dplyr::select(-timing) |>
       merge(
-        data.frame(timing = max(data_big[["timing"]], na.rm = TRUE):(max(data_big[["timing"]], na.rm = TRUE) + years_of_projection - 1))
+        data.frame(timing = max(data_big[["timing"]], na.rm = TRUE) + 1:years_of_projection)
       )
   ) |>
   # Make a FIMSFrame object out of this data frame with the extra row to add all
@@ -270,6 +270,8 @@ parameters_projection <- setup_default_parameters(data = data_4_projections) |>
   )
 ```
 
+    ## Empirical weight-at-age rows found. Growth defaults to "EWAA".
+
 Reference-point targets are currently achieved by specifying a prior on
 `spawning_biomass_ratio`, a derived population quantity, in the final
 year/s of the projection period. Additionally, a prior can be specified
@@ -302,19 +304,46 @@ projection_fit <- parameters_projection |>
   fit_fims(optimize = TRUE)
 ```
 
+    ## Warning: ! 10 of the 39 `log_devs` values in the recruitment module are constant, but
+    ##   the recruitment process distribution includes all of them.
+    ## ℹ The constant values still add to the negative log-likelihood and affect the
+    ##   estimate of `log_sd` (biased low when they are fixed at 0) and, for `log_r`,
+    ##   the stock-recruit parameters.
+
     ## ✔ Starting optimization ...
     ## ℹ Restarting optimizer 3 times to improve gradient.
-    ## ℹ Maximum gradient went from 0.00128 to 0.00037 after 3 steps.
+    ## ℹ Maximum gradient went from 0.00222 to 0.00019 after 3 steps.
     ## ✔ Finished optimization
     ## ✔ Finished sdreport
-    ## ℹ FIMS model version: 0.10.0.9000
-    ## ℹ Total run time was 13.3634 seconds
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
+    ## 
+    ## Also defined by 'tibble'
+    ## 
+    ## ✔ Convergence: "OK"
+    ## ℹ FIMS model version: 0.11.0.9000
+    ## ℹ Total run time was 11.33092 seconds
     ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-    ## ℹ Maximum gradient= 0.00037
+    ## ℹ Maximum gradient= 0.00019
     ## ℹ Negative log likelihood (NLL):
     ## • Marginal NLL= 1624.68892
     ## • Total NLL= 1560.83065
-    ## ℹ Terminal SB= 993.44976
+    ## ℹ Terminal SB= 988.67095
 
 ``` r
 
