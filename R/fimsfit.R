@@ -17,6 +17,7 @@
 methods::setOldClass(Classes = "package_version")
 methods::setOldClass(Classes = "difftime")
 methods::setOldClass(Classes = "sdreport")
+methods::setOldClass(Classes = c("FIMSSdreport", "sdreport"))
 # Join sdreport and list into a class in case the sdreport is not created
 methods::setClassUnion("sdreportOrList", members = c("sdreport", "list"))
 
@@ -133,8 +134,10 @@ methods::setGeneric("get_input", function(x) standardGeneric("get_input"))
 methods::setMethod("get_input", "FIMSFit", function(x) x@input)
 
 #' @return
-#' [get_report()] returns the TMB report, where anything that is flagged as
-#' reportable in the C++ code is returned.
+#' [get_report()] returns the report produced by the selected backend, including
+#' the `nll_components` objective decomposition when the backend supports it.
+#' Its `jnll` is the joint negative log likelihood at the fitted parameters;
+#' the optimizer objective includes the Laplace adjustment for random effects.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -144,7 +147,12 @@ methods::setGeneric("get_report", function(x) standardGeneric("get_report"))
 methods::setMethod("get_report", "FIMSFit", function(x) x@report)
 
 #' @return
-#' [get_obj()] returns the output from [TMB::MakeADFun()].
+#' [get_obj()] returns the backend objective stored in the fit.
+#' For Julia fits, `par` contains fixed effects only. The `fn`, `gr`, `he`,
+#' and `report` functions accept a fixed-effect vector and evaluate the model
+#' at those values, optimizing random effects conditionally when present.
+#' Its `simulate(par = par, complete = FALSE)` function draws observation data
+#' conditional on the supplied fixed effects and conditional random-effect modes.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -154,8 +162,9 @@ methods::setGeneric("get_obj", function(x) standardGeneric("get_obj"))
 methods::setMethod("get_obj", "FIMSFit", function(x) x@obj)
 
 #' @return
-#' [get_opt()] returns the output from [nlminb()], which is the minimizer used
-#' in [fit_fims()].
+#' [get_opt()] returns a summary of Julia's LBFGS optimization with `par`,
+#' `objective`, `convergence`, and `message` fields. A zero convergence code
+#' means that both fixed- and random-effect optimization converged.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -179,7 +188,7 @@ methods::setMethod("get_max_gradient", "FIMSFit", function(x) x@max_gradient)
 #' [get_gradient()] returns the per-parameter gradient vector at the MLE as
 #' stored during fitting. Unlike calling `get_obj(x)[["gr"]](get_opt(x)[["par"]])`
 #' this function is safe to call after [clear()] because it reads
-#' from a stored R vector rather than the compiled C++ objective function.
+#' from a stored R vector. Julia objectives remain usable after [clear()].
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -189,7 +198,8 @@ methods::setGeneric("get_gradient", function(x) standardGeneric("get_gradient"))
 methods::setMethod("get_gradient", "FIMSFit", function(x) x@gradient)
 
 #' @return
-#' [get_sdreport()] returns the list from [TMB::sdreport()].
+#' [get_sdreport()] returns the backend's uncertainty report, or an empty list
+#' when uncertainty reporting was disabled or not retained.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -200,7 +210,13 @@ methods::setMethod("get_sdreport", "FIMSFit", function(x) x@sdreport)
 
 #' @return
 #' [get_estimates()] returns a tibble of parameter values and their
-#' uncertainties from a fitted model.
+#' uncertainties from a fitted model. The `year_i` column is a position that
+#' starts at 1, and the `age` and `length` columns are the ages and length bins
+#' from the data. `age` is `NA` if populations have different ages, and both
+#' are `NA` for fits saved before they were added to the output.
+#' Rows with `type = "likelihood"` contain one negative-log-likelihood component
+#' in `estimated` and its log-likelihood in `lpdf`, including priors and
+#' recruitment processes. Their `lpdf` values sum to the joint log-likelihood.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -211,57 +227,13 @@ methods::setMethod(
   "get_estimates",
   "FIMSFit",
   function(x) {
-    # Helper function
-    add_unique_id <- function(data) {
-      dplyr::group_by(data, .data$label) |>
-        dplyr::mutate(
-          unique_id = paste(
-            .data$label,
-            dplyr::if_else(
-              is.na(.data$parameter_id),
-              seq_len(dplyr::n()),
-              .data$parameter_id
-            ),
-            sep = "_"
-          )
-        ) |>
-        dplyr::ungroup()
+    if (is_julia_backend_input(get_input(x))) {
+      return(get_input(x)[["julia_estimates"]])
     }
-    # Extract the core TMB components (object, sdreport, optimization result)
-    # from the fit object.
-    obj <- get_obj(x)
-    sdreport <- get_sdreport(x)
-    opt <- get_opt(x)
-    parameter_names <- get_obj(x)[["par"]] |>
-      names()
 
-    # Reshape the TMB output into a standardized data frame.
-    # This serves as the "expected" result to compare against.
-    tmb_output <- reshape_tmb_estimates(
-      obj = obj,
-      sdreport = sdreport,
-      opt = opt,
-      parameter_names = parameter_names,
-      precomputed_gradient = get_gradient(x)
-    ) |>
-      add_unique_id()
-
-    # Extract the model_output, which contains the JSON-like structure.
-    model_output <- get_model_output(x)
-    # Reshape the output from the JSON structure into a data frame.
-    json_output <- reshape_json_estimates(model_output) |>
-      add_unique_id()
-
-    # Join the two outputs on parameter_id to compare and consolidate information.
-    estimates <- dplyr::left_join(
-      # There are more rows in json_estimates than tmb_estimates
-      x = json_output,
-      y = tmb_output |>
-        dplyr::select(dplyr::all_of(c("unique_id", "uncertainty", "log_like_cv", "gradient"))),
-      by = c("unique_id")
-    ) |>
-      dplyr::select(-dplyr::all_of("unique_id")) |>
-      dplyr::relocate(dplyr::all_of("uncertainty"), .after = dplyr::all_of("estimation_type"))
+    cli::cli_abort(
+      "This fit uses the retired native backend. Refit it with initialize_fims() and fit_fims()."
+    )
   }
 )
 
@@ -323,17 +295,10 @@ methods::setValidity(
   method = function(object) {
     errors <- character()
 
-    # Check that obj is from TMB::MakeADFun()
-    TMB_MakeADFun_names <- c(
-      "par", "fn", "gr", "he", "hessian", "method", "retape", "env", "report",
-      "simulate"
-    )
-    if (!setequal(names(object@obj), TMB_MakeADFun_names)) {
-      errors <- c(
-        errors,
-        "obj must be a list returned from TMB::MakeADFun() but it does not
-        appear to be so because it does not have the standard names."
-      )
+    required <- c("par", "fn", "gr", "he", "report", "simulate", "env")
+    if (!all(required %in% names(object@obj)) ||
+      !all(vapply(object@obj[c("fn", "gr", "he", "report", "simulate")], is.function, logical(1)))) {
+      errors <- c(errors, "obj must contain the Julia objective, derivative, report and simulation functions.")
     }
 
     # Return
@@ -356,6 +321,943 @@ is.FIMSFit <- function(x) {
   inherits(x, "FIMSFit")
 }
 
+# Internal helpers for Julia-backed fits ----
+
+is_julia_backend_input <- function(x) {
+  identical(attr(x, "backend"), "julia")
+}
+
+as_julia_backend_numeric <- function(x) {
+  as.numeric(unlist(x, recursive = TRUE, use.names = FALSE))
+}
+
+as_julia_backend_matrix <- function(x, nrow = NULL, byrow = TRUE) {
+  if (is.matrix(x)) {
+    return(x)
+  }
+
+  values <- as_julia_backend_numeric(x)
+  if (is.null(nrow)) {
+    return(matrix(values, nrow = 1))
+  }
+
+  matrix(values, nrow = nrow, byrow = byrow)
+}
+
+build_julia_backend_report <- function(julia_input, fit_result) {
+  report <- fit_result[["report"]]
+  data <- julia_input[["data"]]
+  parameters <- julia_input[["parameters"]]
+  report_years <- length(report[["spawning_biomass"]])
+  optional_report_array <- function(name) {
+    value <- report[[name]]
+    if (is.null(value)) {
+      return(NULL)
+    }
+    list(as.array(value))
+  }
+  optional_report_numeric <- function(name) {
+    value <- report[[name]]
+    if (is.null(value)) {
+      return(NULL)
+    }
+    list(as_julia_backend_numeric(value))
+  }
+  optional_report_year_age <- function(name, nrow = report_years) {
+    value <- report[[name]]
+    if (is.null(value)) {
+      return(NULL)
+    }
+    values <- as_julia_backend_matrix(value, nrow = nrow)
+    if (NROW(values) < nrow) {
+      cli::cli_abort("Julia report field {.val {name}} has fewer rows than expected.")
+    }
+    if (NROW(values) > nrow) {
+      values <- values[seq_len(nrow), , drop = FALSE]
+    }
+    list(as.numeric(t(values)))
+  }
+  report_fleet_vectors <- function(name) {
+    value <- report[[name]]
+    if (is.null(value)) {
+      return(NULL)
+    }
+    value <- as.array(value)
+    dimensions <- dim(value)
+    if (length(dimensions) <= 1L) {
+      return(list(as_julia_backend_numeric(value)))
+    }
+    if (length(dimensions) != 2L) {
+      cli::cli_abort("Julia report field {.val {name}} must have at most two dimensions.")
+    }
+    lapply(seq_len(dimensions[[2]]), \(fleet_index) {
+      as_julia_backend_numeric(value[, fleet_index])
+    })
+  }
+  report_fleet_matrices <- function(name) {
+    value <- report[[name]]
+    if (is.null(value)) {
+      return(NULL)
+    }
+    value <- as.array(value)
+    dimensions <- dim(value)
+    if (length(dimensions) == 2L) {
+      return(list(as.numeric(t(value))))
+    }
+    if (length(dimensions) != 3L) {
+      cli::cli_abort("Julia report field {.val {name}} must have two or three dimensions.")
+    }
+    lapply(seq_len(dimensions[[3]]), \(fleet_index) {
+      as.numeric(t(as.matrix(value[, , fleet_index])))
+    })
+  }
+  report_fleet_derived_weights <- function() {
+    value <- report[["growth_derived_mean_WAA_by_fleet"]]
+    used <- report[["age_to_length_conversion_derived_used"]]
+    n_fleets <- length(data[["fleets"]])
+    if (is.null(value) || is.null(used)) {
+      return(rep(list(numeric()), n_fleets))
+    }
+    value <- as.array(value)
+    used <- as.logical(used)
+    if (length(dim(value)) != 3L || length(used) != n_fleets) {
+      cli::cli_abort("Julia growth-derived report dimensions must match the fleet count.")
+    }
+    lapply(seq_len(n_fleets), \(fleet_index) {
+      if (!used[[fleet_index]]) {
+        return(numeric())
+      }
+      as.numeric(t(as.matrix(value[, , fleet_index])))
+    })
+  }
+  report_fleet_conversion_usage <- function() {
+    used <- report[["age_to_length_conversion_derived_used"]]
+    if (is.null(used)) {
+      return(rep(list(0), length(data[["fleets"]])))
+    }
+    used <- as.numeric(used)
+    if (length(used) != length(data[["fleets"]])) {
+      cli::cli_abort("Julia age-to-length conversion usage must match the fleet count.")
+    }
+    lapply(used, identity)
+  }
+  report_fleet_derived_conversions <- function() {
+    conversion <- report[["age_to_length_conversion_derived"]]
+    if (is.null(conversion)) {
+      return(rep(list(numeric()), length(data[["fleets"]])))
+    }
+    report_fleet_conversions("age_to_length_conversion_derived")
+  }
+  report_fleet_conversions <- function(name) {
+    value <- report[[name]]
+    if (is.null(value)) {
+      return(NULL)
+    }
+    value <- as.array(value)
+    dimensions <- dim(value)
+    if (length(dimensions) == 2L) {
+      conversion <- as.numeric(t(value))
+      return(rep(list(conversion), length(data[["fleets"]])))
+    }
+    if (length(dimensions) != 3L) {
+      cli::cli_abort("Julia report field {.val {name}} must have two or three dimensions.")
+    }
+    lapply(seq_len(dimensions[[3]]), \(fleet_index) {
+      as.numeric(t(as.matrix(value[, , fleet_index])))
+    })
+  }
+
+  list(
+    numbers_at_age = list(as.numeric(t(as_julia_backend_matrix(
+      report[["numbers_at_age"]],
+      nrow = report_years
+    )))),
+    catch_numbers_at_age = report_fleet_matrices("catch_numbers_at_age_by_fleet"),
+    biomass = list(as_julia_backend_numeric(report[["biomass"]])),
+    spawning_biomass = list(as_julia_backend_numeric(report[["spawning_biomass"]])),
+    expected_recruitment = list(as_julia_backend_numeric(report[["expected_recruitment"]])),
+    mortality_F = optional_report_year_age("mortality_F", data[["n_years"]]),
+    mortality_M = optional_report_year_age("mortality_M", data[["n_years"]]),
+    mortality_Z = optional_report_year_age("mortality_Z", data[["n_years"]]),
+    proportion_mature_at_age = list(as.numeric(t(as.matrix(report[["proportion_mature_at_age"]])))),
+    weight_at_age = list(as.numeric(t(as.matrix(report[["weights_at_age"]])))),
+    mean_length_at_age = if (is.null(report[["mean_length_at_age"]])) {
+      NULL
+    } else {
+      list(as.numeric(t(as.matrix(report[["mean_length_at_age"]]))))
+    },
+    growth_mean_LAA = optional_report_year_age("mean_length_at_age", data[["n_years"]]),
+    sd_length_at_age = if (is.null(report[["sd_length_at_age"]])) {
+      NULL
+    } else {
+      list(as.numeric(t(as.matrix(report[["sd_length_at_age"]]))))
+    },
+    growth_sd_LAA = optional_report_year_age("sd_length_at_age", data[["n_years"]]),
+    growth_mean_WAA = if (is.null(report[["mean_length_at_age"]])) {
+      NULL
+    } else {
+      optional_report_year_age("weights_at_age", data[["n_years"]])
+    },
+    growth_derived_mean_WAA = report_fleet_derived_weights(),
+    age_to_length_conversion = report_fleet_conversions("age_to_length_conversion_fixed") %||%
+      rep(list(numeric()), length(data[["fleets"]])),
+    age_to_length_conversion_derived = report_fleet_derived_conversions(),
+    age_to_length_conversion_derived_used = report_fleet_conversion_usage(),
+    sum_selectivity = optional_report_year_age("sum_selectivity", data[["n_years"]]),
+    log_recruit_dev = list(as_julia_backend_numeric(parameters[["log_devs"]])),
+    log_r = list(as_julia_backend_numeric(parameters[["log_r"]])),
+    catch_expected = report_fleet_vectors("catch_expected_by_fleet"),
+    index_expected = report_fleet_vectors("index_expected_by_fleet"),
+    total_catch_numbers = list(as_julia_backend_numeric(report[["total_catch_numbers"]])),
+    total_catch_weight = list(as_julia_backend_numeric(report[["total_catch_weight"]])),
+    unfished_biomass = optional_report_numeric("unfished_biomass"),
+    unfished_numbers_at_age = optional_report_year_age("unfished_numbers_at_age"),
+    unfished_spawning_biomass = optional_report_numeric("unfished_spawning_biomass"),
+    spawning_biomass_ratio = optional_report_numeric("spawning_biomass_ratio"),
+    catch_expected_by_fleet = list(as.array(report[["catch_expected_by_fleet"]])),
+    index_expected_by_fleet = list(as.array(report[["index_expected_by_fleet"]])),
+    catch_numbers_at_age_by_fleet = list(as.array(report[["catch_numbers_at_age_by_fleet"]])),
+    index_numbers_at_age_by_fleet = list(as.array(report[["index_numbers_at_age_by_fleet"]])),
+    catch_numbers_by_fleet = list(as.array(report[["catch_numbers_by_fleet"]])),
+    index_numbers_by_fleet = list(as.array(report[["index_numbers_by_fleet"]])),
+    index_numbers_at_age = report_fleet_matrices("index_numbers_at_age_by_fleet"),
+    catch_numbers = report_fleet_vectors("catch_numbers_by_fleet"),
+    index_numbers = report_fleet_vectors("index_numbers_by_fleet"),
+    catch_weight = report_fleet_vectors("catch_weight_by_fleet"),
+    index_weight = report_fleet_vectors("index_weight_by_fleet"),
+    catch_weight_at_age = report_fleet_matrices("catch_weight_at_age_by_fleet"),
+    index_weight_at_age = report_fleet_matrices("index_weight_at_age_by_fleet"),
+    catch_weight_by_fleet = optional_report_array("catch_weight_by_fleet"),
+    index_weight_by_fleet = optional_report_array("index_weight_by_fleet"),
+    catch_weight_at_age_by_fleet = list(as.array(report[["catch_weight_at_age_by_fleet"]])),
+    index_weight_at_age_by_fleet = list(as.array(report[["index_weight_at_age_by_fleet"]])),
+    catch_numbers_at_length_by_fleet = optional_report_array("catch_numbers_at_length_by_fleet"),
+    index_numbers_at_length_by_fleet = optional_report_array("index_numbers_at_length_by_fleet"),
+    catch_numbers_at_length = report_fleet_matrices("catch_numbers_at_length_by_fleet"),
+    index_numbers_at_length = report_fleet_matrices("index_numbers_at_length_by_fleet"),
+    agecomp_expected = report_fleet_matrices("agecomp_expected"),
+    agecomp_proportion = report_fleet_matrices("agecomp_proportion"),
+    lengthcomp_expected = report_fleet_matrices("lengthcomp_expected"),
+    lengthcomp_proportion = report_fleet_matrices("lengthcomp_proportion"),
+    log_index_expected = report_fleet_vectors("log_index_expected_by_fleet"),
+    log_catch_expected = report_fleet_vectors("log_catch_expected_by_fleet"),
+    agecomp_expected_by_fleet = list(as.array(report[["agecomp_expected"]])),
+    agecomp_proportion_by_fleet = optional_report_array("agecomp_proportion"),
+    lengthcomp_expected_by_fleet = list(as.array(report[["lengthcomp_expected"]])),
+    lengthcomp_proportion_by_fleet = optional_report_array("lengthcomp_proportion"),
+    log_index_expected_by_fleet = optional_report_array("log_index_expected_by_fleet"),
+    log_catch_expected_by_fleet = optional_report_array("log_catch_expected_by_fleet"),
+    nll_components = as_julia_backend_numeric(report[["nll_components"]]),
+    nll_component_labels = as.character(report[["nll_component_labels"]]),
+    nll_component_fleets = as.character(report[["nll_component_fleets"]]),
+    jnll = as.numeric(fit_result[["joint_nll"]] %||% fit_result[["nll"]])
+  )
+}
+
+flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_errors) {
+  if (is.null(parameter_info) || !tibble::is_tibble(parameter_info)) {
+    return(tibble::tibble())
+  }
+
+  growth_component_map <- c(
+    growth_log_mean_length_young = "mean_length_young",
+    growth_log_mean_length_old = "mean_length_old",
+    growth_log_coefficient = "growth_coefficient",
+    growth_reference_age_young = "reference_age_for_length_young",
+    growth_reference_age_old = "reference_age_for_length_old",
+    growth_log_length_weight_a = "length_weight_a",
+    growth_log_length_weight_b = "length_weight_b",
+    growth_log_length_sd_at_young = "length_at_age_sd_at_reference_ages",
+    growth_log_length_sd_at_old = "length_at_age_sd_at_reference_ages",
+    growth_log_sd_mean_length_young = "log_sd_mean_length_young",
+    growth_log_sd_mean_length_old = "log_sd_mean_length_old",
+    growth_log_sd_growth_coefficient = "log_sd_growth_coefficient",
+    growth_mean_length_young_mean_length_old_logit_corr =
+      "mean_length_young_mean_length_old_logit_corr",
+    growth_mean_length_young_growth_coefficient_logit_corr =
+      "mean_length_young_growth_coefficient_logit_corr",
+    growth_mean_length_old_growth_coefficient_logit_corr =
+      "mean_length_old_growth_coefficient_logit_corr"
+  )
+  growth_components_on_natural_scale <- c(
+    "growth_log_mean_length_young",
+    "growth_log_mean_length_old",
+    "growth_log_coefficient",
+    "growth_log_length_weight_a",
+    "growth_log_length_weight_b",
+    "growth_log_length_sd_at_young",
+    "growth_log_length_sd_at_old"
+  )
+  component_labels <- c(
+    stats::setNames(
+      setdiff(names(estimates), names(growth_component_map)),
+      setdiff(names(estimates), names(growth_component_map))
+    ),
+    growth_component_map
+  )
+  component_labels <- component_labels[
+    component_labels %in% unique(parameter_info[["label"]])
+  ]
+  mapped_labels <- unique(unname(component_labels))
+  if (length(mapped_labels) == 0L) {
+    return(tibble::tibble())
+  }
+
+  purrr::map_dfr(mapped_labels, function(label_name) {
+    rows <- parameter_info |>
+      dplyr::filter(.data$label == .env$label_name)
+    if (identical(label_name, "length_at_age_sd_at_reference_ages")) {
+      rows <- rows |>
+        dplyr::arrange(.data$age)
+    } else if (identical(label_name, "proportion_female")) {
+      rows <- rows |>
+        dplyr::arrange(.data$age)
+    } else if (identical(label_name, "logit_sel_at_age")) {
+      fleet_order <- unique(rows[["fleet"]])
+      rows <- rows |>
+        dplyr::arrange(
+          match(.data$fleet, .env$fleet_order),
+          .data$timing,
+          .data$age
+        )
+    }
+    component_names <- names(component_labels)[component_labels == label_name]
+    if (identical(label_name, "length_at_age_sd_at_reference_ages") &&
+      all(c(
+        "growth_log_length_sd_at_young",
+        "growth_log_length_sd_at_old"
+      ) %in% component_names)) {
+      component_names <- c(
+        "growth_log_length_sd_at_young",
+        "growth_log_length_sd_at_old"
+      )
+    }
+    estimate_values <- unlist(lapply(component_names, function(component_name) {
+      values <- if (component_name %in% names(estimates)) {
+        as_julia_backend_numeric(estimates[[component_name]])
+      } else {
+        numeric()
+      }
+      if (component_name %in% growth_components_on_natural_scale) exp(values) else values
+    }), use.names = FALSE)
+    se_values <- unlist(lapply(component_names, function(component_name) {
+      if (is.null(standard_errors[[component_name]])) {
+        return(rep(NA_real_, length(estimates[[component_name]])))
+      }
+      values <- as_julia_backend_numeric(standard_errors[[component_name]])
+      if (component_name %in% growth_components_on_natural_scale) {
+        values <- exp(as_julia_backend_numeric(estimates[[component_name]])) * values
+      }
+      values
+    }), use.names = FALSE)
+    if (identical(label_name, "log_M") && length(component_names) == 1L &&
+      is.matrix(estimates[[component_names[[1]]]])) {
+      estimate_values <- as.numeric(t(estimates[[component_names[[1]]]]))
+      se_values <- if (!is.null(standard_errors[[component_names[[1]]]])) {
+        as.numeric(t(standard_errors[[component_names[[1]]]]))
+      } else {
+        rep(NA_real_, length(estimate_values))
+      }
+    }
+    if (length(se_values) == 0L) {
+      se_values <- rep(NA_real_, length(estimate_values))
+    }
+
+    if (nrow(rows) == 0 || length(estimate_values) != nrow(rows)) {
+      return(tibble::tibble())
+    }
+
+    module_ids <- if ("module_id" %in% names(rows)) {
+      dplyr::coalesce(as.integer(rows[["module_id"]]), 1L)
+    } else {
+      rep(1L, nrow(rows))
+    }
+
+    rows |>
+      dplyr::mutate(
+        module_id = module_ids,
+        parameter_id = dplyr::row_number(),
+        type = "parameter",
+        type_id = dplyr::row_number(),
+        input = .data$value,
+        estimated = estimate_values,
+        expected = NA_real_,
+        observed = NA_real_,
+        distribution = NA_character_,
+        input_type = .data$estimation_type,
+        lpdf = NA_real_,
+        likelihood = NA_real_,
+        log_sd = NA_real_,
+        uncertainty = se_values,
+        gradient = NA_real_
+      )
+  })
+}
+
+make_julia_matrix_estimate_rows <- function(label,
+                                            matrix_values,
+                                            module_name = "Population",
+                                            module_id = 1L,
+                                            estimation_type = "derived_quantity",
+                                            fleet = NA_character_,
+                                            distribution = NA_character_,
+                                            observed_matrix = NULL,
+                                            uncertainty = NA_real_) {
+  matrix_values <- as.matrix(matrix_values)
+  observed_values <- if (is.null(observed_matrix)) {
+    rep(NA_real_, length(matrix_values))
+  } else {
+    as.numeric(t(as.matrix(observed_matrix)))
+  }
+
+  tibble::tibble(
+    module_name = module_name,
+    module_id = as.integer(module_id),
+    module_type = module_name,
+    label = label,
+    type = "derived_quantity",
+    type_id = seq_along(as.numeric(t(matrix_values))),
+    parameter_id = NA_integer_,
+    fleet = fleet,
+    year_i = rep(seq_len(nrow(matrix_values)), each = ncol(matrix_values)),
+    age_i = rep(seq_len(ncol(matrix_values)), times = nrow(matrix_values)),
+    input = NA_real_,
+    estimated = as.numeric(t(matrix_values)),
+    expected = if (all(is.na(observed_values))) NA_real_ else as.numeric(t(matrix_values)),
+    observed = observed_values,
+    estimation_type = estimation_type,
+    distribution = distribution,
+    input_type = estimation_type,
+    lpdf = NA_real_,
+    likelihood = NA_real_,
+    log_sd = NA_real_,
+    uncertainty = uncertainty,
+    gradient = NA_real_
+  )
+}
+
+make_julia_vector_estimate_rows <- function(label,
+                                            vector_values,
+                                            module_name = "Population",
+                                            module_id = 1L,
+                                            estimation_type = "derived_quantity",
+                                            fleet = NA_character_,
+                                            distribution = NA_character_,
+                                            observed_values = NULL,
+                                            uncertainty = NA_real_) {
+  vector_values <- as.numeric(vector_values)
+  observed_values <- if (is.null(observed_values)) {
+    rep(NA_real_, length(vector_values))
+  } else {
+    as.numeric(observed_values)
+  }
+
+  tibble::tibble(
+    module_name = module_name,
+    module_id = as.integer(module_id),
+    module_type = module_name,
+    label = label,
+    type = "derived_quantity",
+    type_id = seq_along(vector_values),
+    parameter_id = NA_integer_,
+    fleet = fleet,
+    year_i = seq_along(vector_values),
+    input = NA_real_,
+    estimated = vector_values,
+    expected = if (all(is.na(observed_values))) NA_real_ else vector_values,
+    observed = observed_values,
+    estimation_type = estimation_type,
+    distribution = distribution,
+    input_type = estimation_type,
+    lpdf = NA_real_,
+    likelihood = NA_real_,
+    log_sd = NA_real_,
+    uncertainty = uncertainty,
+    gradient = NA_real_
+  )
+}
+
+build_julia_backend_estimates <- function(input, fit_result, report) {
+  julia_input <- attr(input, "julia_input")
+  parameter_info <- attr(input, "parameter_info")
+  estimates <- fit_result[["estimates"]]
+  standard_errors <- fit_result[["standard_errors"]]
+  report_standard_errors <- fit_result[["report_standard_errors"]]
+  data <- julia_input[["data"]]
+  raw_data <- data[["data"]]
+  n_years <- data[["n_years"]]
+  n_report_years <- length(report[["spawning_biomass"]][[1]])
+  n_ages <- data[["n_ages"]]
+  n_lengths <- data[["n_lengths"]]
+  fleet_names <- data[["fleets"]]
+  n_fleets <- length(fleet_names)
+
+  report_se_vector <- function(name, n_values) {
+    if (is.null(report_standard_errors) || is.null(report_standard_errors[[name]])) {
+      return(rep(NA_real_, n_values))
+    }
+    as_julia_backend_numeric(report_standard_errors[[name]])
+  }
+  report_se_matrix <- function(name, n_rows, n_columns, flatten = FALSE) {
+    if (is.null(report_standard_errors) || is.null(report_standard_errors[[name]])) {
+      values <- matrix(NA_real_, nrow = n_rows, ncol = n_columns)
+    } else {
+      values <- as.matrix(report_standard_errors[[name]])
+    }
+    if (flatten) {
+      as.numeric(t(values))
+    } else {
+      values
+    }
+  }
+  report_se_array <- function(name, dimensions) {
+    if (is.null(report_standard_errors) || is.null(report_standard_errors[[name]])) {
+      return(array(NA_real_, dim = dimensions))
+    }
+    as.array(report_standard_errors[[name]])
+  }
+  report_se_fleet_matrix <- function(name, dimensions, fleet_index) {
+    values <- report_se_array(name, dimensions)
+    as.numeric(t(as.matrix(values[, , fleet_index])))
+  }
+
+  parameter_rows <- flatten_julia_parameter_rows(
+    parameter_info = parameter_info,
+    estimates = estimates,
+    standard_errors = standard_errors
+  )
+
+  output <- list(
+    parameter_rows,
+    make_julia_matrix_estimate_rows(
+      label = "numbers_at_age",
+      matrix_values = matrix(
+        report[["numbers_at_age"]][[1]],
+        nrow = n_report_years,
+        byrow = TRUE
+      ),
+      uncertainty = report_se_matrix(
+        "numbers_at_age",
+        n_report_years,
+        n_ages,
+        flatten = TRUE
+      )
+    ),
+    make_julia_vector_estimate_rows(
+      label = "biomass",
+      vector_values = report[["biomass"]][[1]],
+      uncertainty = report_se_vector("biomass", n_report_years)
+    ),
+    make_julia_vector_estimate_rows(
+      label = "spawning_biomass",
+      vector_values = report[["spawning_biomass"]][[1]],
+      uncertainty = report_se_vector("spawning_biomass", n_report_years)
+    ),
+    make_julia_vector_estimate_rows(
+      label = "expected_recruitment",
+      vector_values = report[["expected_recruitment"]][[1]],
+      uncertainty = report_se_vector("expected_recruitment", n_report_years)
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "mortality_F",
+      matrix_values = matrix(
+        report[["mortality_F"]][[1]],
+        nrow = n_years,
+        byrow = TRUE
+      ),
+      uncertainty = report_se_matrix(
+        "mortality_F",
+        n_years,
+        n_ages,
+        flatten = TRUE
+      )
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "mortality_M",
+      matrix_values = matrix(
+        report[["mortality_M"]][[1]],
+        nrow = n_years,
+        byrow = TRUE
+      ),
+      uncertainty = report_se_matrix(
+        "mortality_M",
+        n_years,
+        n_ages,
+        flatten = TRUE
+      )
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "mortality_Z",
+      matrix_values = matrix(
+        report[["mortality_Z"]][[1]],
+        nrow = n_years,
+        byrow = TRUE
+      ),
+      uncertainty = report_se_matrix(
+        "mortality_Z",
+        n_years,
+        n_ages,
+        flatten = TRUE
+      )
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "proportion_mature_at_age",
+      matrix_values = matrix(
+        report[["proportion_mature_at_age"]][[1]],
+        nrow = n_report_years,
+        byrow = TRUE
+      ),
+      uncertainty = report_se_matrix(
+        "proportion_mature_at_age",
+        n_report_years,
+        n_ages,
+        flatten = TRUE
+      )
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "weight_at_age",
+      matrix_values = matrix(
+        report[["weight_at_age"]][[1]],
+        nrow = n_report_years,
+        byrow = TRUE
+      )
+    ),
+    make_julia_matrix_estimate_rows(
+      label = "sum_selectivity",
+      matrix_values = matrix(
+        report[["sum_selectivity"]][[1]],
+        nrow = n_years,
+        byrow = TRUE
+      ),
+      uncertainty = report_se_matrix(
+        "sum_selectivity",
+        n_years,
+        n_ages,
+        flatten = TRUE
+      )
+    ),
+    make_julia_vector_estimate_rows(
+      label = "total_catch_numbers",
+      vector_values = report[["total_catch_numbers"]][[1]],
+      uncertainty = report_se_vector("total_catch_numbers", n_years)
+    ),
+    make_julia_vector_estimate_rows(
+      label = "total_catch_weight",
+      vector_values = report[["total_catch_weight"]][[1]],
+      uncertainty = report_se_vector("total_catch_weight", n_years)
+    )
+  )
+  if (!is.null(report[["unfished_numbers_at_age"]])) {
+    output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+      label = "unfished_numbers_at_age",
+      matrix_values = matrix(
+        report[["unfished_numbers_at_age"]][[1]],
+        nrow = n_report_years,
+        byrow = TRUE
+      ),
+      uncertainty = report_se_matrix(
+        "unfished_numbers_at_age",
+        n_report_years,
+        n_ages,
+        flatten = TRUE
+      )
+    )
+  }
+  for (label in c(
+    "unfished_biomass",
+    "unfished_spawning_biomass",
+    "spawning_biomass_ratio"
+  )) {
+    if (!is.null(report[[label]])) {
+      output[[length(output) + 1]] <- make_julia_vector_estimate_rows(
+        label = label,
+        vector_values = report[[label]][[1]],
+        uncertainty = report_se_vector(label, n_report_years)
+      )
+    }
+  }
+  for (growth_label in c("mean_length_at_age", "sd_length_at_age")) {
+    if (!is.null(report[[growth_label]])) {
+      output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+        label = growth_label,
+        matrix_values = matrix(
+          report[[growth_label]][[1]],
+          nrow = n_years,
+          byrow = TRUE
+        )
+      )
+    }
+  }
+
+  for (fleet_index in seq_along(fleet_names)) {
+    fleet_name <- fleet_names[[fleet_index]]
+    if (!is.null(data[["observed_catch"]]) &&
+      any(raw_data$type == "catch" & raw_data$fleet == fleet_name)) {
+      output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+        label = "catch_numbers_at_age",
+        matrix_values = report[["catch_numbers_at_age_by_fleet"]][[1]][, , fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        uncertainty = report_se_fleet_matrix(
+          "catch_numbers_at_age_by_fleet",
+          c(n_years, n_ages, n_fleets),
+          fleet_index
+        )
+      )
+      output[[length(output) + 1]] <- make_julia_vector_estimate_rows(
+        label = "catch_expected",
+        vector_values = report[["catch_expected_by_fleet"]][[1]][, fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        distribution = "dlnorm",
+        observed_values = data[["observed_catch"]][, fleet_index],
+        uncertainty = report_se_matrix(
+          "catch_expected_by_fleet",
+          n_years,
+          n_fleets
+        )[, fleet_index]
+      )
+    }
+
+    if (!is.null(data[["observed_index"]]) &&
+      any(raw_data$type == "index" & raw_data$fleet == fleet_name)) {
+      output[[length(output) + 1]] <- make_julia_vector_estimate_rows(
+        label = "index_expected",
+        vector_values = report[["index_expected_by_fleet"]][[1]][, fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        distribution = "dlnorm",
+        observed_values = data[["observed_index"]][, fleet_index],
+        uncertainty = report_se_matrix(
+          "index_expected_by_fleet",
+          n_years,
+          n_fleets
+        )[, fleet_index]
+      )
+    }
+
+    if (!is.null(data[["observed_age_comp"]]) &&
+      any(raw_data$type == "age_comp" & raw_data$fleet == fleet_name)) {
+      output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+        label = "agecomp_expected",
+        matrix_values = report[["agecomp_expected_by_fleet"]][[1]][, , fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        distribution = "dmultinom",
+        observed_matrix = data[["observed_age_comp"]][, , fleet_index],
+        uncertainty = report_se_fleet_matrix(
+          "agecomp_expected",
+          c(n_years, n_ages, n_fleets),
+          fleet_index
+        )
+      )
+    }
+
+    if (!is.null(data[["observed_length_comp"]]) &&
+      any(raw_data$type == "length_comp" & raw_data$fleet == fleet_name)) {
+      output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
+        label = "lengthcomp_expected",
+        matrix_values = report[["lengthcomp_expected_by_fleet"]][[1]][, , fleet_index],
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        distribution = "dmultinom",
+        observed_matrix = data[["observed_length_comp"]][, , fleet_index],
+        uncertainty = report_se_fleet_matrix(
+          "lengthcomp_expected",
+          c(n_years, n_lengths, n_fleets),
+          fleet_index
+        )
+      )
+    }
+  }
+
+  component_labels <- report[["nll_component_labels"]]
+  if (length(component_labels) > 0L) {
+    component_values <- report[["nll_components"]]
+    component_fleets <- report[["nll_component_fleets"]]
+    if (length(component_values) != length(component_labels) ||
+      length(component_fleets) != length(component_labels)) {
+      cli::cli_abort("Likelihood component values, labels and fleets must have matching lengths.")
+    }
+    output[[length(output) + 1L]] <- tibble::tibble(
+      module_name = "Likelihood",
+      label = component_labels,
+      fleet = dplyr::na_if(component_fleets, ""),
+      type = "likelihood",
+      type_id = seq_along(component_values),
+      estimation_type = "likelihood",
+      input_type = "likelihood",
+      estimated = component_values,
+      lpdf = -component_values,
+      likelihood = exp(-component_values)
+    )
+  }
+  dplyr::bind_rows(output)
+}
+
+build_julia_backend_sdreport <- function(input, fit_result) {
+  julia_input <- attr(input, "julia_input")
+  model_config <- attr(input, "julia_model_config")
+  parameters <- fit_result[["estimates"]][names(julia_input[["parameters"]])]
+  parameter_values <- purrr::flatten_dbl(parameters)
+  fixed_mask <- as.logical(model_config[["fixed_parameter_mask"]])
+  random_mask <- as.logical(model_config[["random_parameter_mask"]])
+  fixed_indices <- which(fixed_mask)
+  random_indices <- which(random_mask)
+  parameter_names <- names(parameter_values)
+  if (is.null(parameter_names) || length(parameter_names) != length(parameter_values)) {
+    parameter_names <- paste0("parameter_", seq_along(parameter_values))
+  }
+  covariance <- as.matrix(fit_result[["covariance"]])
+  dimnames(covariance) <- list(parameter_names, parameter_names)
+  fixed_covariance <- covariance[fixed_indices, fixed_indices, drop = FALSE]
+  random_covariance <- covariance[random_indices, random_indices, drop = FALSE]
+  fixed_parameters <- stats::setNames(
+    as.numeric(fit_result[["fixed_parameters"]]),
+    parameter_names[fixed_indices]
+  )
+  random_parameters <- stats::setNames(
+    parameter_values[random_indices],
+    parameter_names[random_indices]
+  )
+  report_values <- as.numeric(fit_result[["report_values"]])
+  report_sd <- fit_result[["report_standard_errors_flat"]]
+  report_sd <- if (is.null(report_sd)) {
+    rep(NA_real_, length(report_values))
+  } else {
+    as.numeric(report_sd)
+  }
+  report_names <- as.character(fit_result[["report_value_names"]])
+  if (length(report_names) == length(report_values)) {
+    names(report_values) <- report_names
+    names(report_sd) <- report_names
+  }
+
+  structure(
+    list(
+      value = report_values,
+      sd = report_sd,
+      cov = fit_result[["report_covariance"]] %||% NA_real_,
+      par.fixed = fixed_parameters,
+      cov.fixed = fixed_covariance,
+      par.random = random_parameters,
+      cov.random = random_covariance,
+      diag.cov.random = diag(random_covariance),
+      pdHess = isTRUE(fit_result[["pd_hessian"]]),
+      uncertainty_status = fit_result[["uncertainty_status"]],
+      unbiased = list(value = NULL, sd = NULL)
+    ),
+    class = c("FIMSSdreport", "sdreport")
+  )
+}
+
+build_julia_backend_obj <- function(parameters, report, fit_result,
+                                    julia_input, model_config) {
+  parameters <- parameters[names(julia_input[["parameters"]])]
+  parameter_vector <- purrr::flatten_dbl(parameters)
+  fixed_indices <- which(as.logical(model_config[["fixed_parameter_mask"]]))
+  random_indices <- which(as.logical(model_config[["random_parameter_mask"]]))
+  fixed_parameters <- parameter_vector[fixed_indices]
+  gradient_vector <- if (!is.null(fit_result[["fixed_gradient"]])) {
+    as.numeric(fit_result[["fixed_gradient"]])
+  } else if (!is.null(fit_result[["gradient"]])) {
+    as.numeric(fit_result[["gradient"]])[fixed_indices]
+  } else {
+    rep(NA_real_, length(fixed_parameters))
+  }
+  validate_parameters <- function(par) {
+    if (!is.numeric(par) || length(par) != length(fixed_parameters) ||
+      any(!is.finite(par))) {
+      cli::cli_abort("Objective parameters must be finite numeric values matching the fixed-effect count.")
+    }
+    as.numeric(par)
+  }
+  evaluate <- function(par, derivative_order) {
+    par <- validate_parameters(par)
+    evaluate_julia_fixed_objective(
+      julia_input, model_config, par, derivative_order
+    )
+  }
+  objective_function <- function(par = fixed_parameters) {
+    par <- validate_parameters(par)
+    if (identical(par, as.numeric(fixed_parameters)) &&
+      !(identical(fit_result[["convergence_code"]], "not_optimized") &&
+        length(random_indices) > 0L)) {
+      return(as.numeric(fit_result[["nll"]]))
+    }
+    as.numeric(evaluate(par, 0L))
+  }
+  gradient_function <- function(par = fixed_parameters) {
+    par <- validate_parameters(par)
+    if (identical(par, as.numeric(fixed_parameters)) &&
+      all(is.finite(gradient_vector))) {
+      return(gradient_vector)
+    }
+    as.numeric(evaluate(par, 1L))
+  }
+  hessian_function <- function(par = fixed_parameters) {
+    par <- validate_parameters(par)
+    if (identical(par, as.numeric(fixed_parameters)) &&
+      !is.null(fit_result[["fixed_hessian"]]) &&
+      (length(random_indices) == 0L || isTRUE(model_config[["compute_standard_errors"]]))) {
+      return(as.matrix(fit_result[["fixed_hessian"]]))
+    }
+    as.matrix(evaluate(par, 2L))
+  }
+  report_function <- function(par = fixed_parameters) {
+    par <- validate_parameters(par)
+    if (identical(par, as.numeric(fixed_parameters))) {
+      return(report)
+    }
+    evaluated <- evaluate(par, 3L)
+    report_input <- julia_input
+    report_input[["parameters"]] <- evaluated[["estimates"]]
+    build_julia_backend_report(report_input, evaluated)
+  }
+  par_list_function <- function(...) {
+    list(
+      p = fixed_parameters, re = parameter_vector[random_indices]
+    )
+  }
+  joint_hessian_function <- function(random = FALSE) {
+    joint_hessian <- fit_result[["hessian"]]
+    if (is.null(joint_hessian) ||
+      identical(fit_result[["convergence_code"]], "not_optimized")) {
+      cli::cli_abort("A fitted model is required to inspect the joint Hessian.")
+    }
+    indices <- if (isTRUE(random)) random_indices else c(fixed_indices, random_indices)
+    as.matrix(joint_hessian)[indices, indices, drop = FALSE]
+  }
+
+  list(
+    par = fixed_parameters,
+    fn = objective_function,
+    gr = gradient_function,
+    he = hessian_function,
+    hessian = hessian_function,
+    method = "JuliaCall",
+    retape = function(...) NULL,
+    env = list(
+      last.par.best = parameter_vector,
+      parameters = par_list_function(),
+      parList = par_list_function,
+      random = random_indices,
+      spHess = joint_hessian_function
+    ),
+    report = report_function,
+    simulate = function(par = fixed_parameters, complete = FALSE) {
+      par <- validate_parameters(par)
+      evaluated <- evaluate(par, 3L)
+      simulate_julia_observations(julia_input[["data"]], model_config, evaluated[["report"]], complete)
+    }
+  )
+}
+
 # Constructors ----
 
 #' Class constructors for class `FIMSFit` and associated child classes
@@ -365,11 +1267,11 @@ is.FIMSFit <- function(x) {
 #' user if they have used their own bespoke code to fit a FIMS model.
 #'
 #' @inheritParams fit_fims
-#' @param obj An object returned from [TMB::MakeADFun()].
+#' @param obj A backend objective object returned by [fit_fims()].
 #' @param opt An object returned from an optimizer, typically from
-#'   [stats::nlminb()], used to fit a TMB model.
-#' @param sdreport An object of the `sdreport` class as returned from
-#'   [TMB::sdreport()].
+#'   [stats::nlminb()] or the Julia backend.
+#' @param sdreport An object containing uncertainty estimates returned by the
+#'   backend.
 #' @param run_time A vector of at least length one, where all entries are of the
 #'   `timediff` class and at least one is named "time_total". This information
 #'   is available in [fit_fims()] and added to this argument internally but if
@@ -387,7 +1289,7 @@ is.FIMSFit <- function(x) {
 #'       A list containing the model setup in the same form it was passed.
 #'     }
 #'     \item{\code{obj}:}{
-#'       A list returned from [TMB::MakeADFun()] in the same form it was passed.
+#'       The backend objective object in the same form it was passed.
 #'     }
 #'     \item{\code{opt}:}{
 #'       A list containing the optimized model in the same form it was passed.
@@ -401,7 +1303,7 @@ is.FIMSFit <- function(x) {
 #'     }
 #'     \item{\code{sdreport}:}{
 #'       An object with the `sdreport` class containing the output from
-#'       `TMB::sdreport(obj)`.
+#'       The backend uncertainty report.
 #'     }
 #'     \item{\code{run_time}:}{
 #'       The length of time it took to run the model if it was optimized.
@@ -425,90 +1327,84 @@ FIMSFit <- function(
   run_time = c("time_total" = as.difftime(0, units = "secs")),
   version = utils::packageVersion("FIMS")
 ) {
-  # Determine the number of parameters
-  n_total <- length(obj[["env"]][["last.par.best"]])
-  n_fixed_effects <- length(obj[["par"]])
-  n_random_effects <- length(obj[["env"]]$parList()[["re"]])
-  number_of_parameters <- c(
-    fixed_effects = n_fixed_effects,
-    random_effects = n_random_effects
+  if (is_julia_backend_input(input)) {
+    optimized_parameters <- if (length(opt) > 0 && !is.null(opt[["par"]])) {
+      opt[["par"]]
+    } else {
+      obj[["par"]]
+    }
+    fixed_effect_count <- as.integer(
+      input[["julia_fixed_parameter_count"]] %||% length(optimized_parameters)
+    )
+    gradient_vector <- if (length(opt) > 0 && !is.null(obj[["gr"]])) {
+      as.numeric(obj[["gr"]](optimized_parameters))
+    } else {
+      rep(NA_real_, fixed_effect_count)
+    }
+    max_gradient <- if (length(gradient_vector) > 0 && any(is.finite(gradient_vector))) {
+      max(abs(gradient_vector), na.rm = TRUE)
+    } else {
+      NA_real_
+    }
+    if (is.null(input[["julia_estimates"]])) {
+      input[["julia_estimates"]] <- tibble::tibble()
+    }
+
+    return(methods::new(
+      "FIMSFit",
+      input = input,
+      obj = obj,
+      opt = opt,
+      max_gradient = max_gradient,
+      gradient = gradient_vector,
+      report = obj[["report"]](),
+      sdreport = sdreport,
+      number_of_parameters = c(
+        fixed_effects = fixed_effect_count,
+        random_effects = as.integer(input[["julia_random_parameter_count"]] %||% 0L)
+      ),
+      run_time = run_time,
+      version = version,
+      model_output = as.character(
+        jsonlite::toJSON(list(backend = "julia", estimates = input[["julia_estimates"]], report = obj[["report"]]()), auto_unbox = TRUE, na = "null", digits = NA)
+      )
+    ))
+  }
+
+  cli::cli_abort(
+    "FIMSFit requires Julia input from initialize_fims(); native model objects are no longer supported."
   )
-  rm(n_total, n_fixed_effects, n_random_effects)
-
-  # Compute the full per-parameter gradient vector once at construction time.
-  # max_gradient is derived from it so obj$gr() is only ever called here.
-  # Storing gradient_vec in the FIMSFit slot means get_estimates() and the
-  # broom methods (tidy, augment, glance) can read from x@gradient instead of
-  # calling obj$gr() again - which segfaults after clear() frees C++ memory.
-  # as.numeric() is required because TMB's obj$gr() returns a matrix (1xn)
-  # in some call patterns, which would fail the "numeric" slot type check.
-  gradient_vector <- if (length(opt) > 0) {
-    as.numeric(obj[["gr"]](opt[["par"]]))
-  } else {
-    rep(NA_real_, length(obj[["par"]]))
-  }
-  max_gradient <- if (length(opt) > 0) max(abs(gradient_vector)) else NA_real_
-
-  # Rename parameters instead of "p"
-  parameter_names <- names(get_parameter_names(obj[["par"]]))
-  names(obj[["par"]]) <- parameter_names
-  random_effects_names <- names(get_random_names(obj[["env"]]$parList()[["re"]]))
-
-  # Get the report
-  report <- if (length(opt) == 0) {
-    obj[["report"]](obj[["env"]][["last.par.best"]])
-  } else {
-    obj[["report"]]()
-  }
-
-  if (length(sdreport) > 0) {
-    # rename the sdreport
-    names(sdreport[["par.fixed"]]) <- parameter_names
-    dimnames(sdreport[["cov.fixed"]]) <- list(parameter_names, parameter_names)
-  }
-
-  model_output <- input[["model"]]$get_output()
-
-
-  fit <- methods::new(
-    "FIMSFit",
-    input = input,
-    obj = obj,
-    opt = opt,
-    max_gradient = max_gradient,
-    gradient = gradient_vector,
-    report = report,
-    sdreport = sdreport,
-    number_of_parameters = number_of_parameters,
-    run_time = run_time,
-    version = version,
-    model_output = model_output
-  )
-  fit
 }
 
 #' Fit a FIMS model (BETA)
 #'
 #' @param input Input list as returned by [initialize_fims()].
-#' @param get_sd A boolean specifying if the [TMB::sdreport()] should be
-#'   calculated?
+#' @param get_sd A boolean specifying whether parameter and derived-quantity
+#'   standard errors should be calculated.
 #' @param save_sd A logical, with the default `TRUE`, indicating whether the
-#'   sdreport is returned in the output. If `FALSE`, the slot for the report
-#'   will be empty.
-#' @param number_of_loops A positive integer specifying the number of
+#'   uncertainty report is retained in the output. If `FALSE`, the `sdreport`
+#'   slot will be empty. For Julia fits, uncertainty values in `estimates` are
+#'   retained.
+#' @param number_of_loops A non-negative integer specifying the number of
 #'   iterations of the optimizer that will be performed to improve the
 #'   gradient. The default is three, leading to four total optimization steps.
 #' @param optimize Optimize (TRUE, default) or (FALSE) build and return
 #'   a list containing the obj and report slot.
 #' @param number_of_newton_steps The number of Newton steps using the inverse
 #'   Hessian to do after optimization. Not yet implemented.
-#' @param control A list of optimizer settings passed to [stats::nlminb()]. The
-#'   the default is a list of length three with `eval.max = 1000`,
-#'   `iter.max = 10000`, and `trace = 0`.
+#' @param control A list with `eval.max = 10000`, `iter.max = 10000`, and
+#'   `trace = 0` by default. These settings are mapped to Julia's optimizer.
+#'   Other control fields are rejected explicitly.
 #' @param filename Character string giving a file name to save the fitted
 #'   object as an RDS object. Defaults to 'fit.RDS', and a value of NULL
 #'   indicates not to save it. If specified, it must end in .RDS. The file is
 #'   written to folder given by `input[["path"]]`. Not yet implemented.
+#' @param getReportCovariance A logical, with the default `FALSE`. Standard
+#'   errors of all parameters and derived quantities are calculated either way.
+#'   If `TRUE`, the full covariance matrix of the derived quantities is also
+#'   calculated and stored as `cov` in the `sdreport`; it grows with the square
+#'   of the number of derived quantities and can use several GB of memory. If
+#'   `FALSE`, `cov` is `NA`.
 #' @return
 #' An object of class `FIMSFit` is returned, where the structure is the same
 #' regardless if `optimize = TRUE` or not. Uncertainty information is only
@@ -530,147 +1426,202 @@ fit_fims <- function(input,
                        iter.max = 10000,
                        trace = 0
                      ),
-                     filename = NULL) {
-  # See issue 455 of sdmTMB to see what should be used.
-  # https://github.com/pbs-assess/sdmTMB/issues/455
-  # NOTE: When we add implementation for newton step we need to
-  # review the above github issue to make sure we maintain continuity
-  # between outputs as last.par may not equal last.par.best due to
-  # the smallest newton gradient solution not matching the smallest
-  # likelihood value. This can cause sanity issues in output reporting.
+                     filename = NULL,
+                     getReportCovariance = FALSE) {
   if (number_of_newton_steps > 0) {
-    cli::cli_abort("Newton steps not implemented yet.")
-  }
-  if (number_of_loops < 0) {
-    cli::cli_abort("number_of_loops ({.par {number_of_loops}}) must be >= 0.")
-  }
-  # If the estimation_type of all parameters is constant, FIMS will abort if
-  # optimize is set to TRUE
-  if (optimize == TRUE & all(purrr::map_vec(input[["parameters"]], length) == 0)) {
-    cli::cli_abort("FIMS must have at least one parameter to optimize.")
-  }
-
-  obj <- TMB::MakeADFun(
-    data = list(),
-    parameters = input$parameters,
-    map = input$map,
-    random = "re",
-    DLL = "FIMS",
-    silent = TRUE
-  )
-  if (!optimize) {
-    initial_fit <- FIMSFit(
-      input = input,
-      obj = obj,
-      run_time = c("time_total" = as.difftime(0, units = "secs"))
-    )
-    return(initial_fit)
-  }
-  if (!is_fims_verbose()) {
-    control$trace <- 0
-  }
-  ## optimize and compare
-  cli::cli_inform(c("v" = "Starting optimization ..."))
-  t0 <- Sys.time()
-  opt <- try_nlminb(
-    object = obj,
-    control_list = control,
-    starting_values = obj[["par"]]
-  )
-
-  if (is.null(opt)) {
-    failed_nlminb_object <- return_failed_nlminb(obj)
-    failed_fit <- fit <- FIMSFit(
-      input = input,
-      obj = obj,
-      opt = failed_nlminb_object[["opt"]],
-      sdreport = list(),
-      run_time = failed_nlminb_object[["run_time"]]
-    )
-    return(failed_fit)
-  }
-
-  maxgrad0 <- maxgrad <- max(abs(obj$gr(opt[["par"]])))
-  if (number_of_loops > 0) {
-    cli::cli_inform(c(
-      "i" = "Restarting optimizer {number_of_loops} time{?s} to improve
-            gradient."
+    cli::cli_abort(c(
+      "x" = "Newton steps are not implemented yet.",
+      "i" = "Use {.code number_of_newton_steps = 0}. To improve the gradient, increase {.arg number_of_loops} instead."
     ))
-    # control$trace is reset to zero regardless of verbosity because the
-    # differences in values printed out using control$trace will be
-    # negligible between these different runs and is not worth printing
-    control$trace <- 0
-    for (ii in 1:number_of_loops) {
-      opt <- try_nlminb(
-        object = obj,
-        control_list = control,
-        starting_values = opt[["par"]]
-      )
-      # Handle hard failures where try_nlminb did not return a list
-      if (is.null(opt)) {
-        cli::cli_inform(message = c(
-          "!" = "{.fn nlminb} failed during loop {ii}.",
-          "i" = "The model successfully converged before this loop.",
-          "i" = "The failed results are being returned."
-        ))
-        failed_nlminb_object <- return_failed_nlminb(obj)
-        failed_fit <- fit <- FIMSFit(
-          input = input,
-          obj = obj,
-          opt = failed_nlminb_object[["opt"]],
-          sdreport = list(),
-          run_time = failed_nlminb_object[["run_time"]]
-        )
-        return(failed_fit)
-      }
-      maxgrad <- max(abs(obj[["gr"]](opt[["par"]])))
+  }
+  if (length(number_of_loops) != 1L ||
+    !is.numeric(number_of_loops) ||
+    !is.finite(number_of_loops) ||
+    number_of_loops < 0 ||
+    number_of_loops > .Machine$integer.max ||
+    number_of_loops != as.integer(number_of_loops)) {
+    cli::cli_abort("number_of_loops must be a non-negative integer.")
+  }
+  if (is_julia_backend_input(input)) {
+    if (!initialize_julia_backend()) {
+      cli::cli_abort(c(
+        "Julia backend initialization failed before fitting.",
+        "i" = "Julia startup is disabled by {.code options(FIMS.disable_julia = TRUE)}; unset this option before fitting."
+      ))
     }
-    div_digit <- cli::cli_div(theme = list(.val = list(digits = 5)))
-    cli::cli_inform(c(
-      "i" = "Maximum gradient went from {.val {maxgrad0}} to
-            {.val {maxgrad}} after {number_of_loops} steps."
-    ))
-    cli::cli_end(div_digit)
+
+    julia_input <- attr(input, "julia_input")
+    julia_model_config <- attr(input, "julia_model_config")
+    if (!is.list(control)) {
+      cli::cli_abort("{.arg control} must be a list for the Julia backend.")
+    }
+    if (length(control) > 0L &&
+      (is.null(names(control)) || anyNA(names(control)) ||
+        any(names(control) == "") || anyDuplicated(names(control)) > 0L)) {
+      cli::cli_abort("{.arg control} must have unique, non-empty names for the Julia backend.")
+    }
+    unsupported_control <- setdiff(
+      names(control),
+      c("eval.max", "iter.max", "trace")
+    )
+    if (length(unsupported_control) > 0L) {
+      cli::cli_abort(
+        "Julia backend does not support optimizer control fields: {toString(unsupported_control)}."
+      )
+    }
+    optimizer_eval_max <- control[["eval.max"]] %||% 10000
+    optimizer_iter_max <- control[["iter.max"]] %||% 10000
+    optimizer_trace <- control[["trace"]] %||% 0
+    if (length(optimizer_eval_max) != 1L ||
+      !is.numeric(optimizer_eval_max) ||
+      !is.finite(optimizer_eval_max) ||
+      optimizer_eval_max < 1 ||
+      optimizer_eval_max > .Machine$integer.max ||
+      optimizer_eval_max != as.integer(optimizer_eval_max)) {
+      cli::cli_abort("{.field control$eval.max} must be a positive integer for the Julia backend.")
+    }
+    if (length(optimizer_iter_max) != 1L ||
+      !is.numeric(optimizer_iter_max) ||
+      !is.finite(optimizer_iter_max) ||
+      optimizer_iter_max < 1 ||
+      optimizer_iter_max > .Machine$integer.max ||
+      optimizer_iter_max != as.integer(optimizer_iter_max)) {
+      cli::cli_abort("{.field control$iter.max} must be a positive integer for the Julia backend.")
+    }
+    if (length(optimizer_trace) != 1L ||
+      !is.numeric(optimizer_trace) ||
+      !is.finite(optimizer_trace) ||
+      optimizer_trace < 0) {
+      cli::cli_abort("{.field control$trace} must be a non-negative number for the Julia backend.")
+    }
+    if (!is_fims_verbose()) {
+      optimizer_trace <- 0
+    }
+    julia_model_config[["optimizer_max_evaluations"]] <-
+      as.integer(optimizer_eval_max)
+    julia_model_config[["optimizer_max_iterations"]] <-
+      as.integer(optimizer_iter_max)
+    julia_model_config[["optimizer_trace"]] <-
+      optimizer_trace > 0
+    julia_model_config[["optimizer_restarts"]] <-
+      as.integer(number_of_loops)
+    julia_model_config[["compute_standard_errors"]] <- isTRUE(get_sd)
+    julia_model_config[["compute_report_covariance"]] <-
+      isTRUE(get_sd) && isTRUE(getReportCovariance)
+    assign_julia_backend_input(julia_input)
+
+    t0 <- Sys.time()
+    fit_result <- if (optimize) {
+      fit_julia_backend_model(
+        julia_input = julia_input,
+        model_config = julia_model_config
+      )
+    } else {
+      evaluated <- evaluate_julia_backend_model(
+        julia_input = julia_input,
+        model_config = julia_model_config
+      )
+      parameter_template <- julia_input[["parameters"]]
+      list(
+        estimates = parameter_template,
+        standard_errors = purrr::map(parameter_template, \(x) rep(NA_real_, length(as_julia_backend_numeric(x)))),
+        gradient = rep(NA_real_, length(purrr::flatten_dbl(parameter_template))),
+        fixed_gradient = rep(NA_real_, sum(julia_model_config[["fixed_parameter_mask"]])),
+        fixed_effect_count = sum(julia_model_config[["fixed_parameter_mask"]]),
+        random_effect_count = sum(julia_model_config[["random_parameter_mask"]]),
+        hessian = diag(length(purrr::flatten_dbl(parameter_template))),
+        nll = evaluated[["nll"]],
+        report = evaluated[["report"]],
+        convergence = TRUE,
+        convergence_code = "not_optimized",
+        iterations = 0L
+      )
+    }
+    time_optimization <- Sys.time() - t0
+
+    report_input <- julia_input
+    report_input[["parameters"]] <- fit_result[["estimates"]]
+    report <- build_julia_backend_report(
+      julia_input = report_input,
+      fit_result = fit_result
+    )
+    input[["julia_estimates"]] <- build_julia_backend_estimates(
+      input = input,
+      fit_result = fit_result,
+      report = report
+    )
+
+    optimized_parameters <- if (!is.null(fit_result[["fixed_parameters"]])) {
+      as.numeric(fit_result[["fixed_parameters"]])
+    } else {
+      purrr::flatten_dbl(fit_result[["estimates"]])
+    }
+    input[["julia_fixed_parameter_count"]] <-
+      fit_result[["fixed_effect_count"]] %||% length(optimized_parameters)
+    input[["julia_random_parameter_count"]] <-
+      fit_result[["random_effect_count"]] %||% 0L
+
+    obj <- build_julia_backend_obj(
+      parameters = if (!is.null(fit_result[["estimates"]])) fit_result[["estimates"]] else julia_input[["parameters"]],
+      report = report,
+      fit_result = fit_result,
+      julia_input = julia_input,
+      model_config = julia_model_config
+    )
+
+    run_time <- c(
+      time_optimization = time_optimization,
+      time_sdreport = as.difftime(0, units = "secs"),
+      time_total = Sys.time() - t0
+    )
+    sdreport <- if (optimize && get_sd && save_sd) {
+      build_julia_backend_sdreport(input, fit_result)
+    } else {
+      list()
+    }
+    fit <- FIMSFit(
+      input = input,
+      obj = obj,
+      opt = if (optimize) {
+        list(
+          par = optimized_parameters,
+          fixed_effect_count = input[["julia_fixed_parameter_count"]],
+          random_effect_count = input[["julia_random_parameter_count"]],
+          objective = as.numeric(fit_result[["nll"]]),
+          convergence = if (isTRUE(fit_result[["convergence"]])) 0L else 1L,
+          message = fit_result[["convergence_code"]]
+        )
+      } else {
+        list()
+      },
+      sdreport = sdreport,
+      run_time = run_time
+    )
+    if (optimize) {
+      if (is.finite(get_max_gradient(fit))) {
+        check_mle_convergence(
+          input, obj, get_opt(fit), get_max_gradient(fit),
+          gradient = get_gradient(fit),
+          parameter_names = names(sdreport[["par.fixed"]])
+        )
+      } else if (!isTRUE(fit_result[["convergence"]])) {
+        cli::cli_warn(
+          "Optimization failed convergence checks: {fit_result[['convergence_code']]}. Results are for diagnostics only."
+        )
+      }
+      if (length(sdreport) > 0L && sum(get_number_of_parameters(fit)) > 0L) {
+        check_sdreport_convergence(
+          input, obj, get_opt(fit), sdreport,
+          parameter_names = names(sdreport[["par.fixed"]]),
+          random_effects_names = names(sdreport[["par.random"]])
+        )
+      }
+      print(fit)
+    }
+    return(fit)
   }
-  time_optimization <- Sys.time() - t0
-  cli::cli_inform(c("v" = "Finished optimization"))
 
-  check_mle_convergence(input, obj, opt, maxgrad)
-
-  FIMS::set_fixed(opt[["par"]])
-
-  time_sdreport <- NA
-  if (get_sd) {
-    t2 <- Sys.time()
-    sdreport <- TMB::sdreport(obj)
-    cli::cli_inform(c("v" = "Finished sdreport"))
-    time_sdreport <- Sys.time() - t2
-    check_sdreport_convergence(input, obj, opt, sdreport)
-  } else {
-    sdreport <- list()
-    time_sdreport <- as.difftime(0, units = "secs")
-  }
-
-  run_time <- c(
-    time_optimization = time_optimization,
-    time_sdreport = time_sdreport,
-    time_total = Sys.time() - t0
-  )
-  fit <- FIMSFit(
-    input = input,
-    obj = obj,
-    opt = opt,
-    sdreport = sdreport,
-    run_time = run_time
-  )
-  print(fit)
-  if (!is.null(filename)) {
-    cli::cli_warn(c(
-      "i" = "Saving output to file is not yet implemented."
-    ))
-    # saveRDS(fit, file=file.path(input[["path"]], filename))
-  }
-  return(fit)
+  cli::cli_abort("fit_fims requires Julia input from initialize_fims(); native model objects are no longer supported.")
 }
 
 # we create an as.list method for this new FIMSFit
@@ -731,9 +1682,12 @@ return_failed_nlminb <- function(object) {
     "x" = "{.fun fit_fims} did not lead to a converged model.",
     "i" = "The resulting coefficients, probability values, or predictions are
     not accurate or stable and should not be used for management.",
-    "i" = "Partial results are returned as a {.var FIMSFit} object to
-    facilitate checking that the model is appropriately configured for your
-    data."
+    "i" = "A {.cls FIMSFit} object containing partial results is returned.",
+    "i" = "Type the name of the variable you assigned it (e.g.,
+           {.code fit <- ...}) to inspect the model inputs and configuration.
+           Additionally, try running {.code FIMS::fit_fims(optimize = FALSE)}
+           and inspecting the output through {.code get_report(fit)} or by
+           viewing the tabular output from {.code View(get_estimates(fit))}."
   )
   cli::cli_warn(message = failed_nlminb_message)
   # Construct a fallback optimizer result with consistent structure, i.e.,

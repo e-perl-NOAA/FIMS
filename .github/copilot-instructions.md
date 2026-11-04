@@ -5,9 +5,9 @@ Copilot should treat the existing codebase, especially the `tests/` directory, a
 
 ## General Development Guidelines
 
-- Always follow the existing C++ and R coding style used in the repo.
+- Always follow the existing Julia and R coding style used in the repo.
   - For R: follow the [tidyverse style guide](https://style.tidyverse.org). Use tidyverse-style syntax instead of base R, and use the pipe operator (`|>`) to connect code.
-  - For C++: follow conventions consistent with the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html).
+  - For Julia: follow the conventions in `inst/julia/FIMSBackend/src/`.
   - For variables: Use full, descriptive names whenever possible.
   - For R object fields: Use `[[ ]]` instead of `$` when extracting fields from an object.
 - Do not introduce new structural patterns or large stylistic rewrites unless the issue specifically asks for them.
@@ -21,26 +21,23 @@ Copilot should treat the existing codebase, especially the `tests/` directory, a
 - Do not mix formatting-only edits with functional changes.
 - Avoid refactors that are not directly related to the given issue.
 
-## C++ Code and Model Structure
+## Julia Backend and Model Structure
 
-- Follow the existing initialization and configuration patterns used in model classes, for example: `Population`, `Fleet`, integration helpers, etc.
+- Follow the existing parameter serialization, model configuration, and population/fleet evaluation patterns.
 - Do not restructure model setup logic unless explicitly required.
-- Maintain consistency between C++ logic and the Rcpp interface.
+- Maintain consistency between the Julia backend and the R bridge.
 - Do not modify public interfaces without updating related tests and documentation.
 
-## C++ Testing – Google Test
+## Julia Testing
 
-Before generating or modifying C++ tests, review the `tests/gtest/` directory.
+Before generating or modifying Julia tests, review
+`inst/julia/FIMSBackend/test/runtests.jl`.
 
-- New test files should follow the pattern:  
-  `tests/gtest/test_FileName_ClassName_FunctionName.cpp`.
-- When creating new C++ tests, first suggest using  
-  `FIMS:::use_gtest_template(name = "FileName_ClassName_FunctionName")`  
-  which generates the test file and registers it in `tests/gtest/CMakeLists.txt`.
-- Do not prioritize manual creation of test files or manual editing of `tests/gtest/CMakeLists.txt` unless necessary.
-- If registering tests manually, ensure they are linked to both `gtest_main` and `fims_test`, and use `gtest_discover_tests()`.
-- Reuse existing fixture patterns and helper structures.
-- Treat existing files in `tests/gtest/` as the reference instead of introducing new test styles.
+- Run backend tests with `julia --project=inst/julia/FIMSBackend -e 'using Pkg; Pkg.test()'`.
+- Reuse existing testsets and fixtures, including independent mathematical oracles.
+- Keep saved historical native expectations independent of Julia results.
+- Mocked bridge checks do not establish numerical parity or real R-to-Julia execution.
+- Do not reintroduce native modules, Rcpp/TMB dependencies, or C++ build tooling.
 
 ## R Testing – testthat
 

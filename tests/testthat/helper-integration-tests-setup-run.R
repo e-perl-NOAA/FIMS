@@ -6,7 +6,7 @@
 #' This function prepares the input data for integration tests by generating
 #' datasets containing only age composition, only length composition data, or
 #' data with missing values. The integration_test_data_components.RData is
-#' generated after running the script R/data_big.R.
+#' generated after running the script data-raw/data_big.R.
 #'
 #' @return None. The function saves the generated datasets as RDS files in the
 #' specified directory.
@@ -19,7 +19,7 @@ prepare_test_data <- function() {
   # The section generates datasets containing only age composition, only length
   # composition data, or data with missing values.
   # The integration_test_data_components.RData is generated after running the
-  # script R/data_big.R.
+  # script data-raw/data_big.R.
   # Load required integration test data components
   load(testthat::test_path("fixtures", "integration_test_data_components.RData"))
 
@@ -214,46 +214,6 @@ prepare_test_data <- function() {
     file = testthat::test_path("fixtures", "deterministic_age_length_comp.RDS"),
     compress = FALSE
   )
-
-  ## Estimation run with age and length comp using wrappers ----
-  # Run FIMS using the setup_and_run_FIMS_with_wrappers function
-  fit_age_length_comp <- setup_and_run_FIMS_with_wrappers(
-    iter_id = iter_id,
-    om_input_list = om_input_list,
-    om_output_list = om_output_list,
-    em_input_list = em_input_list,
-    estimation_mode = TRUE,
-    modified_parameters = modified_parameters
-  )
-
-  clear()
-
-  # Save FIMS results as a test fixture for additional fimsfit tests
-  saveRDS(
-    fit_age_length_comp,
-    file = testthat::test_path("fixtures", "fit_age_length_comp.RDS"),
-    compress = FALSE
-  )
-
-  ## Estimation run with age comp only using wrappers ----
-  # Load test data for age composition from an RDS file
-  data_age_comp <- readRDS(testthat::test_path("fixtures", "data_age_comp.RDS"))
-
-  # Run FIMS model
-  fit_agecomp <- modified_parameters |>
-    initialize_fims(data = data_age_comp) |>
-    fit_fims(optimize = TRUE)
-
-  clear()
-
-  # Save FIMS results as a test fixture for additional fimsfit tests
-  saveRDS(
-    fit_agecomp,
-    file = testthat::test_path("fixtures", "fit_agecomp.RDS"),
-    compress = FALSE
-  )
-
-  ## Estimation run with age comp only using wrappers ----
   modified_parameters_fixed_effects <- modified_parameters |>
     dplyr::mutate(
       estimation_type = dplyr::if_else(
@@ -295,6 +255,32 @@ prepare_test_data <- function() {
     compress = FALSE
   )
 
+  ## Deterministic run with 1 year of age comp missing for each fleet ----
+  # Drop the age composition for 1 year of each fleet, leaving age compositions
+  # in every other year. fleet1 has catch data, so its age composition comes
+  # from catch at age; survey1 has no catch data, so its age composition comes
+  # from index numbers at age. Both fleets also have length compositions.
+  data_missing_agecomp <- data_big |>
+    dplyr::filter(
+      !(type == "age_comp" & fleet == "fleet1" & timing == 3),
+      !(type == "age_comp" & fleet == "survey1" & timing == 5)
+    ) |>
+    FIMSFrame()
+  # Uses the same parameters as deterministic_age_length_comp so the expected
+  # length compositions can be compared between the 2 runs.
+  deterministic_missing_agecomp <- modified_parameters |>
+    initialize_fims(data = data_missing_agecomp) |>
+    fit_fims(optimize = FALSE)
+  clear()
+
+  # Save FIMS results as a test fixture for additional fimsfit tests
+  saveRDS(
+    deterministic_missing_agecomp,
+    file = testthat::test_path("fixtures", "deterministic_missing_agecomp.RDS"),
+    compress = FALSE
+  )
+
+  ## Estimation run with age and length comp using wrappers ----
   # Run FIMS model
   fit_age_length_comp_fixed_effects <- modified_parameters_fixed_effects |>
     initialize_fims(data = data_age_length_comp) |>
@@ -309,6 +295,71 @@ prepare_test_data <- function() {
     compress = FALSE
   )
 
+  # Update the initial parameter values so estimation tests do not start
+  # at the true values. Only modify parameters with estimation_type != "constant".
+  # Rationale:
+  # - Starting at the true values may hide problems with the estimation
+  #   procedure, such as whether the optimizer can recover the true values from
+  #   a reasonable but imperfect starting point.
+  # - Multiplying the parameter values by 1.5 moves the starting values 50%
+  #   away from their original values. The factor 1.5 is arbitrary.
+  initial_value_scale <- 1.5
+  saveRDS(
+    initial_value_scale,
+    file = testthat::test_path("fixtures", "initial_value_scale.RDS")
+  )
+  modified_parameters <- modified_parameters |>
+    dplyr::mutate(
+      value = dplyr::if_else(
+        estimation_type != "constant",
+        value * initial_value_scale,
+        value
+      )
+    )
+  saveRDS(
+    modified_parameters,
+    file = testthat::test_path("fixtures", "parameters_model_comparison_project.RDS"),
+    compress = FALSE
+  )
+
+  # Run FIMS using the setup_and_run_FIMS_with_wrappers function
+  fit_age_length_comp <- setup_and_run_FIMS_with_wrappers(
+    iter_id = iter_id,
+    om_input_list = om_input_list,
+    om_output_list = om_output_list,
+    em_input_list = em_input_list,
+    estimation_mode = TRUE,
+    modified_parameters = modified_parameters
+  )
+
+  clear()
+
+  # Save FIMS results as a test fixture for additional fimsfit tests
+  saveRDS(
+    fit_age_length_comp,
+    file = testthat::test_path("fixtures", "fit_age_length_comp.RDS"),
+    compress = FALSE
+  )
+
+  ## Estimation run with age comp only using wrappers ----
+  # Load test data for age composition from an RDS file
+  data_age_comp <- readRDS(testthat::test_path("fixtures", "data_age_comp.RDS"))
+
+  # Run FIMS model
+  fit_agecomp <- modified_parameters |>
+    initialize_fims(data = data_age_comp) |>
+    fit_fims(optimize = TRUE)
+
+  clear()
+
+  # Save FIMS results as a test fixture for additional fimsfit tests
+  saveRDS(
+    fit_agecomp,
+    file = testthat::test_path("fixtures", "fit_agecomp.RDS"),
+    compress = FALSE
+  )
+
+  ## Estimation run with age comp only using wrappers ----
   # Load a second dataset that contains missing age composition data
   data_age_comp_na <- readRDS(testthat::test_path("fixtures", "data_age_comp_na.RDS"))
   # Fit the FIMS model using the second dataset (with missing values)

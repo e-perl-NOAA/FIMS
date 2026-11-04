@@ -8,7 +8,7 @@ Please use [GitHub Discussions](https://github.com/orgs/NOAA-FIMS/discussions) i
 
 ## Found a :bug:
 
-Please use [GitHub Issues](https://github.com/NOAA-FIMS/FIMS/issues/new?template=bug_report.yml) to submit a :bug: report. If you have an idea for a well-defined enhancement to FIMS, please use GitHub to submit a [Feature request](https://github.com/NOAA-FIMS/FIMS/issues/new?template=feature_request.yml). Before submitting either of these tickets, please search the [existing issues](https://github.com/NOAA-FIMS/FIMS/issues?q=is%3Aissue) to see if something identical or similar has already been submitted. Once created, Issues are automatically tagged with the `status: triage_needed` tag and placed on the [Issue Triage Board](https://github.com/orgs/NOAA-FIMS/projects/21) where they will be labeled, given an assignee, and given a milestone by those in charge of the triage process.
+Please use [GitHub Issues](https://github.com/NOAA-FIMS/FIMS/issues/new?template=bug_report.yml) to submit a :bug: report. If you have an idea for a well-defined enhancement to FIMS, please use GitHub to submit a [Feature request](https://github.com/NOAA-FIMS/FIMS/issues/new?template=feature_request.yml). Before submitting either of these tickets, please search the [existing issues](https://github.com/NOAA-FIMS/FIMS/issues?q=is%3Aissue) to see if something identical or similar has already been submitted. Once created, Issues are automatically tagged with the `status: triage_needed` tag.
 
 ## Contributing code
 
@@ -18,50 +18,18 @@ Not all contributions are code! Writing documentation, teaching, and other activ
 
 Additionally, if you would like to make contributions to the [NOAA-FIMS website](https://noaa-fims.github.io/) (write a blog, etc.), please follow this [contributing guide](https://github.com/NOAA-FIMS/noaa-fims.github.io/blob/main/CONTRIBUTING.md).
 
-### Adding a new module
+### Adding or changing a model component
 
-If you are adding a new C++ module to FIMS (e.g., a new selectivity function, recruitment model, or other population dynamics component), start with the guide titled [Adding a New C++ Module](vignettes/adding-new-module.Rmd).
+Implement model mathematics in `inst/julia/FIMSBackend/src`, following the
+existing module patterns and preserving automatic-differentiation types.
+Update parameter defaults and serialization in R when the user-facing
+configuration changes. Keep parameter ordering explicit.
 
-That guide explains the current architecture in detail. The quick checklist below is intended to help you keep track of the files and workflows you will usually need to touch.
-
-#### Quick checklist for new module work
-
-**C++ implementation**
-
-Note that the examples below are for adding a new module to the population dynamics. If you are adding a module to a different section of `inst/include/`, the structure within each folder is the same so you will just need to replace `population_dynamics` with the appropriate folder name.
-
-- [ ] Add or update the base class in `inst/include/population_dynamics/[category]/functors/[category]_base.hpp` if you are creating a new module family.
-- [ ] Add or update the concrete implementation in `inst/include/population_dynamics/[category]/functors/[name].hpp`.
-- [ ] Add the implementation to the module umbrella header in `inst/include/population_dynamics/[category]/[category].hpp`.
-- [ ] Add Doxygen comments while you build the module, not afterward.
-
-**Rcpp interface and TMB integration**
-
-- [ ] Add or update the interface class in `inst/include/interface/rcpp/rcpp_objects/rcpp_[category].hpp`.
-- [ ] Use `ParameterVector` in the Rcpp interface and `fims::Vector<Type>` in the C++ functor.
-- [ ] Register the object in both the module-specific `live_objects` map and `FIMSRcppInterfaceBase::fims_interface_objects`.
-- [ ] In `add_to_fims_tmb_internal()`, copy parameter values, register fixed/random effects, and add the `info->variable_map[...]` entry.
-- [ ] Implement or update `finalize()` so optimized values are copied back to the R-facing object.
-
-**R exposure and initialization**
-
-- [ ] Register the class in `src/fims_modules.hpp`.
-- [ ] Export the class in `R/FIMS-package.R` and run `devtools::document()`.
-- [ ] Update `R/create_default_configurations.R` if the new module type should appear in the default configuration workflow.
-- [ ] Update `R/setup_default_parameters.R` so default values and estimation types are generated correctly.
-- [ ] Update `R/initialize_modules.R` and `initialize_fims()` if the module needs explicit initialization or linking behavior.
-
-**Testing**
-
-- [ ] Add or update C++ gtests to validate the underlying math and logic.
-- [ ] Add or update testthat tests to validate the Rcpp interface, object wiring, and user-facing behavior.
-- [ ] Include checks for parameter setup/resizing, at least one known-value result, edge cases where relevant, and basic object lifecycle behavior such as IDs and repeated instantiation.
-
-**Validation and follow-up**
-
-- [ ] Complete the tasks found in the [Standard contributor checks](#standard-contributor-checks) section
-- [ ] Update the [Adding a New C++ Module vignette](vignettes/adding-new-module.Rmd) itself if your changes alter the recommended workflow.
-- [ ] Provide feedback to the developers on how helpful the vignette was to your development process.
+Add numerical regressions to `inst/julia/FIMSBackend/test/runtests.jl` and
+high-level R tests to `tests/testthat`. Prefer the existing
+`FIMS:::use_testthat_template("function_name")` helper for new R test files.
+Known-value and independent analytic oracles are required for behavior changes;
+mocked bridge tests alone are insufficient.
 
 ### Feature branches
 
@@ -71,31 +39,37 @@ Along the development process it is important to add tests and ensure that the c
 
 #### Standard contributor checks
 
-* Build the doxygen-generated C++ documentation using `cmake --build build`, where the resulting html files will be in build/html. This can also be done using `setup_and_run_gtest()` in R.
-* Implement the suite of Google tests using `cmake --build build` and `ctest --test-dir build`. This can also be done using `setup_and_run_gtest()` in R. If there are failing tests, run `ctest --test-dir --rerun-failed --output-on-failure` to re-run the failed tests verbosely.
-* Format C++ code using clang-format version 18.0.0 with Google style: `clang-format -i --style="{BasedOnStyle: Google, SortIncludes: false}" $(find ./inst/include ./src ./tests/gtest -name "*.hpp" -o -name "*.cpp")`. If you are contributing from a fork, the automated formatting workflow will add a comment to your pull request with detailed instructions on how to format your code locally.
-* Run clang tidy to check C++ for common mistakes using TODO: document how to run clang-tidy.
-* Spell check the package using [cspell](https://cspell.org/). Install with `npm install -g cspell` and run `cspell "**/*.{cpp,hpp,h,R,Rmd,md}"` from the package root. Add any project-specific terms to `inst/WORDLIST` (used as the cspell dictionary).
+* Install Julia 1.10 or later and run `FIMS::setup_julia()` in a fresh R session.
+* Run `julia --project=inst/julia/FIMSBackend -e 'using Pkg; Pkg.test()'`.
+* Set `FIMS_RUN_JULIA_INTEGRATION=true` to include genuine R-to-Julia regressions.
+* Use `RUN_SLOW_TESTS=true` for the additional long-running estimation cases.
+* Spell check the package using [cspell](https://cspell.org/). Install with `npm install -g cspell` and run `cspell "**/*.{jl,R,Rmd,md}"` from the package root. Add any terms needed to [`NOAA-FIMS/.github/cspell.json`](https://github.com/NOAA-FIMS/.github/blob/main/cspell.json).
 * Build the roxygen documentation using `devtools::document()`. See the [r-lib](https://roxygen2.r-lib.org/) for all available tags and best practices.
 * Implement the suite of testthat tests using `devtools::test()`.
 * Run `styler::style_pkg()` to style R code.
 * Run `usethis::use_tidy_description()` to update the DESCRIPTION file.
-* Run `devtools::check()` to ensure the package can be compiled and R tests pass. If there are failing tests, run `devtools::test(filter = "file_name")` (where "test-file_name.R" is the testthat file containing failing tests) and edit code/tests to troubleshoot tests. During development, run `devtools::build()` locally to build the package more frequently and faster.
+* Run `devtools::check()` to ensure the package can be installed and R tests pass. If there are failing tests, run `devtools::test(filter = "file_name")` (where "test-file_name.R" is the testthat file containing failing tests) and edit code/tests to troubleshoot tests. During development, run `devtools::build()` locally to build the package more frequently and faster.
 * Build the package down site using `pkgdown::build_site()`.
 * Run the code coverage report using `covr::report()` to ensure that all of the code is covered, with the goal of maintaining 80 percent code coverage.
+
+Run `source("data-raw/refresh_julia_fits.R")` in a fresh R session to regenerate
+the shipped fits from their existing input data. The automated data-refresh
+workflow uses this script and does not resimulate observations. The separate
+`data-raw/data_big.R` operating-model simulation remains available when the
+input data themselves need regeneration.
 
 ### Pull requests
 
 Once the work is complete, a pull request should be created to bring the changes into the appropriate branch. Pull requests from forks will be reviewed under the same guidelines as pull requests from internal branches. Review of the pull request will be both automated and manual, where all pull requests must pass automated tests and syntax checks before being merged in addition to being reviewed by at least one developer. [Code review](https://github.com/features/code-review) ensures health and continuous improvement of the FIMS codebase, while simultaneously helping FIMS developers become familiar with the codebase. [Google's code review guide](https://google.github.io/eng-practices/review/) provides a useful set of guidelines for both reviewers and code authors. Each PR is accompanied by a [checklist of major considerations for code reviews](https://github.com/NOAA-FIMS/FIMS/blob/main/.github/workflows/pr-checklist.yml) to guide reviewers through the PR. Additional guidance can be found at [Conventional Comments](https://conventionalcomments.org/) for formatting/structuring your reviewer comments. Navigate to the [Perforce Blog](https://www.perforce.com/blog/qac/9-best-practices-for-code-review) for nine best practices for code review and use the [FIMS Style Guide](#style-guide) to settle any style arguments.
 
-An automated workflow ([pr-format.yml](https://github.com/NOAA-FIMS/FIMS/blob/main/.github/workflows/pr-format.yml)) runs when you open or update a pull request. This workflow checks both C++ and R code formatting. If you are contributing from the main repository, the workflow will automatically create a pull request with formatting changes that need to be merged into your feature branch. If you are contributing from a fork, the workflow will add a comment to your pull request with detailed instructions on how to format your code locally, since the automated workflow cannot push changes to forks.
+An automated workflow ([pr-format.yml](https://github.com/NOAA-FIMS/FIMS/blob/main/.github/workflows/pr-format.yml)) runs when you open or update a pull request. This workflow checks R code formatting and R documentation. If you are contributing from the main repository, the workflow will automatically create a pull request with formatting changes that need to be merged into your feature branch. If you are contributing from a fork, the workflow will add a comment to your pull request with detailed instructions on how to format your code locally, since the automated workflow cannot push changes to forks.
 
 Versioning follows [semantic versioning](https://semver.org/) to establish the major, minor, and patch number for a release. Often, multiple pull requests are included in a single release, which will be initiated by a member of the FIMS Implementation Team. Release notes for each version can be found in the [release notes](https://github.com/NOAA-FIMS/FIMS/releases).
 
 ## Style guide
 
-Style guides are used to ensure the code is consistent, easy to use (e.g., read, share, and verify) and ultimately easier to write. We use the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html) for C++ code and the [tidyverse style guide](https://style.tidyverse.org/) for R code.
-
-A self-imposed style within FIMS is the use of `typename` instead of `class` when defining templates for consistency with the `TMB` package. While types may be defined in many ways, we use `Type` instead of `T` to define Types.
+Style guides are used to ensure the code is consistent, easy to use (e.g., read, share, and verify) and ultimately easier to write. Use the [tidyverse style guide](https://style.tidyverse.org/) for R code
+and follow the existing Julia module style. Native C++ development, registration,
+Google Test, CMake and Doxygen workflows have been retired.
 
 Commit messages communicate details about changes that have occurred to collaborators and improve team efficiency. The best guidance for how to create an excellent commit message can be found on [Conventional Commits](https://www.conventionalcommits.org), which is our style guide for commit messages. See [Conventional Comments](https://conventionalcomments.org/) for how to format reviewer comments.

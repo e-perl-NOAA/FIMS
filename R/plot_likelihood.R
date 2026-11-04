@@ -32,9 +32,7 @@
 #'     profiled value
 #' @param group A character string or vector specifying the grouping variable(s)
 #'   for likelihood components. Default is `"label"` to group by data type.
-#'   Other options could include `c("label", "fleet_name")` for more detailed
-#'   grouping, though fleet names are not currently in FIMS output. Must match
-#'   column name(s) in the estimates data frame
+#'   Must match column name(s) in the estimates data frame.
 #'
 #' @return
 #' A ggplot object displaying likelihood profiles. The plot includes:
@@ -102,9 +100,9 @@
 #' }
 #'
 plot_likelihood <- function(like_fit, group = "label") {
-  # check that like_fit is actually the output from fims_likelihood()
+  # check that like_fit is actually the output from run_fims_likelihood()
   if (!"vec" %in% names(like_fit) | !"estimates" %in% names(like_fit)) {
-    cli::cli_abort("like_fit needs to be a list returned by `fims_likelihood()` that contains `vec` and `estimates`")
+    cli::cli_abort("like_fit needs to be a list returned by `run_fims_likelihood()` that contains `vec` and `estimates`")
   }
 
   # get column name for parameter being profiled
@@ -112,7 +110,11 @@ plot_likelihood <- function(like_fit, group = "label") {
     names() |>
     grep(pattern = "value_", value = TRUE)
   if (length(column_name) > 1) {
-    cli::cli_abort("Function doesn't yet support multiple profile parameters")
+    cli::cli_abort(c(
+      "x" = "{.fn plot_likelihood} plots 1 profiled parameter, but
+      {.arg like_fit} has {length(column_name)}: {.val {column_name}}.",
+      "i" = "Run {.fn run_fims_likelihood} for 1 parameter at a time."
+    ))
   }
   if (length(column_name) == 0) {
     cli::cli_abort(
@@ -124,18 +126,30 @@ plot_likelihood <- function(like_fit, group = "label") {
   # could use paste() to combine multiple grouping variables into one column
   # then use that column for grouping below
 
-  # summing total likelihood by parameter value and data type, use later for plotting
-  by_type <- like_fit$estimates |>
+  estimates <- like_fit[["estimates"]]
+  component_rows <- "type" %in% names(estimates) &&
+    any(estimates[["type"]] == "likelihood", na.rm = TRUE)
+  if (component_rows) {
+    estimates <- estimates |>
+      dplyr::filter(.data$type == "likelihood")
+  }
+  # Julia supplies one row per component, including equal-valued components.
+  likelihood_rows <- estimates |>
     dplyr::filter(!is.na(.data$lpdf)) |>
-    dplyr::group_by(.data[[column_name]], .data[[group]]) |> # grouping by parameter and data type
-    dplyr::distinct(.data$lpdf) |>
+    dplyr::group_by(.data[[column_name]], .data[[group]])
+  if (!component_rows) {
+    likelihood_rows <- likelihood_rows |> dplyr::distinct(.data$lpdf)
+  }
+  by_type <- likelihood_rows |>
     dplyr::summarize(total_like = sum(.data$lpdf, na.rm = TRUE), .groups = "drop")
 
   ### add total likelihood across all groups
-  total <- like_fit$estimates |>
-    dplyr::filter(!is.na(.data$lpdf)) |>
-    dplyr::group_by(.data[[column_name]]) |>
-    dplyr::distinct(.data$lpdf) |>
+  total <- likelihood_rows |>
+    dplyr::group_by(.data[[column_name]])
+  if (!component_rows) {
+    total <- total |> dplyr::distinct(.data$lpdf)
+  }
+  total <- total |>
     dplyr::summarize(total_like = sum(.data$lpdf, na.rm = TRUE), .groups = "drop") |>
     dplyr::mutate(label = "Total") |>
     dplyr::select(.data[[column_name]], .data$label, .data$total_like)
@@ -146,11 +160,15 @@ plot_likelihood <- function(like_fit, group = "label") {
     dplyr::bind_rows(total) |>
     dplyr::arrange(.data[[column_name]]) |>
     dplyr::group_by(.data[[group]]) |>
-    dplyr::mutate(total_like_change = max(.data$total_like, na.rm = TRUE) - .data$total_like) |>
+    dplyr::mutate(
+      total_like_change = max(.data$total_like, na.rm = TRUE) -
+        .data$total_like,
+      group_clean = gsub("_expected", "", .data[[group]])
+    ) |>
     dplyr::ungroup()
 
   # Get all unique group values
-  all_groups_clean <- unique(gsub("_expected", "", grouped_like[[group]]))
+  all_groups_clean <- unique(grouped_like$group_clean)
   other_groups_clean <- setdiff(all_groups_clean, "Total")
 
   # Create color vector: black for Total, default ggplot colors for others
@@ -175,31 +193,43 @@ plot_likelihood <- function(like_fit, group = "label") {
     )
   )
 
-  # plot all the lines
+  # plot all the lines: Total in background, other components on top
   p1 <- grouped_like |>
-    dplyr::mutate(
-      group_clean = gsub("_expected", "", .data[[group]])
-    ) |>
-    ggplot2::ggplot() +
-    ggplot2::geom_line(ggplot2::aes(
+    ggplot2::ggplot(ggplot2::aes(
       x = .data[[column_name]],
-      y = .data$total_like_change,
-      colour = .data$group_clean,
-      linetype = .data$group_clean
-    ), linewidth = 1.2) +
+      y = .data$total_like_change
+    )) +
+    # Total likelihood in background
+    ggplot2::geom_line(
+      data = ~ dplyr::filter(.x, .data$group_clean == "Total"),
+      ggplot2::aes(
+        colour = .data$group_clean,
+        linetype = .data$group_clean
+      ),
+      linewidth = 1.4
+    ) +
+    # Individual data components on top
+    ggplot2::geom_line(
+      data = ~ dplyr::filter(.x, .data$group_clean != "Total"),
+      ggplot2::aes(
+        colour = .data$group_clean,
+        linetype = .data$group_clean
+      ), linewidth = 1.2
+    ) +
     stockplotr::theme_noaa(discrete = TRUE) +
     ggplot2::scale_color_manual(
       values = color_values,
+      breaks = c("Total", other_groups_clean),
       name = "Data Type"
     ) +
     ggplot2::scale_linetype_manual(
       values = linetype_values,
+      breaks = c("Total", other_groups_clean),
       name = "Data Type"
     ) +
     ggplot2::labs(
       x = column_name |> gsub("value_", "", x = _), # remove "value_" from label
-      y = "Change in log-likelihood",
-      color = "Data Type"
+      y = "Change in log-likelihood"
     )
 
   return(p1)

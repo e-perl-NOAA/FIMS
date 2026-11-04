@@ -1,0 +1,591 @@
+using ComponentArrays: ComponentArray, getaxes
+using ForwardDiff: gradient, hessian
+using LinearAlgebra: Symmetric, cholesky, diag, inv, isposdef, logdet
+using Optim: LBFGS, OnceDifferentiable, Options, converged, iterations, minimum, minimizer, optimize
+using Optim: LineSearches
+
+_primal_float(value::ForwardDiff.Dual) = _primal_float(ForwardDiff.value(value))
+_primal_float(value::Real) = Float64(value)
+
+function _flatten_init_params(init_params, model_config = Dict())
+  if init_params isa ComponentArray
+    return Float64.(collect(init_params)), init_params
+  end
+
+  if init_params isa NamedTuple
+    params = ComponentArray(init_params)
+    return Float64.(collect(params)), params
+  end
+
+  if init_params isa AbstractDict
+    params = component_array_from_input(init_params, model_config)
+    return Float64.(collect(params)), params
+  end
+
+  if init_params isa AbstractVector
+    parameter_names = [Symbol("parameter_$index") for index in eachindex(init_params)]
+    return Float64.(init_params), parameter_names
+  end
+
+  throw(ArgumentError("Unsupported initial parameter container for fit_model."))
+end
+
+function _named_component_array(x, parameter_layout)
+  if parameter_layout isa ComponentArray
+    return ComponentArray(x, getaxes(parameter_layout))
+  end
+
+  ComponentArray(NamedTuple{Tuple(parameter_layout)}(Tuple(x)))
+end
+
+function _result_dict(component)
+  Dict(String(name) => getproperty(component, name) for name in propertynames(component))
+end
+
+function _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, random_values)
+  value_type = promote_type(eltype(x0), eltype(fixed_values), eltype(random_values))
+  parameters = value_type.(x0)
+  parameters[fixed_indices] .= fixed_values
+  parameters[random_indices] .= random_values
+  parameters
+end
+
+function _numerical_gradient(objective, x)
+  result = similar(x)
+  for index in eachindex(x)
+    step = cbrt(eps(Float64)) * max(abs(x[index]), 1.0)
+    upper = copy(x)
+    lower = copy(x)
+    upper[index] += step
+    lower[index] -= step
+    result[index] = (objective(upper) - objective(lower)) / (2 * step)
+  end
+  result
+end
+
+function _numerical_hessian(objective, x)
+  hessian_matrix = Matrix{Float64}(undef, length(x), length(x))
+  steps = eps(Float64)^(1 / 4) .* max.(abs.(x), 1.0)
+  objective_value = Float64(objective(x))
+  for row in eachindex(x)
+    upper = copy(x)
+    lower = copy(x)
+    upper[row] += steps[row]
+    lower[row] -= steps[row]
+    hessian_matrix[row, row] =
+      (Float64(objective(upper)) - 2 * objective_value + Float64(objective(lower))) /
+      steps[row]^2
+    for column in 1:(row - 1)
+      upper_upper = copy(x)
+      upper_lower = copy(x)
+      lower_upper = copy(x)
+      lower_lower = copy(x)
+      upper_upper[row] += steps[row]
+      upper_upper[column] += steps[column]
+      upper_lower[row] += steps[row]
+      upper_lower[column] -= steps[column]
+      lower_upper[row] -= steps[row]
+      lower_upper[column] += steps[column]
+      lower_lower[row] -= steps[row]
+      lower_lower[column] -= steps[column]
+      value =
+        (
+          Float64(objective(upper_upper)) -
+          Float64(objective(upper_lower)) -
+          Float64(objective(lower_upper)) +
+          Float64(objective(lower_lower))
+        ) / (4 * steps[row] * steps[column])
+      hessian_matrix[row, column] = value
+      hessian_matrix[column, row] = value
+    end
+  end
+  hessian_matrix
+end
+
+function _numerical_gradient_hessian(objective_gradient, x)
+  result = Matrix{Float64}(undef, length(x), length(x))
+  for index in eachindex(x)
+    step = cbrt(eps(Float64)) * max(abs(x[index]), 1.0)
+    upper = copy(x)
+    lower = copy(x)
+    upper[index] += step
+    lower[index] -= step
+    result[:, index] .= (objective_gradient(upper) - objective_gradient(lower)) / (2 * step)
+  end
+  Matrix(Symmetric((result + result') / 2))
+end
+
+function _laplace_gradient(joint_objective, parameters, fixed_indices, random_indices)
+  isempty(fixed_indices) && return Float64[]
+  fixed_count = length(fixed_indices)
+  active_indices = vcat(fixed_indices, random_indices)
+  active_parameters = parameters[active_indices]
+  active_joint = values -> joint_objective(_compose_parameter_vector(
+    parameters, fixed_indices, values[1:fixed_count],
+    random_indices, values[(fixed_count + 1):end],
+  ))
+  laplace_integrand = values -> begin
+    fixed_values = values[1:fixed_count]
+    random_values = values[(fixed_count + 1):end]
+    random_objective = random -> joint_objective(_compose_parameter_vector(
+      parameters, fixed_indices, fixed_values, random_indices, random,
+    ))
+    active_joint(values) + 0.5 * _positive_definite_logdet(
+      hessian(random_objective, random_values),
+    )
+  end
+  joint_curvature = hessian(active_joint, active_parameters)
+  random_positions = (fixed_count + 1):length(active_indices)
+  # Apply the implicit derivative of the conditional mode; holding that mode
+  # fixed would omit its contribution to the log-determinant derivative.
+  mode_sensitivity = -(
+    Symmetric(joint_curvature[random_positions, random_positions]) \
+    joint_curvature[random_positions, 1:fixed_count]
+  )
+  integrand_gradient = gradient(laplace_integrand, active_parameters)
+  integrand_gradient[1:fixed_count] +
+    mode_sensitivity' * integrand_gradient[random_positions]
+end
+
+function _positive_definite_logdet(hessian_matrix)
+  factorization = try
+    cholesky(Symmetric(hessian_matrix))
+  catch error
+    throw(ArgumentError("Random-effect Hessian is not positive definite: $(sprint(showerror, error))"))
+  end
+  logdet(factorization)
+end
+
+function _hessian_covariance(hessian_matrix)
+  isempty(hessian_matrix) && return zeros(Float64, 0, 0)
+  if !all(isfinite, hessian_matrix)
+    return fill(NaN, size(hessian_matrix))
+  end
+  factorization = cholesky(Symmetric(hessian_matrix); check = false)
+  isposdef(factorization) ? Matrix(inv(factorization)) : fill(NaN, size(hessian_matrix))
+end
+
+function _optimizer_options(config)
+  maximum_iterations = Int(get(config, :optimizer_max_iterations, 10_000))
+  maximum_evaluations = Int(get(config, :optimizer_max_evaluations, 10_000))
+  maximum_iterations > 0 ||
+    throw(ArgumentError("optimizer_max_iterations must be positive."))
+  maximum_evaluations > 0 ||
+    throw(ArgumentError("optimizer_max_evaluations must be positive."))
+  Options(
+    iterations = maximum_iterations,
+    f_calls_limit = maximum_evaluations,
+    show_trace = Bool(get(config, :optimizer_trace, false)),
+  )
+end
+
+function _conditional_mode(x0, fixed_indices, fixed_values, random_indices, joint_objective, options)
+  if isempty(random_indices)
+    parameters = _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, Float64[])
+    joint_nll = joint_objective(parameters)
+    return (
+      parameters = parameters,
+      random_hessian = zeros(Float64, 0, 0),
+      joint_nll = joint_nll,
+      marginal_nll = joint_nll,
+      converged = true,
+      iterations = 0,
+    )
+  end
+  random_start = x0[random_indices]
+  random_objective = random_values -> joint_objective(
+    _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, random_values),
+  )
+  random_gradient! = (storage, random_values) ->
+    copyto!(storage, gradient(random_objective, random_values))
+  random_result = optimize(
+    OnceDifferentiable(random_objective, random_gradient!, random_start),
+    random_start,
+    LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
+    options,
+  )
+  random_mode = minimizer(random_result)
+  parameters = _compose_parameter_vector(
+    x0, fixed_indices, fixed_values, random_indices, random_mode,
+  )
+  random_hessian = hessian(random_objective, random_mode)
+  joint_nll = minimum(random_result)
+  (
+    parameters = parameters,
+    random_hessian = random_hessian,
+    joint_nll = joint_nll,
+    marginal_nll = joint_nll + 0.5 * _positive_definite_logdet(random_hessian) -
+      0.5 * length(random_indices) * log(2π),
+    converged = converged(random_result),
+    iterations = iterations(random_result),
+  )
+end
+
+function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, derivative_order = 0)
+  objective_config = normalize_keys(config)
+  x0, parameter_layout = _flatten_init_params(init_params, objective_config)
+  fixed_mask = Bool.(collect(get(objective_config, :fixed_parameter_mask, trues(length(x0)))))
+  random_mask = Bool.(collect(get(objective_config, :random_parameter_mask, falses(length(x0)))))
+  length(fixed_mask) == length(x0) && length(random_mask) == length(x0) ||
+    throw(ArgumentError("Parameter masks must match the initial parameter count."))
+  any(fixed_mask .& random_mask) &&
+    throw(ArgumentError("A parameter cannot be both fixed and random."))
+  fixed_indices = findall(fixed_mask)
+  random_indices = findall(random_mask)
+  values = Float64.(vec(collect(fixed_values)))
+  length(values) == length(fixed_indices) ||
+    throw(ArgumentError("Fixed parameter values must match the fixed-effect count."))
+  all(isfinite, values) || throw(ArgumentError("Fixed parameter values must be finite."))
+  derivative_order in (0, 1, 2, 3) ||
+    throw(ArgumentError("derivative_order must be 0, 1, 2, or 3 (report)."))
+  options = _optimizer_options(objective_config)
+  joint_objective = parameters -> evaluate_nll(
+    _named_component_array(parameters, parameter_layout), data_dict, objective_config,
+  )
+  objective = fixed -> begin
+    result = _conditional_mode(
+      x0, fixed_indices, fixed, random_indices, joint_objective, options,
+    )
+    result.converged ||
+      throw(ArgumentError("Random-effect optimization did not converge while evaluating the objective."))
+    result.marginal_nll
+  end
+  objective_gradient = fixed -> begin
+    result = _conditional_mode(
+      x0, fixed_indices, fixed, random_indices, joint_objective, options,
+    )
+    result.converged ||
+      throw(ArgumentError("Random-effect optimization did not converge while evaluating the gradient."))
+    _laplace_gradient(joint_objective, result.parameters, fixed_indices, random_indices)
+  end
+  if derivative_order == 3
+    result = _conditional_mode(
+      x0, fixed_indices, values, random_indices, joint_objective, options,
+    )
+    result.converged ||
+      throw(ArgumentError("Random-effect optimization did not converge while evaluating the report."))
+    parameters = _named_component_array(result.parameters, parameter_layout)
+    evaluated = evaluate_model(parameters, data_dict, objective_config)
+    evaluated["estimates"] = _result_dict(parameters)
+    return evaluated
+  elseif derivative_order == 1
+    return isempty(random_indices) ? gradient(objective, values) : objective_gradient(values)
+  elseif derivative_order == 2
+    return isempty(random_indices) ? hessian(objective, values) :
+      _numerical_gradient_hessian(objective_gradient, values)
+  end
+  objective(values)
+end
+
+function _report_standard_errors(
+  parameters,
+  parameter_layout,
+  data_dict,
+  config,
+  covariance,
+  parameter_indices = collect(eachindex(parameters)),
+)
+  report = evaluate_model(_named_component_array(parameters, parameter_layout), data_dict, config)["report"]
+  report_standard_error_fields = Set([
+    "agecomp_expected",
+    "agecomp_proportion",
+    "biomass",
+    "catch_expected_by_fleet",
+    "catch_numbers_by_fleet",
+    "catch_numbers_at_age_by_fleet",
+    "catch_numbers_at_length_by_fleet",
+    "catch_weight_by_fleet",
+    "catch_weight_at_age_by_fleet",
+    "expected_recruitment",
+    "index_expected_by_fleet",
+    "index_numbers_by_fleet",
+    "index_numbers_at_age_by_fleet",
+    "index_numbers_at_length_by_fleet",
+    "index_weight_by_fleet",
+    "index_weight_at_age_by_fleet",
+    "lengthcomp_expected",
+    "lengthcomp_proportion",
+    "log_catch_expected_by_fleet",
+    "log_index_expected_by_fleet",
+    "mortality_F",
+    "mortality_M",
+    "mortality_Z",
+    "numbers_at_age",
+    "proportion_mature_at_age",
+    "spawning_biomass",
+    "spawning_biomass_ratio",
+    "sum_selectivity",
+    "total_catch_numbers",
+    "total_catch_weight",
+    "unfished_biomass",
+    "unfished_numbers_at_age",
+    "unfished_spawning_biomass",
+  ])
+  report_names = sort!(
+    String[
+      name for (name, value) in report if
+      name in report_standard_error_fields &&
+      (value isa Real || (value isa AbstractArray && eltype(value) <: Real))
+    ],
+  )
+  isempty(report_names) && return Dict{String, Any}()
+
+  report_lengths = map(report_names) do name
+    value = report[name]
+    value isa Real ? 1 : length(value)
+  end
+  flatten_reports = active_parameters -> begin
+    full_parameters = _compose_parameter_vector(
+      parameters, parameter_indices, active_parameters, Int[], Float64[],
+    )
+    evaluated_report =
+      evaluate_model(_named_component_array(full_parameters, parameter_layout), data_dict, config)["report"]
+    vcat(
+      (
+        evaluated_report[name] isa Real ?
+        [evaluated_report[name]] :
+        vec(evaluated_report[name])
+        for name in report_names
+      )...,
+    )
+  end
+  report_jacobian = isempty(parameter_indices) ?
+    zeros(Float64, sum(report_lengths), 0) :
+    ForwardDiff.jacobian(flatten_reports, parameters[parameter_indices])
+  active_covariance = covariance[parameter_indices, parameter_indices]
+  weighted_jacobian = report_jacobian * active_covariance
+  report_variances = vec(sum(weighted_jacobian .* report_jacobian, dims = 2))
+  report_standard_errors = map(report_variances) do variance
+    isfinite(variance) && variance >= 0 ? sqrt(variance) : NaN
+  end
+
+  output = Dict{String, Any}()
+  report_values = Float64[]
+  report_value_names = String[]
+  offset = 1
+  for (name, length) in zip(report_names, report_lengths)
+    value = report[name]
+    standard_errors = report_standard_errors[offset:(offset + length - 1)]
+    output[name] = value isa Real ? only(standard_errors) : reshape(standard_errors, size(value))
+    values = value isa Real ? [value] : vec(value)
+    append!(report_values, values)
+    if length == 1
+      push!(report_value_names, name)
+    else
+      append!(report_value_names, ["$name[$index]" for index in 1:length])
+    end
+    offset += length
+  end
+  report_covariance =
+    Bool(get(config, :compute_report_covariance, false)) ?
+    report_jacobian * active_covariance * report_jacobian' :
+    nothing
+  (
+    standard_errors = output,
+    standard_errors_flat = report_standard_errors,
+    values = report_values,
+    value_names = report_value_names,
+    covariance = report_covariance,
+  )
+end
+
+function fit_model(init_params, data_dict, config = Dict())
+  objective_config = Dict(config)
+  x0, parameter_layout = _flatten_init_params(init_params, objective_config)
+  parameter_names =
+    parameter_layout isa ComponentArray ?
+    String.(Symbol.(propertynames(parameter_layout))) :
+    String.(parameter_layout)
+  objective_config = merge(Dict(:parameter_names => parameter_names), objective_config)
+  optimizer_options = _optimizer_options(objective_config)
+  optimizer_restarts = Int(get(objective_config, :optimizer_restarts, 0))
+  optimizer_restarts >= 0 ||
+    throw(ArgumentError("optimizer_restarts must be non-negative."))
+
+  fixed_mask = Bool.(collect(get(objective_config, :fixed_parameter_mask, trues(length(x0)))))
+  random_mask = Bool.(collect(get(objective_config, :random_parameter_mask, falses(length(x0)))))
+  length(fixed_mask) == length(x0) ||
+    throw(ArgumentError("fixed_parameter_mask must match the initial parameter count."))
+  length(random_mask) == length(x0) ||
+    throw(ArgumentError("random_parameter_mask must match the initial parameter count."))
+  any(fixed_mask .& random_mask) &&
+    throw(ArgumentError("A parameter cannot be both fixed and random."))
+
+  fixed_indices = findall(fixed_mask)
+  random_indices = findall(random_mask)
+  active_indices = findall(fixed_mask .| random_mask)
+  fixed_start = x0[fixed_indices]
+  joint_objective = parameters ->
+    evaluate_nll(_named_component_array(parameters, parameter_layout), data_dict, objective_config)
+
+  function conditional_mode(fixed_values)
+    _conditional_mode(
+      x0, fixed_indices, fixed_values, random_indices, joint_objective, optimizer_options,
+    )
+  end
+
+  marginal_objective = fixed_values -> conditional_mode(fixed_values).marginal_nll
+  marginal_gradient = fixed_values -> begin
+    result = conditional_mode(fixed_values)
+    _laplace_gradient(joint_objective, result.parameters, fixed_indices, random_indices)
+  end
+  outer_gradient! = (storage, fixed_values) -> begin
+    values = if isempty(random_indices)
+      gradient(marginal_objective, fixed_values)
+    else
+      marginal_gradient(fixed_values)
+    end
+    copyto!(storage, values)
+  end
+
+  outer_result = if isempty(fixed_indices)
+    nothing
+  else
+    result = optimize(
+      OnceDifferentiable(marginal_objective, outer_gradient!, fixed_start),
+      fixed_start,
+      LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
+      optimizer_options,
+    )
+    for _ in 1:optimizer_restarts
+      result = optimize(
+        OnceDifferentiable(marginal_objective, outer_gradient!, minimizer(result)),
+        minimizer(result),
+        LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
+        optimizer_options,
+      )
+    end
+    result
+  end
+  fixed_hat = _primal_float.(isnothing(outer_result) ? fixed_start : minimizer(outer_result))
+  conditional_result = conditional_mode(fixed_hat)
+  xhat = _primal_float.(conditional_result.parameters)
+  estimate_components = _named_component_array(xhat, parameter_layout)
+  evaluated_model = evaluate_model(estimate_components, data_dict, objective_config)
+
+  # Constants have no sampling uncertainty. Leave their unevaluated curvature
+  # explicitly unavailable instead of differentiating the entire input.
+  joint_hessian = fill(NaN, length(xhat), length(xhat))
+  if !isempty(active_indices)
+    active_objective = values -> joint_objective(_compose_parameter_vector(
+      xhat, active_indices, values, Int[], Float64[],
+    ))
+    joint_hessian[active_indices, active_indices] .=
+      hessian(active_objective, xhat[active_indices])
+  end
+  compute_standard_errors = Bool(get(objective_config, :compute_standard_errors, true))
+  fixed_hessian = if isempty(fixed_indices)
+    zeros(Float64, 0, 0)
+  elseif isempty(random_indices)
+    Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
+  elseif compute_standard_errors
+    _numerical_gradient_hessian(marginal_gradient, fixed_hat)
+  else
+    Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
+  end
+  fixed_covariance = if compute_standard_errors
+    _hessian_covariance(fixed_hessian)
+  else
+    fill(NaN, length(fixed_indices), length(fixed_indices))
+  end
+  conditional_random_covariance = if compute_standard_errors
+    _hessian_covariance(joint_hessian[random_indices, random_indices])
+  else
+    fill(NaN, length(random_indices), length(random_indices))
+  end
+  uncertainty_valid = compute_standard_errors &&
+    all(isfinite, fixed_covariance) && all(isfinite, conditional_random_covariance)
+  if compute_standard_errors && !uncertainty_valid
+    @warn "Parameter Hessian is non-finite or not positive definite; affected covariance and standard errors are unavailable."
+  end
+  random_fixed_sensitivity =
+    isempty(random_indices) || isempty(fixed_indices) ?
+    zeros(Float64, length(random_indices), length(fixed_indices)) :
+    -conditional_random_covariance * joint_hessian[random_indices, fixed_indices]
+  random_covariance =
+    conditional_random_covariance +
+    random_fixed_sensitivity * fixed_covariance * random_fixed_sensitivity'
+  covariance = zeros(Float64, length(x0), length(x0))
+  covariance[fixed_indices, fixed_indices] .= fixed_covariance
+  covariance[random_indices, random_indices] .= random_covariance
+  if !isempty(fixed_indices) && !isempty(random_indices)
+    covariance[random_indices, fixed_indices] .= random_fixed_sensitivity * fixed_covariance
+    covariance[fixed_indices, random_indices] .=
+      covariance[random_indices, fixed_indices]'
+  end
+  variances = fill(NaN, length(x0))
+  variances[fixed_indices] .= diag(fixed_covariance)
+  variances[random_indices] .= diag(random_covariance)
+  standard_errors = map(variances) do variance
+    isfinite(variance) && variance >= 0 ? sqrt(variance) : NaN
+  end
+  if !compute_standard_errors
+    fill!(standard_errors, NaN)
+  end
+  se_components = _named_component_array(standard_errors, parameter_layout)
+  report_uncertainty =
+    compute_standard_errors ?
+    _report_standard_errors(
+      xhat, parameter_layout, data_dict, objective_config, covariance, active_indices,
+    ) :
+    (
+      standard_errors = Dict{String, Any}(),
+      standard_errors_flat = Float64[],
+      values = Float64[],
+      value_names = String[],
+      covariance = nothing,
+    )
+
+  fit_gradient = zeros(Float64, length(x0))
+  if !isempty(fixed_indices)
+    fixed_gradient = if isempty(random_indices)
+      gradient(marginal_objective, fixed_hat)
+    else
+      marginal_gradient(fixed_hat)
+    end
+    fit_gradient[fixed_indices] .= fixed_gradient
+  end
+
+  fixed_converged = isnothing(outer_result) || converged(outer_result)
+  random_converged = conditional_result.converged
+  fit_converged = fixed_converged && random_converged
+  convergence_code = if fixed_converged && random_converged
+    isempty(active_indices) ? "no_estimable_parameters" :
+    isnothing(outer_result) ? "random_effects_converged" : "converged"
+  elseif !fixed_converged && !random_converged
+    "fixed_and_random_effects_not_converged"
+  elseif !fixed_converged
+    "fixed_effects_not_converged"
+  else
+    "random_effects_not_converged"
+  end
+
+  Dict(
+    "estimates" => _result_dict(estimate_components),
+    "fixed_parameters" => fixed_hat,
+    "fixed_gradient" => fit_gradient[fixed_indices],
+    "fixed_effect_count" => length(fixed_indices),
+    "random_effect_count" => length(random_indices),
+    "nll" => conditional_result.marginal_nll,
+    "joint_nll" => conditional_result.joint_nll,
+    "convergence" => fit_converged,
+    "convergence_code" => convergence_code,
+    "fixed_convergence" => fixed_converged,
+    "random_convergence" => random_converged,
+    "iterations" => isnothing(outer_result) ? conditional_result.iterations : iterations(outer_result),
+    "gradient" => fit_gradient,
+    "report" => evaluated_model["report"],
+    "report_standard_errors" => report_uncertainty.standard_errors,
+    "report_standard_errors_flat" => report_uncertainty.standard_errors_flat,
+    "report_values" => report_uncertainty.values,
+    "report_value_names" => report_uncertainty.value_names,
+    "report_covariance" => report_uncertainty.covariance,
+    "pd_hessian" => uncertainty_valid,
+    "uncertainty_status" => !compute_standard_errors ? "not_requested" :
+      (uncertainty_valid ? "available" : "invalid_hessian"),
+    "hessian" => joint_hessian,
+    "fixed_hessian" => fixed_hessian,
+    "covariance" => covariance,
+    "standard_errors" => _result_dict(se_components),
+  )
+end

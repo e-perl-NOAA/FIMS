@@ -155,6 +155,38 @@ test_that("`fims_frame()` works with the correct inputs", {
   )
 })
 
+test_that("`model_weight_at_age()` works with projection years", {
+  years_of_projection <- 2
+  first_year_weight <- dplyr::filter(
+    data_big,
+    type == "weight_at_age",
+    timing == 1
+  )
+  data_with_projection <- data_big |>
+    dplyr::add_row(
+      type = "catch",
+      timing = get_end_year(fims_frame) + years_of_projection,
+      fleet = "fleet1",
+      observed = -999,
+      unit = "mt"
+    ) |>
+    dplyr::bind_rows(
+      dplyr::select(first_year_weight, -timing) |>
+        merge(data.frame(
+          timing = max(data_big[["timing"]], na.rm = TRUE) +
+            1:years_of_projection
+        ))
+    )
+  #' @description Test that `model_weight_at_age()` returns the data weights followed by the weights supplied for each projection year.
+  expect_equal(
+    model_weight_at_age(data_with_projection),
+    c(
+      model_weight_at_age(fims_frame),
+      rep(first_year_weight[["observed"]], years_of_projection)
+    )
+  )
+})
+
 ## Edge handling ----
 test_that("`FIMSFrame()` returns correct outputs for edge cases", {
   #' @description Test that `get_data()` retrieves the data slot as a data frame when passed a data frame rather than a FIMSFrame object.
@@ -242,8 +274,127 @@ test_that("`FIMSFrame()` returns correct error messages", {
     regexp = "`timing` can only handle years right now"
   )
 
-  #' @description Test that `FIMSFrame()` returns an error when a required type is not present.
-  expect_error(FIMSFrame(dplyr::filter(data_big, type != "weight_at_age")))
+  #' @description Test that `FIMSFrame()` can be created without empirical weight-at-age data.
+  expect_s4_class(
+    FIMSFrame(dplyr::filter(data_big, type != "weight_at_age")),
+    "FIMSFrame"
+  )
+
+  #' @description Test that `FIMSFrame()` errors when a fleet appears only in weight-at-age data rather than adding a fleet.
+  expect_error(
+    FIMSFrame(dplyr::mutate(
+      data_big,
+      fleet = ifelse(type == "weight_at_age", "fleet_1", fleet)
+    )),
+    regexp = "no catch, index, or composition\\s+data:\\s+\"fleet_1\""
+  )
+
+  #' @description Test that `FIMSFrame()` errors when a fleet appears only in age-to-length conversion data.
+  expect_error(
+    FIMSFrame(dplyr::mutate(
+      data_big,
+      fleet = ifelse(type == "age_to_length_conversion", "fleet3", fleet)
+    )),
+    regexp = "no catch, index, or composition\\s+data:\\s+\"fleet3\""
+  )
+
+  terminal_weight <- dplyr::filter(
+    data_big,
+    type == "weight_at_age",
+    timing == max(timing, na.rm = TRUE)
+  )
+  #' @description Test that `FIMSFrame()` returns an error when weight-at-age data repeat a timing.
+  expect_error(
+    FIMSFrame(dplyr::bind_rows(data_big, terminal_weight)),
+    regexp = "more than one row of weight-at-age data: 31"
+  )
+
+  #' @description Test that `FIMSFrame()` returns an error when weight-at-age data have a timing after the year following the last model year.
+  expect_error(
+    FIMSFrame(dplyr::bind_rows(
+      dplyr::filter(data_big, !(type == "weight_at_age" & timing == 31)),
+      dplyr::mutate(terminal_weight, timing = 32)
+    )),
+    regexp = "the following timings: 32"
+  )
+
+  #' @description Test that `FIMSFrame()` does not warn about age-to-length conversion data that sum to 1 for each age.
+  expect_no_warning(FIMSFrame(data_big))
+
+  #' @description Test that `FIMSFrame()` warns when age-to-length conversion values for an age do not sum to 1, and that rescaling gives back the original table.
+  expect_warning(
+    half_age_3 <- FIMSFrame(dplyr::mutate(
+      data_big,
+      observed = ifelse(
+        type == "age_to_length_conversion" & age == 3,
+        observed / 2,
+        observed
+      )
+    )),
+    regexp = "Age 3 sums to 0\\.5\\."
+  )
+  expect_equal(
+    model_age_to_length_conversion(half_age_3),
+    model_age_to_length_conversion(FIMSFrame(data_big))
+  )
+
+  #' @description Test that age-to-length conversion values entered as counts give the same table as proportions.
+  expect_warning(
+    counts <- FIMSFrame(dplyr::mutate(
+      data_big,
+      observed = ifelse(
+        type == "age_to_length_conversion",
+        observed * 100,
+        observed
+      )
+    )),
+    regexp = "rescaled to sum to 1"
+  )
+  expect_equal(
+    model_age_to_length_conversion(counts),
+    model_age_to_length_conversion(FIMSFrame(data_big))
+  )
+
+  #' @description Test that `FIMSFrame()` errors when an age-to-length conversion value is negative or missing.
+  for (bad_value in c(-0.1, NA, -999)) {
+    expect_error(
+      FIMSFrame(dplyr::mutate(
+        data_big,
+        observed = ifelse(
+          type == "age_to_length_conversion" & age == 3 & length == 0,
+          bad_value,
+          observed
+        )
+      )),
+      regexp = "must be 0 or\\s+greater"
+    )
+  }
+
+  #' @description Test that `FIMSFrame()` errors when the age-to-length conversion values for an age are all 0.
+  expect_error(
+    FIMSFrame(dplyr::mutate(
+      data_big,
+      observed = ifelse(
+        type == "age_to_length_conversion" & age == 3,
+        0,
+        observed
+      )
+    )),
+    regexp = "all 0 for these\\s+ages:\\s+3"
+  )
+
+  #' @description Test that `FIMSFrame()` errors when the age-to-length conversion values for a length are all 0, which would make the likelihood undefined.
+  expect_error(
+    FIMSFrame(dplyr::mutate(
+      data_big,
+      observed = ifelse(
+        type == "age_to_length_conversion" & length == 100,
+        0,
+        observed
+      )
+    )),
+    regexp = "all 0 for these\\s+lengths:\\s+100"
+  )
 
   #' @description Test that `FIMSFrame` validators pick up on a missing age in age-composition data.
   expect_error(
@@ -281,7 +432,7 @@ test_that("`FIMSFrame()` returns correct error messages", {
   #' @description Test that `FIMSFrame()` returns an error when there are no age data.
   expect_error(
     FIMSFrame(dplyr::mutate(data_big, age = NA_integer_)),
-    regexp = "they are all `NA`"
+    regexp = "they are all\\s+`NA`"
   )
 
   #' @description Test that `FIMSFrame()` returns an error when the age column is not present but `age_to_length_conversion` is present in type.
@@ -325,13 +476,12 @@ test_that("`model_*()` works with the correct inputs", {
   names(index_dat) <- fleet_names_index
 
   for (index_i in 1:n_index) {
-    index <- Index
-    index_dat[[fleet_names_index[index_i]]] <- methods::new(index, n_years)
     #' @description Test that `model_index()` works with correct inputs.
     expect_silent(
       index_dat[[fleet_names_index[index_i]]] <-
         model_index(fims_frame, fleet_names_index[index_i])
     )
+    expect_length(index_dat[[fleet_names_index[index_i]]], n_years)
   }
 
   clear()
@@ -340,12 +490,11 @@ test_that("`model_*()` works with the correct inputs", {
   names(age_comp_dat) <- fleet_names_age_comp
 
   for (fleet_f in 1:n_age_comp) {
-    age_comp_dat[[fleet_names_age_comp[fleet_f]]] <- methods::new(AgeComp, n_years, n_ages)
     #' @description Test that `model_age_comp()` works with correct inputs.
-    age_comp_dat[[fleet_names_age_comp[fleet_f]]]$age_comp_data[] <- model_age_comp(fims_frame, fleet_names_age_comp[fleet_f])
     expect_silent(
-      age_comp_dat[[fleet_names_age_comp[fleet_f]]]$age_comp_data[] <- model_age_comp(fims_frame, fleet_names_age_comp[fleet_f])
+      age_comp_dat[[fleet_names_age_comp[fleet_f]]] <- model_age_comp(fims_frame, fleet_names_age_comp[fleet_f])
     )
+    expect_length(age_comp_dat[[fleet_names_age_comp[fleet_f]]], n_years * n_ages)
   }
 
   clear()
@@ -369,17 +518,23 @@ test_that("`model_*()` works with the correct inputs", {
 ## Edge handling ----
 test_that("`model_*()` returns correct outputs for edge cases", {
   #' @description Test that `model_age_to_length_conversion()` returns averaged data when more than one value is given.
+  # The second set for age 1 is uniform over lengths, so it still sums to 1.
+  age_1_conversion <- dplyr::filter(
+    data_big,
+    type == "age_to_length_conversion",
+    age == 1
+  )
+  uniform_probability <- 1 / NROW(age_1_conversion)
   multiple_data <- dplyr::bind_rows(
     data_big,
-    dplyr::filter(data_big, type == "age_to_length_conversion", age == 1) |>
-      dplyr::mutate(observed = 0.01)
+    dplyr::mutate(age_1_conversion, observed = uniform_probability)
   ) |> FIMSFrame()
   expect_warning(model_age_to_length_conversion(multiple_data))
   expect_equal(
     suppressWarnings(model_age_to_length_conversion(multiple_data))[1],
     data_big |> dplyr::filter(age == 1, length == 0, type == "age_to_length_conversion") |>
       dplyr::pull(observed) |>
-      c(0.01) |>
+      c(uniform_probability) |>
       mean()
   )
 
@@ -408,6 +563,14 @@ test_that("`model_*()` returns correct error messages", {
   expect_error(
     model_weight_at_age(fims_frame, fleet_names),
     regexp = "unused argument"
+  )
+
+  #' @description Test that `model_weight_at_age()` says what to add and lists the types when there is no weight-at-age data.
+  expect_error(
+    model_weight_at_age(
+      FIMSFrame(dplyr::filter(data_big, type != "weight_at_age"))
+    ),
+    regexp = "no `type = \"weight_at_age\"` rows.*Types in the data"
   )
 
   #' @description Test that the `model_catch()` returns an error when a fleet is not supplied.

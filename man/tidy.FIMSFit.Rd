@@ -34,7 +34,7 @@ A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
 \describe{
 \item{\code{term}}{Parameter label (from \code{label} in \code{\link[=get_estimates]{get_estimates()}}).}
 \item{\code{estimate}}{Point estimate at the MLE.}
-\item{\code{std.error}}{Standard error from \code{\link[TMB:sdreport]{TMB::sdreport()}}.}
+\item{\code{std.error}}{Standard error from \code{\link[=get_sdreport]{get_sdreport()}}.}
 \item{\code{statistic}}{Wald z-statistic (\code{estimate / std.error}).}
 \item{\code{p.value}}{Two-sided p-value for the z-test.}
 \item{\code{conf.low}, \code{conf.high}}{Confidence bounds (only when
@@ -63,7 +63,7 @@ log_Fmort, log_q, etc.).}
 \item{\code{"random_effects"}}{Integrated-out random effects (log_devs, etc.).}
 \item{\code{"derived_quantity"}}{Model outputs that are not parameters
 (spawning biomass, expected catches, etc.). Uncertainty here comes from
-the delta method via \code{\link[TMB:sdreport]{TMB::sdreport()}}.}
+the delta method via \code{\link[=get_sdreport]{get_sdreport()}}.}
 }
 Pass any subset of these strings to \code{parameters} to control which rows are
 returned.
@@ -73,7 +73,7 @@ returned.
 
 \code{statistic} and \code{p.value} are computed as a two-sided Wald z-test:
 \code{z = estimate / std.error},
-\verb{p = 2 * pnorm(-|z|)}.
+\verb{p = 2 * stats::pnorm(-|z|)}.
 These are asymptotically valid for fixed effects under regularity
 conditions; treat them as approximate for random effects and derived
 quantities.

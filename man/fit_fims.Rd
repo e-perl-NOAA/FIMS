@@ -12,20 +12,22 @@ fit_fims(
   optimize = TRUE,
   number_of_newton_steps = 0,
   control = list(eval.max = 10000, iter.max = 10000, trace = 0),
-  filename = NULL
+  filename = NULL,
+  getReportCovariance = FALSE
 )
 }
 \arguments{
 \item{input}{Input list as returned by \code{\link[=initialize_fims]{initialize_fims()}}.}
 
-\item{get_sd}{A boolean specifying if the \code{\link[TMB:sdreport]{TMB::sdreport()}} should be
-calculated?}
+\item{get_sd}{A boolean specifying whether parameter and derived-quantity
+standard errors should be calculated.}
 
 \item{save_sd}{A logical, with the default \code{TRUE}, indicating whether the
-sdreport is returned in the output. If \code{FALSE}, the slot for the report
-will be empty.}
+uncertainty report is retained in the output. If \code{FALSE}, the \code{sdreport}
+slot will be empty. For Julia fits, uncertainty values in \code{estimates} are
+retained.}
 
-\item{number_of_loops}{A positive integer specifying the number of
+\item{number_of_loops}{A non-negative integer specifying the number of
 iterations of the optimizer that will be performed to improve the
 gradient. The default is three, leading to four total optimization steps.}
 
@@ -35,14 +37,21 @@ a list containing the obj and report slot.}
 \item{number_of_newton_steps}{The number of Newton steps using the inverse
 Hessian to do after optimization. Not yet implemented.}
 
-\item{control}{A list of optimizer settings passed to \code{\link[stats:nlminb]{stats::nlminb()}}. The
-the default is a list of length three with \code{eval.max = 1000},
-\code{iter.max = 10000}, and \code{trace = 0}.}
+\item{control}{A list with \code{eval.max = 10000}, \code{iter.max = 10000}, and
+\code{trace = 0} by default. These settings are mapped to Julia's optimizer.
+Other control fields are rejected explicitly.}
 
 \item{filename}{Character string giving a file name to save the fitted
 object as an RDS object. Defaults to 'fit.RDS', and a value of NULL
 indicates not to save it. If specified, it must end in .RDS. The file is
 written to folder given by \code{input[["path"]]}. Not yet implemented.}
+
+\item{getReportCovariance}{A logical, with the default \code{FALSE}. Standard
+errors of all parameters and derived quantities are calculated either way.
+If \code{TRUE}, the full covariance matrix of the derived quantities is also
+calculated and stored as \code{cov} in the \code{sdreport}; it grows with the square
+of the number of derived quantities and can use several GB of memory. If
+\code{FALSE}, \code{cov} is \code{NA}.}
 }
 \value{
 An object of class \code{FIMSFit} is returned, where the structure is the same

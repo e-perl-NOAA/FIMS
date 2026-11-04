@@ -324,7 +324,8 @@ NULL
 #' Observations are ordered by age and length in the order defined by
 #' [FIMSFrame()]. When multiple observations are present across a single age
 #' and length, they are averaged because `age_to_length_conversion` data cannot
-#' vary across fleets or time.
+#' vary across fleets or time. The values for each age are then rescaled to sum
+#' to 1.
 #'
 #' @export
 #' @rdname model_
@@ -438,16 +439,6 @@ methods::setMethod(
   "model_length_comp",
   "FIMSFrame",
   function(x, fleet) {
-    conversion_data <- dplyr::filter(
-      .data = x@data,
-      .data[["type"]] == "age_to_length_conversion"
-    )
-    if (NROW(conversion_data) == 0) {
-      cli::cli_abort(c(
-        "There are no {.var age_to_length_conversion} data present, therefore
-        you cannot fit to {.var length_comp} data."
-      ))
-    }
     dplyr::filter(
       .data = x@data,
       .data[["type"]] == "length_comp",
@@ -497,9 +488,12 @@ methods::setMethod(
       .data[["type"]] == "weight_at_age"
     )
     if (NROW(model_data) == 0) {
-      cli::cli_abort(
-        message = "No weight_at_age data found in FIMSFrame object."
-      )
+      cli::cli_abort(c(
+        "x" = "The data have no {.code type = \"weight_at_age\"} rows.",
+        "i" = "Add weight at age for each model age, either 1 set for all
+        years or 1 set per year plus the year after the last model year.",
+        "i" = "Types in the data: {.val {unique(x@data[['type']])}}."
+      ))
     }
     all_fleets <- unique(model_data[["fleet"]])
     if (length(all_fleets) > 1) {
@@ -574,20 +568,23 @@ methods::setMethod(
       .data = as.data.frame(x@data),
       .data[["type"]] == "age_to_length_conversion"
     )
-    if (NROW(model_data) > get_n_ages(x) * get_n_lengths(x)) {
+    conversion_lengths <- model_data |>
+      dplyr::pull(.data[["length"]]) |>
+      unique() |>
+      stats::na.omit() |>
+      sort()
+
+    if (NROW(model_data) > get_n_ages(x) * length(conversion_lengths)) {
       cli::cli_warn(
         "`age_to_length_conversion` data is time- and fleet-invariant and
-        should consist of {get_n_ages(x) * get_n_lengths(x)} rows not
+        should consist of {get_n_ages(x) * length(conversion_lengths)} rows not
         {NROW(model_data)} rows like what is provided. Data passed to the
         model will be averaged over timing and name."
       )
     }
     model_data |>
-      dplyr::group_by(.data[["age"]], .data[["length"]]) |>
-      dplyr::summarize(
-        mean_observed = mean(as.numeric(.data[["observed"]]), na.rm = TRUE)
-      ) |>
-      dplyr::pull(as.numeric(.data[["mean_observed"]]))
+      rescale_age_to_length_conversion() |>
+      dplyr::pull(.data[["value"]])
   }
 )
 #' @rdname model_
@@ -725,7 +722,7 @@ assert_presence_of_fleet <- function(data, fleet) {
   fleets <- get_fleets(data)
   if (!fleet %in% fleets) {
     cli::cli_abort(c(
-      "x" = "{.var fleet} is not present in the {.var data}.",
+      "x" = "{.var fleet} {.val {fleet}} is not present in {.var data}.",
       "i" = "Available fleet names are: {.val {fleets}}."
     ))
   }
@@ -745,11 +742,11 @@ methods::setValidity(
     present_types <- unique(object@data[["type"]])
 
     # Issues warning if there are any unrecognized types
-    unknown_types <- sort(setdiff(present_types, fims_input_types))
+    unknown_types <- sort(setdiff(present_types, FIMS::fims_input_types))
     if (length(unknown_types) > 0) {
       cli::cli_warn(c(
         "!" = "Data contains unexpected type{?s}: {.var {unknown_types}}.",
-        "i" = "Allowed types are: {.var {fims_input_types}}.",
+        "i" = "Allowed types are: {.var {FIMS::fims_input_types}}.",
         "i" = "Model will run but check that data types are correct."
       ))
     }
@@ -845,7 +842,10 @@ validate_dimension_of_conversion <- function(data, n_groups, n_timings) {
   good_data <- dplyr::filter(data, .data$observed != -999)
   good_type <- unique(data[["type"]])
   if (length(good_type) > 1) {
-    cli::cli_abort("Only one type of data can exist in {.var data}.")
+    cli::cli_abort(c(
+      "x" = "Only 1 type of data can be checked at a time.",
+      "i" = "{.var data} has {.val {good_type}}."
+    ))
   }
   n_rows <- NROW(good_data)
   n_timings <- dplyr::if_else(
@@ -872,6 +872,176 @@ validate_dimension_of_conversion <- function(data, n_groups, n_timings) {
   } else {
     return(TRUE)
   }
+}
+
+# FIMSFrame() takes fleets from every row. A fleet named only in rows such as
+# weight_at_age would be added to the model with default parameters, so every
+# fleet must have observations.
+validate_fleets_have_observations <- function(data) {
+  observation_types <- c("age_comp", "catch", "index", "length_comp")
+  observed_fleets <- data |>
+    dplyr::filter(.data[["type"]] %in% observation_types) |>
+    dplyr::pull(.data[["fleet"]])
+  fleets_without_observations <- setdiff(
+    stats::na.omit(data[["fleet"]]),
+    observed_fleets
+  )
+  if (length(fleets_without_observations) > 0) {
+    cli::cli_abort(c(
+      "x" = "The following fleets have no catch, index, or composition data:
+      {.val {fleets_without_observations}}.",
+      "i" = "Every fleet present in your data must have at least catch, index,
+      or composition data, e.g., a fleet with just age_to_length_conversion data
+      is not allowed.",
+      "i" = "Check the {.var fleet} and {.var type} values in the rows for
+      the following fleets: {.val {fleets_without_observations}}, where
+      {.code dplyr::count(data, fleet, type)} is helpful for investigating data
+      types by fleet."
+    ))
+  }
+  invisible(TRUE)
+}
+
+# The model uses one age-to-length table. Rows are averaged over fleets and
+# timings, and each age is rescaled to sum to 1 so values can be entered as
+# proportions or counts. An age that does not sum to 1 would otherwise get more
+# or less weight in the expected length compositions.
+rescale_age_to_length_conversion <- function(data) {
+  data |>
+    dplyr::summarize(
+      value = mean(as.numeric(.data[["observed"]]), na.rm = TRUE),
+      .by = c("age", "length")
+    ) |>
+    dplyr::mutate(
+      value = .data[["value"]] / sum(.data[["value"]]),
+      .by = "age"
+    ) |>
+    dplyr::arrange(.data[["age"]], .data[["length"]])
+}
+
+validate_age_to_length_conversion <- function(data) {
+  observed <- data[["observed"]]
+  if (any(is.na(observed) | observed < 0)) {
+    cli::cli_abort(c(
+      "{.var age_to_length_conversion} values in {.var observed} must be 0 or
+      greater.",
+      "i" = "Missing values, including -999, are not allowed."
+    ))
+  }
+  mean_observed <- dplyr::summarize(
+    data,
+    observed = mean(.data[["observed"]]),
+    .by = c("age", "length")
+  )
+  age_sums <- dplyr::summarize(
+    mean_observed,
+    sum_observed = sum(.data[["observed"]]),
+    .by = "age"
+  )
+  zero_ages <- age_sums |>
+    dplyr::filter(.data[["sum_observed"]] == 0) |>
+    dplyr::pull(.data[["age"]])
+  if (length(zero_ages) > 0) {
+    cli::cli_abort(
+      "{.var age_to_length_conversion} values are all 0 for these ages:
+      {zero_ages}."
+    )
+  }
+  # A length that no age can reach has an expected composition of 0, which
+  # makes the length-composition likelihood undefined.
+  zero_lengths <- mean_observed |>
+    dplyr::summarize(total = sum(.data[["observed"]]), .by = "length") |>
+    dplyr::filter(.data[["total"]] == 0) |>
+    dplyr::pull(.data[["length"]])
+  if (length(zero_lengths) > 0) {
+    cli::cli_abort(
+      "{.var age_to_length_conversion} values are all 0 for these lengths:
+      {zero_lengths}."
+    )
+  }
+  # Matches the tolerance for composition data.
+  rescaled_ages <- dplyr::filter(
+    age_sums,
+    abs(.data[["sum_observed"]] - 1) > 1e-3
+  )
+  if (NROW(rescaled_ages) > 0) {
+    sums <- signif(rescaled_ages[["sum_observed"]], 4)
+    age_messages <- glue::glue("Age {rescaled_ages[['age']]} sums to {sums}.")
+    names(age_messages) <- rep("*", length(age_messages))
+    cli::cli_warn(c(
+      "{.var age_to_length_conversion} values are rescaled to sum to 1 for
+      each age.",
+      age_messages
+    ))
+  }
+  invisible(TRUE)
+}
+
+# Keep fleet-bin resolution explicit by default. Fixed age-to-length rows are
+# only treated as bin geometry when a caller intentionally opts into that path.
+resolve_fleet_length_bins <- function(
+  data,
+  allow_global_conversion_fallback = FALSE
+) {
+  data_tbl <- tibble::as_tibble(data)
+
+  if (!all(c("fleet", "type", "length") %in% colnames(data_tbl))) {
+    return(list())
+  }
+
+  fleets <- sort(unique(stats::na.omit(data_tbl[["fleet"]])))
+  if (length(fleets) == 0) {
+    return(list())
+  }
+
+  global_conversion_bins <- if (allow_global_conversion_fallback) {
+    data_tbl |>
+      dplyr::filter(
+        .data$type == "age_to_length_conversion",
+        !is.na(.data$length)
+      ) |>
+      dplyr::pull(.data$length) |>
+      unique() |>
+      sort()
+  } else {
+    numeric()
+  }
+
+  out <- stats::setNames(vector("list", length(fleets)), fleets)
+
+  for (fleet_i in fleets) {
+    explicit_bins <- data_tbl |>
+      dplyr::filter(
+        .data$fleet == fleet_i,
+        .data$type == "length_bin",
+        !is.na(.data$length)
+      ) |>
+      dplyr::pull(.data$length) |>
+      unique() |>
+      sort()
+
+    comp_bins <- data_tbl |>
+      dplyr::filter(
+        .data$fleet == fleet_i,
+        .data$type == "length_comp",
+        !is.na(.data$length)
+      ) |>
+      dplyr::pull(.data$length) |>
+      unique() |>
+      sort()
+
+    out[[fleet_i]] <- if (length(explicit_bins) > 0) {
+      explicit_bins
+    } else if (length(comp_bins) > 0) {
+      comp_bins
+    } else if (allow_global_conversion_fallback) {
+      global_conversion_bins
+    } else {
+      numeric()
+    }
+  }
+
+  out
 }
 
 # Constructors ----
@@ -920,9 +1090,7 @@ validate_dimension_of_conversion <- function(data, n_groups, n_timings) {
 #' for your distribution. And, use `?distributions` to get a list of
 #' distributions that have density functions in base R. To get information on
 #' available derived quantities to set the central tendency of the distribution
-#' to, you can create a fleet object and inspect the available names, e.g.,
-#' `names(methods::new(Fleet))`, or you can navigate to the Public Attributes
-#' section of the doxygen documentation for Fleet by running `?Fleet`.
+#' to, see the catch and index fields returned by [get_report()].
 #' ### Sorting
 #' It is important that the order of the rows in the data are correct but it is
 #' not expected that the user will do this. Instead, the returned data are
@@ -982,10 +1150,7 @@ FIMSFrame <- function(data) {
       "{.var data} has 0 rows of data and cannot be used to make a FIMSFrame."
     )
   }
-  # TODO: Change this check when internal estimation of growth is possible
-  if (NROW(dplyr::filter(data, .data$type == "weight_at_age")) == 0) {
-    cli::cli_abort("{.var data} must contain {.var weight_at_age} data.")
-  }
+
   if (!all(is.numeric(data[["timing"]]))) {
     cli::cli_abort("{.var timing} must be in numeric format.")
   }
@@ -1007,15 +1172,22 @@ FIMSFrame <- function(data) {
   n_years <- as.integer(end_year - start_year + 1)
   years <- start_year:end_year
 
+  validate_fleets_have_observations(data)
+
   # Get the fleets represented in the data
   fleets <- unique(na.omit(data[["fleet"]]))
   n_fleets <- length(fleets)
 
   if ("age" %in% colnames(data)) {
     if (all(is.na(data[["age"]]))) {
-      cli::cli_abort(
-        message = "The `age` column exists in `data` but they are all `NA`."
-      )
+      cli::cli_abort(c(
+        "x" = "The {.var age} column exists in {.var data} but they are all
+        {.code NA}.",
+        "i" = "FIMS takes the model ages from the {.code age_comp} and
+        {.code weight_at_age} rows, so give those rows an {.var age}.",
+        "i" = "Without age-composition data, {.code weight_at_age} rows are
+        the only source of model ages."
+      ))
     } else {
       # Forced to use annual age bins because the model has an annual time step
       # FUTURE: allow for different age bins rather than 1 year increment
@@ -1050,10 +1222,9 @@ FIMSFrame <- function(data) {
     if (all(is.na(data[["length"]]))) {
       lengths <- numeric()
     } else {
-      data_for_length_calculations <- dplyr::filter(data, .data$type == "length_comp")
-      lengths <- sort(na.omit(
-        unique(data_for_length_calculations[["length"]])
-      ))
+      resolved_fleet_length_bins <- resolve_fleet_length_bins(data)
+      lengths <- sort(unique(unlist(resolved_fleet_length_bins, use.names = FALSE)))
+
       # Check that the age column exists b/c conversion data depends on it
       if (!"age" %in% colnames(data)) {
         cli::cli_abort(
@@ -1062,12 +1233,17 @@ FIMSFrame <- function(data) {
           {.var age_to_length_conversion} type."
         )
       }
-      # Check that age_to_length_conversion data exist once
-      validate_dimension_of_conversion(
-        dplyr::filter(data, .data$type == "age_to_length_conversion"),
-        n_groups = n_ages * length(lengths),
-        n_timings = 1
-      )
+
+      conversion_data <- dplyr::filter(data, .data$type == "age_to_length_conversion")
+      if (NROW(conversion_data) > 0) {
+        conversion_lengths <- sort(na.omit(unique(conversion_data[["length"]])))
+        validate_age_to_length_conversion(conversion_data)
+        validate_dimension_of_conversion(
+          conversion_data,
+          n_groups = n_ages * length(conversion_lengths),
+          n_timings = 1
+        )
+      }
     }
   } else {
     lengths <- numeric()
@@ -1085,6 +1261,46 @@ FIMSFrame <- function(data) {
       n_groups = n_ages,
       n_timings = n_years
     )
+
+  # model_weight_at_age() reads weights by position, so each fleet, timing,
+  # and age needs exactly one row, ending at the year after the last model year.
+  if ("age" %in% colnames(data) && "weight_at_age" %in% unique(data[["type"]])) {
+    weight_data <- dplyr::filter(data, .data$type == "weight_at_age")
+    duplicated_weight_timings <- weight_data |>
+      dplyr::count(.data$fleet, .data$timing, .data$age) |>
+      dplyr::filter(.data$n > 1) |>
+      dplyr::pull(.data$timing) |>
+      unique()
+    if (length(duplicated_weight_timings) > 0) {
+      cli::cli_abort(c(
+        "x" = "Only one row of weight_at_age data per fleet, timing, and age
+        are allowed in the input data for a FIMS model.",
+        "i" = "The following timings have more than one row of
+        weight-at-age data: {duplicated_weight_timings}.",
+        "i" = "Use {.code dplyr::filter(dplyr::count(data, type, timing, fleet,
+        age), type == 'weight_at_age', n > 1)} to investigate the problem."
+      ))
+    }
+    late_weight_timings <- weight_data |>
+      dplyr::filter(.data$timing > end_year + 1) |>
+      dplyr::pull(.data$timing) |>
+      unique()
+    if (length(late_weight_timings) > 0) {
+      cli::cli_abort(c(
+        "x" = "The {.var weight_at_age} type in your input data contains
+        information for years after {end_year + 1}, i.e., the year after
+        the last model year, which is not allowed.",
+        "i" = "The invalid weight-at-age data occurs in the following timings:
+        {late_weight_timings}.",
+        "i" = "Remove these rows of weight-at-age data, or extend the modeled
+        years by adding a row of catches row for invalid years.",
+        "i" = "Remember that you only need additional weight-at-age data for
+        one year beyond which you have other data so you can estimate the
+        biomass on January 01 after all catches have been removed from the
+        previous year."
+      ))
+    }
+  }
 
   # Work on filling in missing data with -999 and arrange in the correct
   # order so that getting information out with model_*() are correct.
@@ -1123,23 +1339,45 @@ FIMSFrame <- function(data) {
     missing_ages <- missing_time_series[0, ]
   }
   if ("length" %in% colnames(formatted_data)) {
-    missing_lengths <- create_missing_data(
-      data = formatted_data,
-      bins = lengths,
-      timings = years,
-      column = "length",
-      types = "length_comp"
+    fleet_length_bins <- resolve_fleet_length_bins(formatted_data)
+
+    missing_lengths <- purrr::imap_dfr(fleet_length_bins, \(bins, fleet_i) {
+      fleet_length_data <- formatted_data |>
+        dplyr::filter(
+          .data$fleet == fleet_i,
+          .data$type == "length_comp"
+        )
+
+      if (length(bins) == 0 || NROW(fleet_length_data) == 0) {
+        return(formatted_data[0, ])
+      }
+
+      create_missing_data(
+        data = fleet_length_data,
+        bins = bins,
+        timings = years,
+        column = "length",
+        types = "length_comp"
+      )
+    })
+
+    expected_length_counts <- tibble::tibble(
+      fleet = names(fleet_length_bins),
+      expected_n = purrr::map_int(fleet_length_bins, length)
     )
+
     summary_by_name <- dplyr::count(
       missing_lengths,
       .data$fleet,
       .data$timing
     ) |>
-      dplyr::filter(.data$n != n_lengths) |>
+      dplyr::left_join(expected_length_counts, by = "fleet") |>
+      dplyr::filter(.data$n != .data$expected_n) |>
       dplyr::summarize(
         timings = paste(.data$timing, collapse = ", "),
         .by = dplyr::all_of("fleet")
       )
+
     if (NROW(summary_by_name) > 0) {
       cli::cli_abort(
         "You cannot have missing length values for a given timing and fleet

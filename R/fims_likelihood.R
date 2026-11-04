@@ -21,9 +21,12 @@
 #' spans from 2 units below to 2 units above the estimated value. The profiled
 #' values are evenly spaced on the parameter scale (not log scale).
 #'
-#' Models are run in parallel for computational efficiency. The function
-#' automatically handles parameter identification using module names when needed
-#' to distinguish between multiple instances of the same parameter type.
+#' Models are run in parallel for computational efficiency. Use `module_name`
+#' when the same parameter label exists in more than 1 module. Parameters with
+#' more than 1 row in a module (for example, 1 per fleet, year, or age) cannot
+#' be profiled yet.
+#' Julia refits use separate R sessions rather than forked workers when
+#' running in parallel.
 #'
 #' @param model A FIMSFit object returned by [FIMS::fit_fims()]. Used to extract
 #'   the estimated value of the parameter being profiled.
@@ -33,9 +36,9 @@
 #' @param data A data frame, tibble, or FIMSFrame object containing the model
 #'   data. This should include all data types required by FIMS.
 #' @param module_name A character string specifying the module containing the
-#'   parameter to profile. Default is `NULL`. Required when the parameter name
-#'   exists in multiple modules (e.g., multiple fleets). Examples include
-#'   `"fleet1"`, `"survey1"`, or `"recruitment"`.
+#'   parameter to profile, as in the `module_name` column of `parameters`.
+#'   Default is `NULL`. Required when the parameter label exists in more than 1
+#'   module, e.g., `"Maturity"` or `"Selectivity"` for `inflection_point`.
 #' @param parameter_name A character string specifying the parameter to profile.
 #'   Default is `"log_rzero"`. Must match a parameter name in the FIMS model.
 #'   Common options include `"log_rzero"`, `"log_sigma_recruit"`, `"logit_steep"`,
@@ -52,6 +55,9 @@
 #' @param length An integer specifying the number of points in the likelihood
 #'   profile. Default is `5`. Use an odd number to include the estimated value.
 #'   Must be a positive integer. Values above 50 will generate a warning
+#' @param backend Backend for refits. Defaults to the backend of `model`.
+#' @param priors Optional Julia parameter priors. Defaults to the priors
+#'   retained in `model`.
 #'
 #' @return
 #' A list with two named elements:
@@ -60,7 +66,7 @@
 #'   with the following key columns:
 #'   * `label` - Type of estimate (e.g., "spawning_biomass", "recruitment")
 #'   * `year_i` - Year index for the estimate
-#'   * `age_i` - Age index (if applicable)
+#'   * `age` - Age from the data (if applicable)
 #'   * `estimated` - Point estimate value
 #'   * `uncertainty` - Standard error of the estimate
 #'   * `lpdf` - Log probability density (negative log-likelihood component)
@@ -128,7 +134,9 @@ run_fims_likelihood <- function(
   n_cores = NULL,
   min = -2,
   max = 2,
-  length = 5
+  length = 5,
+  backend = NULL,
+  priors = attr(get_input(model), "julia_priors")
   # TODO: check inputs to make sure they make sense
 ) {
   # checking inputs
@@ -147,6 +155,10 @@ run_fims_likelihood <- function(
   if (!inherits(model, "FIMSFit")) {
     cli::cli_abort("Input model needs to be a FIMSFit object.")
   }
+  if (is.null(backend)) {
+    backend <- "julia"
+  }
+  backend <- match.arg(backend, "julia")
   # calculate vector
   values <- seq(min, max, length = length)
 
@@ -154,30 +166,69 @@ run_fims_likelihood <- function(
     cli::cli_warn("Inputs min and max don't span 0. Are you sure this is right?")
   }
 
-  init <- FIMS::get_estimates(model) |>
-    dplyr::filter(.data[["label"]] == parameter_name) |>
-    dplyr::pull(.data[["estimated"]]) # NOTE: input and estimated value are slightly different (even though its fixed) input = 13.8155, estimated = 13.857
-
   if (!is.null(module_name)) {
     module_names <- parameters |>
       dplyr::pull(.data[["module_name"]]) |>
       unique()
     if (!module_name %in% module_names) {
-      cli::cli_abort("Input module_name not found in parameters tibble.")
+      cli::cli_abort(c(
+        "x" = "{.arg module_name} {.val {module_name}} not found in
+        {.arg parameters}.",
+        "i" = "Module names in {.arg parameters}: {.val {module_names}}."
+      ))
     }
-    parameter_row <- parameters |>
-      dplyr::filter(.data[["module_name"]] == module_name & .data[["label"]] == parameter_name)
-  } else {
-    parameter_row <- parameters |>
-      dplyr::filter(.data[["label"]] == parameter_name)
   }
 
+  # `%in%` rather than `==` because `x == NULL` has length 0, which `filter()`
+  # rejects, so a NULL module_name matches every module
+  parameter_row <- parameters |>
+    dplyr::filter(
+      .data[["label"]] == .env$parameter_name,
+      is.null(.env$module_name) |
+        .data[["module_name"]] %in% .env$module_name
+    )
+
   if (nrow(parameter_row) == 0) {
-    cli::cli_abort("Input parameter_name did not match any rows in parameter tibble.")
+    available_labels <- parameters |>
+      dplyr::filter(
+        is.null(.env$module_name) |
+          .data[["module_name"]] %in% .env$module_name
+      ) |>
+      dplyr::pull(.data[["label"]]) |>
+      unique()
+    where <- if (is.null(module_name)) "" else paste0(" in ", module_name)
+    cli::cli_abort(c(
+      "x" = "{.arg parameter_name} {.val {parameter_name}} did not match any
+      rows in {.arg parameters}.",
+      "i" = "Labels{where}: {.val {available_labels}}."
+    ))
   }
 
   if (nrow(parameter_row) > 1) {
-    cli::cli_abort("Input parameter_name matched too many rows in parameter tibble: {length(parameter_row)}. Try adding a module_name.")
+    if (is.null(module_name)) {
+      cli::cli_abort("Input parameter_name matched too many rows in parameter tibble: {nrow(parameter_row)}. Try adding a module_name.")
+    }
+    cli::cli_abort(
+      "{nrow(parameter_row)} parameters in module {.val {module_name}} have
+      label {.val {parameter_name}} (for example, 1 per fleet or year);
+      {.fn run_fims_likelihood} cannot select one of them."
+    )
+  }
+
+  # NOTE: input and estimated value are slightly different (even though its
+  # fixed) input = 13.8155, estimated = 13.857
+  init <- FIMS::get_estimates(model) |>
+    dplyr::filter(
+      .data[["label"]] == .env$parameter_name,
+      is.null(.env$module_name) |
+        .data[["module_name"]] %in% .env$module_name
+    ) |>
+    dplyr::pull(.data[["estimated"]])
+  if (length(init) != 1) {
+    cli::cli_abort(
+      "Found {length(init)} estimates of {.val {parameter_name}} in the model;
+      expected 1."
+    )
   }
 
   vec <- values + init
@@ -196,11 +247,14 @@ run_fims_likelihood <- function(
     }
     n_cores_to_use <- as.integer(n_cores)
   }
-  dplyr::case_when(
-    n_cores_to_use == 1 ~ future::plan(future::sequential),
-    n_cores_to_use > 1 & Sys.info()["sysname"] == "Windows" ~ future::plan(future::multisession, workers = n_cores_to_use),
-    n_cores_to_use > 1 & Sys.info()["sysname"] != "Windows" ~ future::plan(future::multicore, workers = n_cores_to_use)
-  )
+  julia <- NULL
+  if (n_cores_to_use == 1) {
+    future::plan(future::sequential)
+  } else {
+    setup_julia()
+    julia <- .fims_julia_backend_state[["julia"]]
+    future::plan(future::multisession, workers = n_cores_to_use)
+  }
 
   if (n_cores_to_use == 1) {
     cli::cli_alert_info("...Running sequentially on a single core")
@@ -214,14 +268,19 @@ run_fims_likelihood <- function(
   # run FIMS in parallel for each of the likelihood profile values
   estimates_list <- furrr::future_map(
     .x = vec,
-    .f = function(value, parameter_name, module_name, parameters, data) {
+    .f = function(value, parameter_name, module_name, parameters, data, backend, priors) {
+      if (!is.null(julia)) {
+        setup_julia(julia = julia)
+      }
       # Run the model
       fit <- run_modified_pars_fims(
         new_value = value,
         parameter_name = parameter_name,
         module_name = module_name,
         parameters = parameters,
-        data = data
+        data = data,
+        backend = backend,
+        priors = priors
       )
       # Extract estimates immediately while still in worker
       FIMS::get_estimates(fit)
@@ -230,6 +289,8 @@ run_fims_likelihood <- function(
     module_name = module_name,
     parameters = parameters,
     data = data,
+    backend = backend,
+    priors = priors,
     .options = furrr::furrr_options(seed = TRUE, globals = TRUE)
   )
 

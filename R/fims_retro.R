@@ -14,6 +14,7 @@
 #' whether the model estimates are stable and whether there is a consistent
 #' pattern of revision as new data are added. The function runs models in
 #' parallel for computational efficiency.
+#' Julia refits use separate R sessions rather than forked workers.
 #'
 #' The first element of `years_to_remove` should typically be 0 to represent
 #' the reference model with no data removed. This allows for direct comparison
@@ -38,6 +39,8 @@
 #' @param n_cores An integer specifying the number of CPU cores to use for
 #'   parallel processing. If `NULL` (default), uses `parallel::detectCores() - 1`.
 #'   Set to 1 for sequential processing. Must be a positive integer.
+#' @param backend Backend passed to [initialize_fims()] for each refit.
+#' @param priors Optional Julia parameter priors used for each refit.
 #'
 #' @return
 #' A list with two named elements:
@@ -46,7 +49,7 @@
 #'   runs, with the following key columns:
 #'   * `label` - Type of estimate (e.g., "spawning_biomass")
 #'   * `year_i` - Year index for the estimate
-#'   * `age_i` - Age index (if applicable)
+#'   * `age` - Age from the data (if applicable)
 #'   * `estimated` - Point estimate value
 #'   * `uncertainty` - Standard error of the estimate
 #'   * `retrospective_peel` - Number of years removed for this peel
@@ -106,8 +109,11 @@ run_fims_retrospective <- function(
   years_to_remove,
   data,
   parameters,
-  n_cores = NULL
+  n_cores = NULL,
+  backend = "julia",
+  priors = NULL
 ) {
+  backend <- match.arg(backend)
   # Validate years_to_remove
   if (length(years_to_remove) == 0) {
     cli::cli_abort("years_to_remove must have at least one value")
@@ -127,11 +133,14 @@ run_fims_retrospective <- function(
     }
     n_cores_to_use <- as.integer(n_cores)
   }
-  dplyr::case_when(
-    n_cores_to_use == 1 ~ future::plan(future::sequential),
-    n_cores_to_use > 1 & Sys.info()["sysname"] == "Windows" ~ future::plan(future::multisession, workers = n_cores_to_use),
-    n_cores_to_use > 1 & Sys.info()["sysname"] != "Windows" ~ future::plan(future::multicore, workers = n_cores_to_use)
-  )
+  julia <- NULL
+  if (n_cores_to_use == 1) {
+    future::plan(future::sequential)
+  } else {
+    setup_julia()
+    julia <- .fims_julia_backend_state[["julia"]]
+    future::plan(future::multisession, workers = n_cores_to_use)
+  }
 
   if (n_cores_to_use == 1) {
     cli::cli_alert_info("...Running sequentially on a single core")
@@ -144,10 +153,15 @@ run_fims_retrospective <- function(
   estimates_list <- furrr::future_map(
     .x = years_to_remove,
     .f = function(years) {
+      if (!is.null(julia)) {
+        setup_julia(julia = julia)
+      }
       fit <- run_modified_data_fims(
         years_to_remove = years,
         data = data,
-        parameters = parameters
+        parameters = parameters,
+        backend = backend,
+        priors = priors
       )
       FIMS::get_estimates(fit)
     },

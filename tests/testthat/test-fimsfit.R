@@ -9,25 +9,14 @@
 
 # FIMSFit ----
 ## Setup ----
-# Load the test data from an RDS file containing the fitted model estimates
-if (!file.exists(testthat::test_path("fixtures", "fit_age_length_comp.RDS"))) {
-  suppressWarnings(
-    suppressMessages(
-      prepare_test_data()
-    )
-  )
-}
-
-fit_age_length_comp <- readRDS(testthat::test_path("fixtures", "fit_age_length_comp.RDS"))
-fit_agecomp <- readRDS(testthat::test_path("fixtures", "fit_agecomp.RDS"))
-fit_list <- list(fit_age_length_comp, fit_agecomp)
-on.exit(rm(fit_list), add = TRUE)
+fit_big_optimized <- FIMS::fit_big_optimized
+fit_big_unoptimized <- FIMS:::fit_big_unoptimized
 
 ## IO correctness ----
 test_that("`is.FIMSFit()` works with correct inputs", {
-  #' @description Test that `is.FIMSFit(fit_age_length_comp)` returns TRUE.
+  #' @description Test that `is.FIMSFit(fit_big_optimized)` returns TRUE.
   expect_true(
-    object = is.FIMSFit(fit_age_length_comp)
+    object = is.FIMSFit(fit_big_optimized)
   )
 
   expected_names <- c(
@@ -36,9 +25,47 @@ test_that("`is.FIMSFit()` works with correct inputs", {
   )
   #' @description Test a FIMSFit object has the correct slot names.
   expect_equal(
-    object = slotNames(fit_age_length_comp),
+    object = slotNames(fit_big_optimized),
     expected = expected_names
   )
+})
+
+test_that("`is.FIMSFit()` works with a fit without optimization", {
+  #' @description Test that `is.FIMSFit(fit_big_unoptimized)` returns TRUE.
+  expect_true(is.FIMSFit(fit_big_unoptimized))
+  expect_equal(
+    slotNames(fit_big_unoptimized),
+    slotNames(fit_big_optimized)
+  )
+  expect_gte(as.numeric(get_run_time(fit_big_unoptimized)[["time_total"]]), 0)
+})
+
+test_that("`fit_fims()` retains requested Julia report covariance", {
+  # The first 5 years of data_big keep the covariance matrix small; weight at
+  # age needs 1 more year than the other data
+  yearly_types <- c("catch", "index", "age_comp", "length_comp")
+  data_5_years <- data_big |>
+    dplyr::filter(
+      !(.data[["type"]] %in% c(yearly_types, "weight_at_age")) |
+        (.data[["type"]] %in% yearly_types & .data[["timing"]] <= 5) |
+        (.data[["type"]] == "weight_at_age" & .data[["timing"]] <= 6)
+    ) |>
+    FIMSFrame()
+  fit_with_covariance <- setup_default_parameters(data_5_years) |>
+    dplyr::mutate(estimation_type = dplyr::if_else(
+      .data$label == "log_q" & .data$fleet == "survey1",
+      "fixed_effects", "constant"
+    )) |>
+    initialize_fims(data = data_5_years) |>
+    fit_fims(number_of_loops = 1, getReportCovariance = TRUE)
+  sdreport <- get_sdreport(fit_with_covariance)
+  #' @description Test that `getReportCovariance = TRUE` stores the full covariance of the derived quantities.
+  expect_equal(
+    object = dim(sdreport[["cov"]]),
+    expected = rep(length(sdreport[["value"]]), 2)
+  )
+  expect_true(all(is.finite(diag(sdreport[["cov"]]))))
+  clear()
 })
 
 ## Edge handling ----
@@ -47,206 +74,59 @@ test_that("`is.FIMSFit()` returns correct outputs for edge cases", {
   expect_false(is.FIMSFit("not_a_FIMSFit"))
 
   # Modify the total run_time to be more than a day
-  fit_age_length_comp@run_time[["time_total"]] <- 86401 # 60*60*24+1
+  fit_big_optimized@run_time[["time_total"]] <- 86401 # 60*60*24+1
   #' @description Test that `print(FIMSFit)` returns no error when the total run_time is more than a day.
-  expect_no_error(print(fit_age_length_comp))
+  expect_no_error(print(fit_big_optimized))
 
   # Modify the total run_time to be more than a hour
-  fit_age_length_comp@run_time[["time_total"]] <- 3601 # 60*60+1
+  fit_big_optimized@run_time[["time_total"]] <- 3601 # 60*60+1
   #' @description Test that `print(FIMSFit)` returns no error when the total run_time is more than an hour.
-  expect_no_error(print(fit_age_length_comp))
+  expect_no_error(print(fit_big_optimized))
 
   # Modify the total run_time to be more than a minute
-  fit_age_length_comp@run_time[["time_total"]] <- 61 # 60+1
+  fit_big_optimized@run_time[["time_total"]] <- 61 # 60+1
   #' @description Test that `print(FIMSFit)` returns no error when the total run_time is more than a minute.
-  expect_no_error(print(fit_age_length_comp))
+  expect_no_error(print(fit_big_optimized))
 })
 
 ## Error handling ----
-test_that("fit_fims() errors when optimization fails to converge", {
-  # Create a simple test case that will fail to converge by setting
-  # extremely restrictive iteration limits
-
-  # Skip if test fixtures don't exist
-  skip_if_not(file.exists(testthat::test_path("fixtures", "integration_test_data.RData")))
-
-  load(testthat::test_path("fixtures", "integration_test_data.RData"))
-
-  # Set up the model with data
-  data_age_comp <- FIMSFrame(data_big)
-  parameters <- readRDS(
-    testthat::test_path("fixtures", "parameters_model_comparison_project.RDS")
+test_that("fit_fims() errors when Newton steps are requested", {
+  #' @description Test that fit_fims() says to use number_of_loops when Newton steps are requested.
+  expect_error(
+    fit_fims(input = NULL, number_of_newton_steps = 1),
+    regexp = "Newton steps are not implemented yet.*number_of_loops"
   )
+})
 
-  initialized_model <- parameters |>
-    initialize_fims(data = data_age_comp)
-
-  # Set control parameters that will cause convergence failure
-  # by making iteration limits extremely low
-  bad_control <- list(
-    eval.max = 1,
-    iter.max = 1,
-    trace = 0
-  )
-
-  #' @description Test that fit_fims() throws an informative warning when convergence fails.
-  expect_warning(
-    result <- initialized_model |>
-      fit_fims(optimize = TRUE, control = bad_control),
-    regexp = "Optimization failed convergence checks"
-  )
-
-  # Set control parameters that will allow convergence but
-  # return large gradient
-  bad_control <- list(
-    rel.tol = 0.1,
-    trace = 0
-  )
-
-  #' @description Test that fit_fims() throws an informative error when max gradient is high.
-  expect_warning(
-    result <- initialized_model |>
-      fit_fims(optimize = TRUE, control = bad_control),
-    regexp = "Maximum absolute gradient"
-  )
-
-  # Set control parameters that will allow convergence but
-  # return moderately large gradient
-  bad_control <- list(
-    rel.tol = 1e-4,
-    trace = 0
-  )
-
-  #' @description Test that fit_fims() throws an informative warning when max gradient is moderately high.
-  expect_warning(
-    result <- initialized_model |>
-      fit_fims(optimize = TRUE, control = bad_control),
-    regexp = "Optimization resulted in high gradients"
-  )
-
-  clear()
-
-  # Fix Catch sd at high value in penalized likelihood model to cause high standard errors
-  parameters_4_model <- parameters |>
-    dplyr::rows_update(
-      tibble::tibble(
-        label = "log_devs",
-        timing = 2:get_n_years(data_age_comp),
-        estimation_type = "fixed_effects"
-      ),
-      by = c("label", "timing")
-    ) |>
-    dplyr::rows_update(
-      tibble::tibble(
-        module_name = "Recruitment",
-        label = "log_sd",
-        estimation_type = "constant"
-      ),
-      by = c("module_name", "label")
+test_that("fit_fims() reports real Julia optimizer nonconvergence", {
+  skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
+    "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise Julia convergence reporting.")
+  raw <- data_big |>
+    dplyr::filter(
+      !.data$type %in% c("length_comp", "age_to_length_conversion"),
+      dplyr::if_else(.data$type == "weight_at_age", .data$timing <= 6, .data$timing <= 5)
     )
-
-  initialized_model <- parameters_4_model |>
-    initialize_fims(data = get_data(data_age_comp) |>
-      dplyr::rows_update(
-        tibble::tibble(
-          fleet = "fleet1",
-          type = "catch",
-          uncertainty = "~dlnorm(meanlog=log_catch_expected, sdlog = 10)",
-        ),
-        by = c("fleet", "type")
-      ) |>
-      FIMSFrame())
-
-  #' @description Test that fit_fims() throws an informative warning when parameter SE values are too large.
-  expect_warning(
-    result <- initialized_model |> fit_fims(optimize = TRUE),
-    regexp = "Large condition number detected in Hessian"
-  )
-
-  clear()
-
-  # Estimate the first (age, year) of natural mortality to cause NA standard errors
-  parameters_4_model <- parameters |>
-    dplyr::rows_update(
-      tibble::tibble(
-        label = "log_devs",
-        timing = 2:get_n_years(data_age_comp),
-        estimation_type = "fixed_effects"
+  data <- FIMSFrame(raw)
+  parameters <- setup_default_parameters(data) |>
+    dplyr::mutate(
+      estimation_type = dplyr::if_else(
+        .data$label == "log_rzero" |
+          (.data$label == "log_q" & .data$fleet == "survey1"),
+        "fixed_effects", "constant"
       ),
-      by = c("label", "timing")
-    ) |>
-    dplyr::rows_update(
-      tibble::tibble(
-        module_name = "Recruitment",
-        label = "log_sd",
-        estimation_type = "constant"
-      ),
-      by = c("module_name", "label")
-    ) |>
-    dplyr::rows_update(
-      tibble::tibble(
-        label = "log_M",
-        timing = 1,
-        estimation_type = "fixed_effects"
-      ),
-      by = c("label", "timing")
+      distribution_type = NA_character_, distribution = NA_character_
     )
-
-  initialized_model <- parameters_4_model |>
-    initialize_fims(data = data_age_comp)
-
-  #' @description Test that fit_fims() throws an informative warning when parameter SE values are NA.
+  input <- initialize_fims(parameters, data)
+  #' @description Test that restrictive Julia optimizer limits return a warned diagnostic fit.
   expect_warning(
-    result <- initialized_model |> fit_fims(optimize = TRUE),
-    regexp = "NA standard errors"
+    fit <- fit_fims(input, number_of_loops = 0, get_sd = FALSE,
+      control = list(iter.max = 1, eval.max = 1)),
+    "Optimization failed convergence checks"
   )
-
-  clear()
-
-  # Add an additional slope parameter to make the model overparameterized
-  parameters_4_model <- parameters |>
-    dplyr::rows_update(
-      tibble::tibble(
-        fleet = "fleet1",
-        label = "log_q",
-        estimation_type = "fixed_effects"
-      ),
-      by = c("fleet", "label")
-    )
-
-  initialized_model <- parameters_4_model |>
-    initialize_fims(data = data_age_comp)
-
-  #' @description Test that fit_fims() throws an informative warning when the Hessian is not positive definite.
-  expect_warning(
-    result <- initialized_model |> fit_fims(optimize = TRUE),
-    regexp = "Standard error calculations failed convergence checks"
-  )
-
-  #' @description Test that fit_fims() returns a non-converged model when you know it is not supposed to converge. The warnings and messages are suppressed because {nlminb} uses backend code that we do not want to print to the screen during testing but we know will be there.
-  data("data_big", package = "FIMS")
-  data_4_model <- FIMSFrame(data_big)
-  # Create parameters
-  initialized_poor_model <- setup_default_parameters(data = data_4_model) |>
-    dplyr::rows_update(
-      tibble::tibble(
-        module_name = "Population",
-        label = c("log_init_naa"),
-        age = 1,
-        value = -Inf
-      ),
-      by = c("module_name", "label", "age")
-    ) |>
-    initialize_fims(data = data_4_model)
-  test_results <- suppressWarnings(suppressMessages(
-    fit_fims(initialized_poor_model, optimize = TRUE)
-  ))
-  expect_true(inherits(test_results, "FIMSFit"))
-  expect_equal(get_opt(test_results)[["convergence"]], 1L)
-  expect_equal(
-    names(get_opt(test_results)),
-    c("par", "objective", "convergence", "message")
-  )
-
+  expect_s4_class(fit, "FIMSFit")
+  expect_equal(get_opt(fit)[["convergence"]], 1L)
+  expect_length(get_gradient(fit), 2L)
+  expect_length(get_sdreport(fit), 0L)
+  expect_true(all(is.finite(get_gradient(fit))))
   clear()
 })

@@ -7,7 +7,7 @@
 setup_default_Selectivity(
   data,
   fleet,
-  module_type = c("Logistic", "DoubleLogistic")
+  module_type = c("Logistic", "DoubleLogistic", "AgeSpecific")
 )
 }
 \arguments{
@@ -18,7 +18,7 @@ your long input data.}
 parameters are being created.}
 
 \item{module_type}{A string specifying the desired form of selectivity. Allowable
-forms include Logistic, DoubleLogistic
+forms include Logistic, DoubleLogistic, AgeSpecific
 and the default is
 Logistic.
 See \code{\link{setup_default_parameters}} for full column descriptions.}
@@ -36,6 +36,10 @@ functions for data, fleet, selectivity, recruitment, maturity, growth, and
 population components, then combines those defaults into one tibble.
 You can modify the returned tibble before fitting a model (for example,
 updating maturity and selectivity parameter values).
+
+Growth defaults are chosen from the data. Models with empirical weight-at-age
+data default to \code{"EWAA"}. Models without empirical weight-at-age data but with
+length-composition data default to \code{"VonBertalanffySchnute"}.
 
 To create the default initial numbers at age, this function uses the defaults
 from \code{setup_default_Population()} and \code{setup_default_Recruitment()}, which

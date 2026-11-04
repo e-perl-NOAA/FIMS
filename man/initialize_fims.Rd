@@ -2,60 +2,34 @@
 % Please edit documentation in R/initialize_modules.R
 \name{initialize_fims}
 \alias{initialize_fims}
-\title{Initialize C++ modules via Rcpp for a FIMS model}
+\title{Initialize a FIMS model}
 \usage{
-initialize_fims(parameters, data)
+initialize_fims(parameters, data, backend = "julia", priors = NULL)
 }
 \arguments{
-\item{parameters}{A tibble returned from \code{\link[=setup_default_parameters]{setup_default_parameters()}}. It
-is the primary source of information for what is initialized. That is, if a
-fleet exists in the data but parameter information for how to specify
-selectivity for that fleet is not provided, then selectivity will not be
-initialized for that fleet.}
+\item{parameters}{Parameter tibble returned by \code{\link[=setup_default_parameters]{setup_default_parameters()}}.}
 
-\item{data}{An S4 object with the \code{FIMSFrame} class, which is returned from
-\code{\link[=FIMSFrame]{FIMSFrame()}}. Passing the data is required because initialization of the
-modules requires passing the data and information regarding the uncertainty
-of that data, i.e., input sample sizes for the multinomial distribution.}
+\item{data}{A \code{\link[=FIMSFrame]{FIMSFrame()}} object.}
+
+\item{backend}{The model backend. Only \code{"julia"} is supported.}
+
+\item{priors}{Optional prior tibble with \code{module_name}, \code{fleet}, \code{label},
+\code{timing}, \code{age}, \code{distribution}, \code{mean}, and \code{sd}. Normal and lognormal
+priors are supported on the parameter's documented natural scale.}
 }
 \value{
-A list is returned with two elements, \code{parameters} and \code{model}. The list can
-be passed to the \code{input} argument of \code{\link[=fit_fims]{fit_fims()}} to fit the model. The first
-element of the list can also be passed to the \code{parameters} argument of
-\code{\link[TMB:MakeADFun]{TMB::MakeADFun()}} if you wish to have more control over the model-fitting
-process.
-The model element of the returned list stores the instantiated C++ model
-module, e.g., the results of \code{methods::new(CatchAtAge)} for a catch-at-age
-model.
-It is important that you only have one FIMS model initialized in your R
-workspace at a time. Thus, after you initialize and fit the model, you should
-run \code{\link[=clear]{clear()}}.
+An input list for \code{\link[=fit_fims]{fit_fims()}}, retaining its parameters, data,
+configuration and priors independently of other models.
 }
 \description{
-This function uses information from a parameter data frame that stores the
-model specifications and a\code{FIMSFrame} object that stores the data to
-instantiate, i.e., create an instance of a class, the required C++ modules.
-Several C++ modules are needed to run a FIMS model and the required modules
-will be different for each model type. For example, for a catch-at-age
-model one needs to instantiate recruitment, growth, and maturity modules and
-at least one fleet and population module.
+Prepare a self-contained Julia model from the parameter tibble and data.
+Julia is initialized lazily when the model is fitted. The former native
+module API and \code{backend = "tmb"} have been retired.
 }
 \examples{
 \dontrun{
-# Prepare data for FIMS model
-data("data_big", package = "FIMS")
-data_4_model <- FIMSFrame(data_big)
-# Instantiate modules
-parameters_list <- setup_default_parameters(data = data_4_model) |>
-  initialize_fims(data = data_4_model)
-clear()
-}
-}
-\seealso{
-\itemize{
-\item \code{\link[=setup_default_parameters]{setup_default_parameters()}}
-\item \code{\link[=FIMSFrame]{FIMSFrame()}}
-\item \code{\link[=fit_fims]{fit_fims()}}
-\item \code{\link[=clear]{clear()}}
+data <- FIMSFrame(data_big)
+input <- setup_default_parameters(data) |> initialize_fims(data)
+fit <- fit_fims(input)
 }
 }

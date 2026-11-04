@@ -1,12 +1,11 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^\.github$
+^\.git$
 ^\.history$
 ^\.agents$
-CMakeLists.txt
-tests/gtest
 tests/test_plan
-build
+^build($|/)
 ^codecov\.yml$
 ^cspell\.json$
 .vscode
@@ -16,7 +15,6 @@ build
 CONTRIBUTING.md
 fims.log
 ^doc$
-^doxygen$
 ^Meta$
 ^_pkgdown\.yml$
 ^docs$

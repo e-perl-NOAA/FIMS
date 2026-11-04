@@ -46,6 +46,99 @@ test_that("`setup_default_parameters()` works with correct inputs", {
   )
 })
 
+test_that("`setup_default_parameters()` defaults to EWAA when empirical weight-at-age is present", {
+  result <- setup_default_parameters(data = data)
+
+  growth_type <- result |>
+    dplyr::filter(.data[["module_name"]] == "Growth") |>
+    dplyr::pull(.data[["module_type"]]) |>
+    unique()
+
+  #' @description Test that empirical weight-at-age data keep the default Growth module as EWAA.
+  expect_equal(growth_type, "EWAA")
+
+  clear()
+})
+
+test_that("`setup_default_parameters()` defaults to VonBertalanffySchnute when weight-at-age is absent and length compositions are present", {
+  data_without_weight_at_age <- FIMS::FIMSFrame(
+    dplyr::filter(data_big, type != "weight_at_age")
+  )
+
+  result <- setup_default_parameters(data = data_without_weight_at_age)
+
+  growth_type <- result |>
+    dplyr::filter(.data[["module_name"]] == "Growth") |>
+    dplyr::pull(.data[["module_type"]]) |>
+    unique()
+
+  #' @description Test that length-composition data trigger VonBertalanffySchnute when empirical weight-at-age data are absent.
+  expect_equal(growth_type, "VonBertalanffySchnute")
+
+  clear()
+})
+
+test_that("`setup_default_parameters()` errors when neither weight-at-age nor length compositions are present", {
+  data_without_growth_information <- FIMS::FIMSFrame(
+    dplyr::filter(
+      data_big,
+      !type %in% c("weight_at_age", "length_comp")
+    )
+  )
+
+  #' @description Test that FIMS does not silently choose a default Growth module without empirical weight-at-age or length-composition data.
+  expect_error(
+    setup_default_parameters(data = data_without_growth_information),
+    regexp = "cannot choose a default Growth module"
+  )
+
+  clear()
+})
+
+test_that("`setup_default_parameters()` is invariant to input row order", {
+  reordered_data <- data_big |>
+    dplyr::arrange(
+      dplyr::desc(.data$timing),
+      .data$fleet,
+      .data$type,
+      .data$age,
+      .data$length
+    ) |>
+    FIMS::FIMSFrame()
+
+  reordered_parameters <- setup_default_parameters(data = reordered_data)
+  expected_parameters <- setup_default_parameters(data = data)
+
+  #' @description Test that reordering input rows does not change default parameters.
+  expect_equal(reordered_parameters, expected_parameters)
+
+  clear()
+})
+
+test_that("`setup_default_parameters()` configures an additional fleet", {
+  additional_fleet_data <- data_big |>
+    dplyr::filter(
+      .data$fleet == "fleet1",
+      .data$type %in% c("catch", "age_comp", "length_comp")
+    ) |>
+    dplyr::mutate(fleet = "fleet_mock")
+
+  data_with_additional_fleet <- dplyr::bind_rows(data_big, additional_fleet_data) |>
+    FIMS::FIMSFrame()
+  parameters_with_additional_fleet <- setup_default_parameters(
+    data = data_with_additional_fleet
+  )
+
+  mock_fleet_modules <- parameters_with_additional_fleet |>
+    dplyr::filter(.data$fleet == "fleet_mock") |>
+    dplyr::pull(.data$module_name) |>
+    unique()
+  #' @description Test that the added fleet has Fleet and Selectivity parameters.
+  expect_setequal(mock_fleet_modules, c("Fleet", "Selectivity"))
+
+  clear()
+})
+
 test_that("modular pipeline matches `setup_default_parameters()`", {
   fleet1_name <- "fleet1"
 
@@ -235,14 +328,50 @@ test_that("`setup_default_log_init_naa()` handles scalar and vector `log_M`", {
     log_M = vector_log_M
   )
 
+  # One year of the unfished population dynamics: recruitment of R0 at age 0,
+  # survival exp(-M) to the next age, and survivors of the last two ages
+  # accumulating in the plus group.
+  project_unfished_one_year <- function(numbers_at_age, m, rzero) {
+    n <- length(numbers_at_age)
+    projected <- c(rzero, numbers_at_age[-n] * exp(-m[-n]))
+    projected[n] <- projected[n] + numbers_at_age[n] * exp(-m[n])
+    projected
+  }
   expected_m <- exp(vector_log_M)
-  expected_vector <- log_rzero - c(0, cumsum(expected_m))[seq_len(n_ages)]
-  expected_vector[n_ages] <- expected_vector[n_ages] - log(expected_m[n_ages])
 
   #' @description Test that scalar log_M still returns one value per age.
   expect_length(scalar_result, n_ages)
-  #' @description Test that vector log_M produces expected age-specific log_init_naa values.
-  expect_equal(vector_result, expected_vector)
+  #' @description Test that vector log_M gives the unfished equilibrium, i.e.,
+  #' projecting one year returns the same numbers-at-age, including the plus group.
+  expect_equal(
+    project_unfished_one_year(exp(vector_result), expected_m, exp(log_rzero)),
+    exp(vector_result)
+  )
+  #' @description Test the plus group against its known value for M = 0.2:
+  #' R0 * exp(-0.2 * (n_ages - 1)) / (1 - exp(-0.2)).
+  expect_equal(
+    scalar_result[n_ages],
+    log_rzero - 0.2 * (n_ages - 1) - log(1 - exp(-0.2))
+  )
+
+  clear()
+})
+
+test_that("`setup_default_log_init_naa()` keeps a finite plus group for small M", {
+  n_ages <- get_n_ages(data)
+  log_rzero <- log(1e+06)
+
+  result <- FIMS:::setup_default_log_init_naa(
+    n_ages = n_ages,
+    log_rzero = log_rzero,
+    log_M = -40
+  )
+
+  #' @description Test that a very small M gives a finite plus group of about R0 / M, where 1 - exp(-M) would round to 0.
+  expect_equal(
+    result[n_ages],
+    log_rzero - (n_ages - 1) * exp(-40) + 40
+  )
 
   clear()
 })

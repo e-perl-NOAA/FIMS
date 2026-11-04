@@ -10,9 +10,9 @@
 # fims_retrospective ----
 ## Setup ----
 #' @description Skip the test unless explicitly enabled for heavy integration testing.
-testthat::skip_if_not(
-  testthat:::env_var_is_true("RUN_SLOW_TESTS"),
-  message = "Skipping: RUN_SLOW_TESTS is not set to true."
+testthat::skip_if(
+  Sys.getenv("RUN_SLOW_TESTS") != "true",
+  "Skipping: RUN_SLOW_TESTS is not set to true."
 )
 
 # Load or prepare any necessary data for testing
@@ -226,7 +226,7 @@ test_that("calculate_mohns_rho() returns correct error messages", {
       retro_fit = retro_fit_invalid,
       quantity = "spawning_biomass"
     ),
-    regexp = "must contain reference year run"
+    regexp = "must contain the reference run"
   )
 
   #' @description Test that calculate_mohns_rho() errors with non-existent quantity.

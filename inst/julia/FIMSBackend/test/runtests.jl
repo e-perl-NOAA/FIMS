@@ -1,0 +1,1250 @@
+using FIMSBackend
+using Test
+using ComponentArrays: ComponentArray
+using ForwardDiff: derivative
+using LinearAlgebra: diag
+using SpecialFunctions: erf
+
+@testset "parameter prior transforms" begin
+  parameters = ComponentArray((
+    maturity_slope = 2.0,
+    growth_log_length_weight_b = log(3.0),
+    growth_log_mean_length_young = log(4.0),
+  ))
+  config = Dict(
+    :parameter_prior_components => [
+      "maturity_slope",
+      "growth_log_length_weight_b",
+      "growth_log_mean_length_young",
+    ],
+    :parameter_prior_indices => [1, 1, 1],
+    :parameter_prior_distributions => ["dnorm", "dlnorm", "dnorm"],
+    :parameter_prior_means => [1.0, log(2.0), 3.0],
+    :parameter_prior_sds => [0.5, 0.4, 0.5],
+    :parameter_prior_transforms => ["identity", "exp", "exp"],
+  )
+  components = FIMSBackend.parameter_prior_nll_components(parameters, config)
+  @test components[1] ≈ 0.5 * log(2π) + log(0.5) + 2.0
+  @test components[2] ≈
+        0.5 * log(2π) + log(0.4) + log(3.0) + (log(3.0) - log(2.0))^2 / (2 * 0.4^2)
+  @test components[3] ≈ 0.5 * log(2π) + log(0.5) + 2.0
+  for index in eachindex(components)
+    singleton_config = Dict(key => values[index] for (key, values) in config)
+    @test only(FIMSBackend.parameter_prior_nll_components(parameters, singleton_config)) ≈
+          components[index]
+  end
+  @test_throws DimensionMismatch FIMSBackend.parameter_prior_nll_components(
+    parameters, merge(config, Dict(:parameter_prior_means => 1.0)),
+  )
+  @test_throws ArgumentError FIMSBackend.parameter_prior_nll_components(
+    parameters,
+    merge(config, Dict(:parameter_prior_transforms => ["identity", "exp", "sqrt"])),
+  )
+end
+
+@testset "optimizer settings" begin
+  options = FIMSBackend._optimizer_options(Dict(
+    :optimizer_max_iterations => 12,
+    :optimizer_max_evaluations => 34,
+    :optimizer_trace => true,
+  ))
+  @test options.iterations == 12
+  @test options.f_calls_limit == 34
+  @test options.show_trace
+  @test_throws ArgumentError FIMSBackend._optimizer_options(
+    Dict(:optimizer_max_iterations => 0),
+  )
+end
+
+@testset "Hessian covariance requires positive definite curvature" begin
+  @test FIMSBackend._hessian_covariance([4.0 0.0; 0.0 2.0]) ≈ [0.25 0.0; 0.0 0.5]
+  @test all(isnan, FIMSBackend._hessian_covariance([1.0 1.0; 1.0 1.0]))
+  @test all(isnan, FIMSBackend._hessian_covariance([-1.0 0.0; 0.0 1.0]))
+  @test all(isnan, FIMSBackend._hessian_covariance(reshape([NaN], 1, 1)))
+  @test size(FIMSBackend._hessian_covariance(zeros(0, 0))) == (0, 0)
+end
+
+@testset "implicit Laplace derivatives with coupled random effects" begin
+  fixed_indices = [3, 2]
+  random_indices = [4, 1]
+  mode_parameters = fixed -> begin
+    first, second = fixed[2], fixed[1]
+    center = [2 * first + second^2 + 0.025, first^2 - first + second]
+    [center[1], first, second, center[2], 0.1]
+  end
+  joint_objective = parameters -> begin
+    first, second = parameters[2], parameters[3]
+    center = [
+      2 * first + second^2 + 0.25 * parameters[5],
+      first^2 - first + second,
+    ]
+    transformed = [1.0 0.3; 0.2 1.0] * (
+      parameters[[1, 4]] - center
+    )
+    0.5 * (first^2 / 0.16 + second^2 / 0.49) +
+      exp(first) * (exp(transformed[1]) - transformed[1]) +
+      0.5 * exp(-first) * transformed[2]^2
+  end
+  fixed = [-0.2, 0.4]
+  parameters = mode_parameters(fixed)
+  marginal = values ->
+    0.5 * (values[2]^2 / 0.16 + values[1]^2 / 0.49) +
+    exp(values[2]) + log(0.94) - log(2π)
+  marginal_gradient = values -> FIMSBackend._laplace_gradient(
+    joint_objective, mode_parameters(values), fixed_indices, random_indices,
+  )
+  @test marginal_gradient(fixed) ≈
+        [fixed[1] / 0.49, fixed[2] / 0.16 + exp(fixed[2])] atol = 1e-10
+  @test marginal_gradient(fixed) ≈
+        FIMSBackend._numerical_gradient(marginal, fixed) rtol = 1e-8
+  @test FIMSBackend._numerical_gradient_hessian(marginal_gradient, fixed) ≈
+        [inv(0.49) 0.0; 0.0 inv(0.16) + exp(fixed[2])] rtol = 1e-8
+  options = FIMSBackend._optimizer_options(Dict())
+  conditional = FIMSBackend._conditional_mode(
+    parameters, fixed_indices, fixed, random_indices,
+    joint_objective, options,
+  )
+  @test conditional.converged
+  @test conditional.parameters ≈ parameters atol = 1e-8
+  @test conditional.marginal_nll ≈ marginal(fixed) atol = 1e-8
+end
+
+@testset "population proportion-female parameter layouts" begin
+  parameter_values = (
+    log_init_naa = log.([1000.0, 800.0, 600.0]),
+    log_M = fill(log(0.2), 2, 3),
+    log_Fmort = fill(log(0.1), 2, 1),
+  )
+  data = Dict(
+    :n_years => 2,
+    :n_ages => 3,
+    :ages => [1.0, 2.0, 3.0],
+    :weights_at_age => ones(2, 3),
+    :maturity_at_age => ones(2, 3),
+    :proportion_female => [0.2, 0.5, 0.8],
+  )
+
+  scalar_parameters = ComponentArray(
+    merge(parameter_values, (proportion_female = 0.35,)),
+  )
+  scalar_population = FIMSBackend.build_population_model(
+    scalar_parameters,
+    data,
+    data[:weights_at_age],
+  )
+  @test scalar_population.proportion_female == fill(0.35, 3)
+
+  age_parameters = ComponentArray(
+    merge(parameter_values, (proportion_female = [0.2, 0.5, 0.8],)),
+  )
+  age_population = FIMSBackend.build_population_model(
+    age_parameters,
+    data,
+    data[:weights_at_age],
+  )
+  @test age_population.proportion_female == [0.2, 0.5, 0.8]
+
+  data_only_population = FIMSBackend.build_population_model(
+    ComponentArray(parameter_values),
+    data,
+    data[:weights_at_age],
+  )
+  @test data_only_population.proportion_female == [0.2, 0.5, 0.8]
+
+  invalid_parameters = ComponentArray(
+    merge(parameter_values, (proportion_female = [0.2, 0.5],)),
+  )
+  @test_throws ArgumentError FIMSBackend.build_population_model(
+    invalid_parameters,
+    data,
+    data[:weights_at_age],
+  )
+end
+
+@testset "age-specific selectivity" begin
+  ages = [1.0, 2.0, 3.0]
+  parameters = ComponentArray((
+    logit_sel_at_age = [
+      log(1 / 3) log(3);
+      0.0 log(1 / 3);
+      log(3) 0.0;
+    ],
+  ))
+  model_config = Dict(:selectivity_types => ["AgeSpecific", "AgeSpecific"])
+  first_fleet = FIMSBackend.build_selectivity(parameters, model_config, 1, ages)
+  second_fleet = FIMSBackend.build_selectivity(parameters, model_config, 2, ages)
+
+  @test [first_fleet(age) for age in ages] ≈ [0.25, 0.5, 0.75]
+  @test [second_fleet(age) for age in ages] ≈ [0.75, 0.25, 0.5]
+  @test_throws ArgumentError first_fleet(4.0)
+  @test derivative(
+    value -> FIMSBackend.AgeSpecificSelectivity([value], [1.0])(1.0),
+    0.0,
+  ) ≈ 0.25
+end
+
+@testset "age-specific selectivity supports scalar and year-specific parameters" begin
+  ages = [1.0, 2.0]
+  scalar = FIMSBackend.AgeSpecificSelectivity([0.0], ages, 2)
+  @test [scalar(age, year) for year in 1:2 for age in ages] ≈ fill(0.5, 4)
+
+  yearly = FIMSBackend.AgeSpecificSelectivity(
+    [log(1 / 3), log(3), log(3), log(1 / 3)],
+    ages,
+    2,
+  )
+  @test [yearly(age, 1) for age in ages] ≈ [0.25, 0.75]
+  @test [yearly(age, 2) for age in ages] ≈ [0.75, 0.25]
+  @test_throws ArgumentError yearly(1.0, 3)
+  @test_throws ArgumentError FIMSBackend.AgeSpecificSelectivity(
+    [0.0, 1.0, 2.0],
+    ages,
+    2,
+  )
+end
+
+@testset "spawning biomass per recruit" begin
+  natural_mortality = [0.1, 0.2, 0.3]
+  weights_at_age = repeat(reshape([2.0, 4.0, 8.0], 1, 3), 3, 1)
+  maturity_at_age = repeat(reshape([0.5, 0.75, 1.0], 1, 3), 3, 1)
+  proportion_female = [1.0, 0.5, 0.5]
+  population = PopulationModel(
+    ages = [1.0, 2.0, 3.0],
+    weights_at_age = weights_at_age,
+    maturity_at_age = maturity_at_age,
+    proportion_female = proportion_female,
+    numbers_at_age = zeros(3, 3),
+    catch_numbers_at_age = zeros(2, 3),
+    biomass = zeros(3),
+    spawning_biomass = zeros(3),
+    expected_recruitment = zeros(3),
+    mortality_F = zeros(2, 3),
+    mortality_M = repeat(reshape(natural_mortality, 1, 3), 2, 1),
+    mortality_Z = zeros(2, 3),
+    catch_expected = zeros(2),
+    index_expected = zeros(2),
+    catch_numbers_at_age_by_fleet = zeros(2, 3, 1),
+    index_numbers_at_age_by_fleet = zeros(2, 3, 1),
+    catch_expected_by_fleet = zeros(2, 1),
+    index_expected_by_fleet = zeros(2, 1),
+  )
+  numbers_per_recruit = [
+    1.0,
+    exp(-natural_mortality[1]),
+    exp(-natural_mortality[1] - natural_mortality[2]) /
+      (1 - exp(-natural_mortality[3])),
+  ]
+  expected_phi_0 = sum(
+    numbers_per_recruit .* proportion_female .* maturity_at_age[1, :] .* weights_at_age[1, :]
+  )
+
+  @test FIMSBackend.Population.spawning_biomass_per_recruit(population) ≈ expected_phi_0
+
+  observed_phi_0 = Ref(0.0)
+  step_population!(
+    population,
+    nothing,
+    (spawners, phi_0) -> begin
+      observed_phi_0[] = phi_0
+      zero(phi_0)
+    end,
+    Dict(
+      :fishing_mortality => zeros(2, 1),
+      :fleet_selectivity => zeros(2, 3, 1),
+    ),
+  )
+  @test observed_phi_0[] ≈ expected_phi_0
+
+  for fishing_rate in (0.0, 1e-12)
+    low_mortality_population = deepcopy(population)
+    low_mortality_population.mortality_M .= 0
+    low_mortality_population.numbers_at_age[1, :] .= 1000
+    step_population!(
+      low_mortality_population,
+      nothing,
+      (spawners, phi_0) -> zero(phi_0),
+      Dict(
+        :fishing_mortality => fill(log(fishing_rate), 2, 1),
+        :fleet_selectivity => ones(2, 3, 1),
+        :phi_0 => expected_phi_0,
+      ),
+    )
+    @test all(isfinite, low_mortality_population.catch_numbers_at_age)
+    @test low_mortality_population.catch_numbers_at_age[1, :] ≈
+      fill(1000 * -expm1(-fishing_rate), 3) rtol = 1e-13
+  end
+end
+
+@testset "multi-fleet catch, index, age, and length streams" begin
+  parameter_values = (
+    inflection_point = [2.0, 2.0],
+    slope = [1.0, 1.0],
+    inflection_point_asc = [2.0, 2.0],
+    slope_asc = [1.0, 1.0],
+    inflection_point_desc = [4.0, 4.0],
+    slope_desc = [1.0, 1.0],
+    log_rzero = log(1000.0),
+    logit_steep = 0.0,
+    log_devs = [0.0],
+    log_r = log.([500.0]),
+    log_init_naa = log.([1000.0, 800.0, 600.0]),
+    log_M = fill(log(0.2), 2, 3),
+    log_Fmort = [log(0.1) -200.0; log(0.1) -200.0],
+    log_q = [0.0, log(2.0)],
+  )
+  parameters = ComponentArray(parameter_values)
+  vonb_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (
+        growth_log_mean_length_young = log(275.0),
+        growth_log_mean_length_old = log(725.0),
+        growth_log_coefficient = log(0.18),
+        growth_reference_age_young = 1.0,
+        growth_reference_age_old = 3.0,
+        growth_log_length_weight_a = log(2.5e-11),
+        growth_log_length_weight_b = log(3.0),
+        growth_log_length_sd_at_young = log(28.0),
+        growth_log_length_sd_at_old = log(73.0),
+      ),
+    ),
+  )
+  delta_method_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (
+        growth_log_mean_length_young = log(275.0),
+        growth_log_mean_length_old = log(725.0),
+        growth_log_coefficient = log(0.18),
+        growth_reference_age_young = 1.0,
+        growth_reference_age_old = 3.0,
+        growth_log_length_weight_a = log(2.5e-11),
+        growth_log_length_weight_b = log(3.0),
+        growth_log_sd_mean_length_young = log(12.0),
+        growth_log_sd_mean_length_old = log(20.0),
+        growth_log_sd_growth_coefficient = log(0.03),
+        growth_mean_length_young_mean_length_old_logit_corr = 0.2,
+        growth_mean_length_young_growth_coefficient_logit_corr = -0.3,
+        growth_mean_length_old_growth_coefficient_logit_corr = 0.1,
+      ),
+    ),
+  )
+  maturity_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (maturity_inflection_point = 2.0, maturity_slope = 1.0),
+    ),
+  )
+  data = Dict(
+    :fleets => ["fish", "survey"],
+    :fleet_has_catch => [true, false],
+    :fleet_has_index => [false, true],
+    :n_years => 2,
+    :n_ages => 3,
+    :n_lengths => 2,
+    :ages => [1.0, 2.0, 3.0],
+    :lengths => [10.0, 20.0],
+    :weights_at_age => repeat(reshape([1.0, 2.0, 3.0], 1, 3), 2, 1),
+    :maturity_at_age => repeat(reshape([0.0, 0.5, 1.0], 1, 3), 2, 1),
+    :proportion_female => ones(3),
+    :observed_catch => [100.0 -999.0; 90.0 -999.0],
+    :observed_index => [-999.0 500.0; -999.0 450.0],
+    :observed_age_comp => cat(
+      [10.0 20.0 30.0; 12.0 22.0 28.0],
+      fill(-999.0, 2, 3),
+      dims = 3,
+    ),
+    :observed_length_comp => cat(
+      [20.0 40.0; 22.0 38.0],
+      fill(-999.0, 2, 2),
+      dims = 3,
+    ),
+    :age_to_length_conversion => [0.9 0.1; 0.5 0.5; 0.1 0.9],
+  )
+  config = Dict(
+    :selectivity_types => ["Logistic", "Logistic"],
+    :recruitment => :beverton_holt,
+    :recruitment_process_active => true,
+    :recruitment_process_distribution => "dnorm",
+    :recruitment_process_mode => "log_devs",
+    :catch_sigma => 0.1,
+    :index_sigma => 0.1,
+    :parameter_names => String.(propertynames(parameters)),
+  )
+
+  result = evaluate_model(parameters, data, config)
+  report = result["report"]
+  expected_selectivity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
+  expected_mortality = 0.2 .+ (0.1 + exp(-200.0)) .* expected_selectivity
+  expected_catch_numbers =
+    [1000.0, 800.0, 600.0] .* 0.1 .* expected_selectivity ./
+    expected_mortality .* (1.0 .- exp.(-expected_mortality))
+  @test report["catch_numbers_at_age_by_fleet"][1, :, 1] ≈
+    expected_catch_numbers rtol = 1e-13
+  @test length(report["nll_components"]) == 5
+  @test report["nll_component_labels"] == [
+    "recruitment_process", "catch_expected", "agecomp_expected",
+    "lengthcomp_expected", "index_expected",
+  ]
+  @test report["nll_component_fleets"] == ["", "fish", "fish", "fish", "survey"]
+  @test sum(report["nll_components"]) ≈ result["nll"]
+  vonb_result = evaluate_model(
+    vonb_parameters,
+    data,
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  delta_method_result = evaluate_model(
+    delta_method_parameters,
+    data,
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  maturity_result = evaluate_model(maturity_parameters, data, config)
+  age_specific_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (
+        logit_sel_at_age = [
+          log(1 / 3) log(3);
+          0.0 log(1 / 3);
+          log(3) 0.0;
+        ],
+      ),
+    ),
+  )
+  age_specific_result = evaluate_model(
+    age_specific_parameters,
+    data,
+    merge(config, Dict(:selectivity_types => ["AgeSpecific", "AgeSpecific"])),
+  )
+  year_specific_parameters = ComponentArray(
+    merge(
+      parameter_values,
+      (
+        logit_sel_at_age = [
+          log(1 / 3),
+          0.0,
+          log(3),
+          log(3),
+          0.0,
+          log(1 / 3),
+          log(3),
+          log(1 / 3),
+          0.0,
+        ],
+      ),
+    ),
+  )
+  year_specific_result = evaluate_model(
+    year_specific_parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :selectivity_types => ["AgeSpecific", "AgeSpecific"],
+        :selectivity_parameter_offsets => [1, 7],
+        :selectivity_parameter_lengths => [6, 3],
+      ),
+    ),
+  )
+  no_process_result = evaluate_model(
+    parameters,
+    data,
+    merge(config, Dict(:recruitment_process_active => false)),
+  )
+  normal_prior_result = evaluate_model(
+    parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :parameter_prior_components => ["slope"],
+        :parameter_prior_indices => [1],
+        :parameter_prior_distributions => ["dnorm"],
+        :parameter_prior_means => [1.5],
+        :parameter_prior_sds => [3.0],
+      ),
+    ),
+  )
+  lognormal_prior_result = evaluate_model(
+    parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :parameter_prior_components => ["slope"],
+        :parameter_prior_indices => [1],
+        :parameter_prior_distributions => ["dlnorm"],
+        :parameter_prior_means => [0.2],
+        :parameter_prior_sds => [0.5],
+      ),
+    ),
+  )
+  growth_prior_result = evaluate_model(
+    vonb_parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :growth_model_type => "VonBertalanffySchnute",
+        :parameter_prior_components => [
+          "growth_log_mean_length_young",
+          "growth_log_length_weight_b",
+        ],
+        :parameter_prior_indices => [1, 1],
+        :parameter_prior_distributions => ["dnorm", "dlnorm"],
+        :parameter_prior_means => [250.0, log(2.5)],
+        :parameter_prior_sds => [10.0, 0.4],
+        :parameter_prior_transforms => ["exp", "exp"],
+      ),
+    ),
+  )
+  maturity_prior_result = evaluate_model(
+    maturity_parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :parameter_prior_components => ["maturity_slope"],
+        :parameter_prior_indices => [1],
+        :parameter_prior_distributions => ["dnorm"],
+        :parameter_prior_means => [0.5],
+        :parameter_prior_sds => [0.25],
+      ),
+    ),
+  )
+
+  @test isfinite(result["nll"])
+  expected_maturity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
+  @test maturity_result["report"]["proportion_mature_at_age"] ≈
+    repeat(reshape(expected_maturity, 1, :), 3, 1)
+  @test maturity_result["nll"] != result["nll"]
+  @test age_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
+  @test year_specific_result["report"]["sum_selectivity"][1, :] ≈ [1.0, 0.75, 1.25]
+  @test year_specific_result["report"]["sum_selectivity"][2, :] ≈ [1.5, 0.75, 0.75]
+  native_abs(value) = sqrt(value^2 + 1e-5)
+  native_max(value, floor) = (value + floor + native_abs(value - floor)) / 2
+  expected_lengths = [
+    275.0 +
+    (725.0 - 275.0) *
+    (1.0 - exp(-0.18 * (age - 1.0))) /
+    native_max(native_abs(1.0 - exp(-0.18 * (3.0 - 1.0))), 1e-8) for age in data[:ages]
+  ]
+  @test vonb_result["report"]["mean_length_at_age"] ≈
+    repeat(reshape(expected_lengths, 1, :), 2, 1) rtol = 1e-13
+  @test vonb_result["report"]["weights_at_age"] ≈
+    repeat(reshape(2.5e-11 .* expected_lengths .^ 3.0, 1, :), 3, 1)
+  @test all(
+    isapprox.(sum(vonb_result["report"]["age_to_length_conversion"], dims = 2), 1.0)
+  )
+  observed_length_edges = FIMSBackend.growth_observation_edges(data[:lengths])
+  @test observed_length_edges == [5.0, 15.0, 25.0]
+  @test FIMSBackend.growth_population_size_edges(observed_length_edges) ==
+    collect(5.0:26.0)
+  size_edges = collect(5.0:26.0)
+  fleet_edges = [5.0, 15.0, 26.0]
+  expected_conversion = zeros(3, 2)
+  for age_index in 1:3
+    mean_length = vonb_result["report"]["mean_length_at_age"][1, age_index]
+    sd_length = native_max(vonb_result["report"]["sd_length_at_age"][1, age_index], 1e-8)
+    cdf(edge) = 0.5 * (1 + erf((edge - mean_length) / (sd_length * sqrt(2))))
+    size_probabilities = zeros(length(size_edges) - 1)
+    size_probabilities[1] = cdf(size_edges[2])
+    for bin_index in 2:(length(size_probabilities) - 1)
+      size_probabilities[bin_index] =
+        cdf(size_edges[bin_index + 1]) - cdf(size_edges[bin_index])
+    end
+    size_probabilities[end] = cdf(2 * mean_length - size_edges[end - 1])
+    size_probabilities .+= 1e-12
+    size_probabilities ./= sum(size_probabilities)
+    for length_index in 1:2
+      for size_index in eachindex(size_probabilities)
+        overlap = max(
+          0.0,
+          min(fleet_edges[length_index + 1], size_edges[size_index + 1]) -
+          max(fleet_edges[length_index], size_edges[size_index]),
+        )
+        expected_conversion[age_index, length_index] +=
+          size_probabilities[size_index] * overlap /
+          (size_edges[size_index + 1] - size_edges[size_index])
+      end
+    end
+    expected_conversion[age_index, :] .+= 1e-12
+    expected_conversion[age_index, :] ./= sum(expected_conversion[age_index, :])
+  end
+  @test vonb_result["report"]["age_to_length_conversion"] ≈ expected_conversion
+  vonb_report = vonb_result["report"]
+  @test vonb_report["age_to_length_conversion_derived_used"] == trues(2)
+  @test size(vonb_report["growth_derived_mean_WAA_by_fleet"]) == (2, 3, 2)
+  expected_weight_at_length =
+    exp(vonb_parameters.growth_log_length_weight_a) .*
+    native_max.(data[:lengths], 1e-8) .^ exp(vonb_parameters.growth_log_length_weight_b)
+  expected_derived_mean_WAA =
+    expected_conversion * expected_weight_at_length
+  @test vonb_report["growth_derived_mean_WAA_by_fleet"][:, :, 1] ≈
+        repeat(reshape(expected_derived_mean_WAA, 1, 3), 2, 1)
+  @test vonb_report["growth_derived_mean_WAA_by_fleet"][:, :, 2] ≈
+        repeat(reshape(expected_derived_mean_WAA, 1, 3), 2, 1)
+  fleet_specific_data = merge(
+    data,
+    Dict(
+      :n_lengths => 3,
+      :lengths => [10.0, 20.0, 30.0],
+      :lengths_by_fleet => [10.0 20.0; 20.0 30.0; 0.0 0.0],
+      :n_lengths_by_fleet => [2, 2],
+      :observed_length_comp => cat(
+        [20.0 40.0 0.0; 22.0 38.0 0.0],
+        [0.0 30.0 50.0; 0.0 34.0 46.0],
+        dims = 3,
+      ),
+    ),
+  )
+  fleet_specific_result = evaluate_model(
+    vonb_parameters,
+    fleet_specific_data,
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  fleet_specific_conversion =
+    fleet_specific_result["report"]["age_to_length_conversion"]
+  @test size(fleet_specific_conversion) == (3, 3, 2)
+  @test all(isapprox.(sum(fleet_specific_conversion, dims = 2), 1.0))
+  @test all(fleet_specific_conversion[:, 3, 1] .== 0)
+  @test all(fleet_specific_conversion[:, 1, 2] .== 0)
+  @test isfinite(fleet_specific_result["nll"])
+  changed_length_comp = copy(fleet_specific_data[:observed_length_comp])
+  changed_length_comp[1, 1, 1] += 10
+  changed_composition_result = evaluate_model(
+    vonb_parameters,
+    merge(fleet_specific_data, Dict(:observed_length_comp => changed_length_comp)),
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  @test changed_composition_result["nll"] != fleet_specific_result["nll"]
+  @test isfinite(vonb_result["nll"])
+  delta_sd = delta_method_result["report"]["sd_length_at_age"]
+  @test all(isfinite, delta_sd)
+  @test all(delta_sd .> 0)
+  @test delta_sd != vonb_result["report"]["sd_length_at_age"]
+  @test isfinite(delta_method_result["nll"])
+  reference_log_lengths = [log(275.0), log(725.0), log(0.18)]
+  mean_length_at_age = function (log_lengths, age)
+    mean_young = exp(log_lengths[1])
+    mean_old = exp(log_lengths[2])
+    coefficient = exp(log_lengths[3])
+    numerator = 1 - exp(-coefficient * (age - 1.0))
+    denominator = native_max(native_abs(1 - exp(-coefficient * (3.0 - 1.0))), 1e-8)
+    mean_young + (mean_old - mean_young) * numerator / denominator
+  end
+  correlation(value) = 2 / (1 + exp(-value)) - 1
+  covariance_young_old = correlation(0.2) * 12.0 * 20.0
+  covariance_young_coefficient = correlation(-0.3) * 12.0 * 0.03
+  covariance_old_coefficient = correlation(0.1) * 20.0 * 0.03
+  variance_young = 12.0^2
+  variance_old = 20.0^2
+  variance_coefficient = 0.03^2
+  growth_covariance = [
+    variance_young covariance_young_old covariance_young_coefficient
+    covariance_young_old variance_old covariance_old_coefficient
+    covariance_young_coefficient covariance_old_coefficient variance_coefficient
+  ]
+  function native_log_length_gradient(age)
+    numerator = 1 - exp(-0.18 * (age - 1.0))
+    denominator = native_max(native_abs(1 - exp(-0.18 * 2.0)), 1e-8)
+    ratio = numerator / denominator
+    mean_length = native_max(mean_length_at_age(reference_log_lengths, age), 1e-8)
+    # Native delta-method gradients use the unsmoothed denominator derivative.
+    ratio_derivative =
+      ((age - 1.0) * exp(-0.18 * (age - 1.0)) * denominator -
+       numerator * 2.0 * exp(-0.18 * 2.0)) / denominator^2
+    [(1 - ratio) * 275.0, ratio * 725.0, 450.0 * ratio_derivative * 0.18] ./ mean_length
+  end
+  expected_delta_sd = [
+    native_max(
+      mean_length_at_age(reference_log_lengths, age) *
+      sqrt(native_max(
+        sum(
+          native_log_length_gradient(age) .*
+          (growth_covariance * native_log_length_gradient(age))
+        ),
+        0.0,
+      )),
+      1e-8,
+    ) for age in data[:ages]
+  ]
+  @test delta_sd[1, :] ≈ expected_delta_sd atol = 1e-5
+  @test_throws ArgumentError evaluate_model(
+    ComponentArray(
+      merge(
+        parameter_values,
+        (
+          growth_log_mean_length_young = log(275.0),
+          growth_log_mean_length_old = log(725.0),
+          growth_log_coefficient = log(0.18),
+          growth_reference_age_young = 1.0,
+          growth_reference_age_old = 3.0,
+          growth_log_length_weight_a = log(2.5e-11),
+          growth_log_length_weight_b = log(3.0),
+          growth_log_sd_mean_length_young = log(12.0),
+        ),
+      ),
+    ),
+    data,
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  @test isfinite(
+    derivative(log(12.0)) do log_sd_young
+      differentiated_parameters = ComponentArray(
+        merge(
+          parameter_values,
+          (
+            growth_log_mean_length_young = log(275.0),
+            growth_log_mean_length_old = log(725.0),
+            growth_log_coefficient = log(0.18),
+            growth_reference_age_young = 1.0,
+            growth_reference_age_old = 3.0,
+            growth_log_length_weight_a = log(2.5e-11),
+            growth_log_length_weight_b = log(3.0),
+            growth_log_sd_mean_length_young = log_sd_young,
+            growth_log_sd_mean_length_old = log(20.0),
+            growth_log_sd_growth_coefficient = log(0.03),
+            growth_mean_length_young_mean_length_old_logit_corr = 0.2,
+            growth_mean_length_young_growth_coefficient_logit_corr = -0.3,
+            growth_mean_length_old_growth_coefficient_logit_corr = 0.1,
+          ),
+        ),
+      )
+      evaluate_nll(
+        differentiated_parameters,
+        data,
+        merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+      )
+    end,
+  )
+  vonb_config = merge(config, Dict(:growth_model_type => "VonBertalanffySchnute"))
+  @test isfinite(
+    derivative(log(275.0)) do log_mean_length_young
+      differentiated_parameters = ComponentArray(
+        merge(
+          parameter_values,
+          (
+            growth_log_mean_length_young = log_mean_length_young,
+            growth_log_mean_length_old = log(725.0),
+            growth_log_coefficient = log(0.18),
+            growth_reference_age_young = 1.0,
+            growth_reference_age_old = 3.0,
+            growth_log_length_weight_a = log(2.5e-11),
+            growth_log_length_weight_b = log(3.0),
+            growth_log_length_sd_at_young = log(28.0),
+            growth_log_length_sd_at_old = log(73.0),
+          ),
+        ),
+      )
+      evaluate_nll(differentiated_parameters, data, vonb_config)
+    end,
+  )
+  @test normal_prior_result["nll"] - result["nll"] ≈
+    0.5 * log(2π) + log(3.0) + (1.0 - 1.5)^2 / (2 * 3.0^2)
+  @test normal_prior_result["report"]["parameter_prior_nll"] ≈
+    0.5 * log(2π) + log(3.0) + (1.0 - 1.5)^2 / (2 * 3.0^2)
+  @test lognormal_prior_result["nll"] - result["nll"] ≈
+    0.5 * log(2π) + log(0.5) + log(1.0) + (log(1.0) - 0.2)^2 / (2 * 0.5^2)
+  expected_growth_prior_nll =
+    0.5 * log(2π) + log(10.0) + (275.0 - 250.0)^2 / (2 * 10.0^2) +
+    0.5 * log(2π) + log(0.4) + log(3.0) + (log(3.0) - log(2.5))^2 / (2 * 0.4^2)
+  @test growth_prior_result["nll"] - vonb_result["nll"] ≈ expected_growth_prior_nll
+  @test growth_prior_result["report"]["parameter_prior_nll"] ≈ expected_growth_prior_nll
+  @test maturity_prior_result["nll"] - maturity_result["nll"] ≈
+        0.5 * log(2π) + log(0.25) + (1.0 - 0.5)^2 / (2 * 0.25^2)
+  @test isapprox(result["nll"] - no_process_result["nll"], 0.5 * log(2π); atol = 1e-8)
+  log_r_result = evaluate_model(
+    parameters,
+    data,
+    merge(config, Dict(:recruitment_process_mode => "log_r")),
+  )
+  log_r_no_process_result = evaluate_model(
+    parameters,
+    data,
+    merge(
+      config,
+      Dict(:recruitment_process_active => false, :recruitment_process_mode => "log_r"),
+    ),
+  )
+  @test log_r_result["report"]["expected_recruitment"][2] ≈ 500.0
+  expected_phi_0 =
+    0.5 * exp(-0.2) * 2.0 +
+    3.0 * exp(-0.4) / (1.0 - exp(-0.2))
+  steepness = 0.6
+  spawning_biomass = log_r_no_process_result["report"]["spawning_biomass"][1]
+  mean_recruitment =
+    0.8 * 1000.0 * steepness * spawning_biomass /
+    (
+      0.2 * expected_phi_0 * 1000.0 * (1.0 - steepness + sqrt(eps(Float64))) +
+        spawning_biomass * (steepness - 0.2)
+    )
+  expected_process_nll =
+    0.5 * log(2π) + (log(500.0) - log(mean_recruitment))^2 / 2.0
+  @test isapprox(
+    log_r_result["nll"] - log_r_no_process_result["nll"],
+    expected_process_nll;
+    atol = 1e-8,
+  )
+  lognormal_process_result = evaluate_model(
+    parameters,
+    data,
+    merge(
+      config,
+      Dict(
+        :recruitment_process_distribution => "dlnorm",
+        :recruitment_process_mode => "log_r",
+      ),
+    ),
+  )
+  expected_lognormal_process_nll = FIMSBackend.lognormal_random_effect_nll(
+    [log(500.0)],
+    [log(mean_recruitment)],
+    1.0,
+  )
+  @test isapprox(
+    lognormal_process_result["nll"] - log_r_no_process_result["nll"],
+    expected_lognormal_process_nll;
+    atol = 1e-8,
+  )
+  @test_throws ArgumentError FIMSBackend.lognormal_random_effect_nll([-0.1], [0.0], 1.0)
+  @test size(report["catch_expected_by_fleet"]) == (2, 2)
+  @test size(report["index_expected_by_fleet"]) == (2, 2)
+  @test size(report["catch_numbers_at_age_by_fleet"]) == (2, 3, 2)
+  @test size(report["numbers_at_age"]) == (3, 3)
+  @test size(report["biomass"]) == (3,)
+  @test size(report["spawning_biomass"]) == (3,)
+  @test size(report["expected_recruitment"]) == (3,)
+  @test size(report["mortality_F"]) == (2, 3)
+  @test size(report["mortality_M"]) == (2, 3)
+  @test size(report["mortality_Z"]) == (2, 3)
+  @test size(report["sum_selectivity"]) == (2, 3)
+  @test size(report["catch_weight_at_age_by_fleet"]) == (2, 3, 2)
+  @test size(report["index_weight_at_age_by_fleet"]) == (2, 3, 2)
+  @test size(report["catch_numbers_at_length_by_fleet"]) == (2, 2, 2)
+  @test size(report["index_numbers_at_length_by_fleet"]) == (2, 2, 2)
+  @test size(report["unfished_numbers_at_age"]) == (3, 3)
+  @test length(report["unfished_biomass"]) == 3
+  @test length(report["unfished_spawning_biomass"]) == 3
+  @test length(report["spawning_biomass_ratio"]) == 3
+  @test report["mortality_Z"][1:2, :] ≈
+        report["mortality_F"][1:2, :] + report["mortality_M"][1:2, :]
+  @test report["numbers_at_age"][3, 1] == report["expected_recruitment"][3]
+  @test report["numbers_at_age"][3, 2] ≈
+        report["numbers_at_age"][2, 1] * exp(-report["mortality_Z"][2, 1])
+  @test report["numbers_at_age"][3, 3] ≈
+        report["numbers_at_age"][2, 2] * exp(-report["mortality_Z"][2, 2]) +
+        report["numbers_at_age"][2, 3] * exp(-report["mortality_Z"][2, 3])
+  @test report["biomass"][3] ≈
+        sum(report["numbers_at_age"][3, :] .* report["weights_at_age"][3, :])
+  @test report["total_catch_numbers"] ≈ vec(sum(report["catch_numbers_by_fleet"], dims = 2))
+  @test report["total_catch_weight"] ≈ vec(sum(report["catch_expected_by_fleet"], dims = 2))
+  @test size(report["agecomp_expected"]) == (2, 3, 2)
+  @test size(report["lengthcomp_expected"]) == (2, 2, 2)
+  @test all(isapprox(value, 1.0; atol = 1e-10) for value in sum(report["agecomp_proportion"], dims = 2))
+  @test vec(sum(report["agecomp_expected"][:, :, 1], dims = 2)) ≈ [60.0, 62.0]
+  @test vec(sum(report["agecomp_expected"][:, :, 2], dims = 2)) ≈ report["index_numbers_by_fleet"][:, 2]
+  @test all(isapprox(value, 1.0; atol = 1e-10) for value in sum(report["lengthcomp_proportion"], dims = 2))
+  @test all(isapprox(value, 1.0; atol = 1e-10) for value in sum(report["lengthcomp_proportion"], dims = 2))
+  @test vec(sum(report["lengthcomp_expected"][:, :, 1], dims = 2)) ≈ [60.0, 60.0]
+  @test all(report["index_expected_by_fleet"][:, 2] .> report["index_expected_by_fleet"][:, 1])
+  @test report["catch_weight_by_fleet"] ≈ report["catch_expected_by_fleet"]
+  @test report["index_weight_by_fleet"] ≈ report["index_expected_by_fleet"]
+  @test report["log_index_expected_by_fleet"] ≈ log.(report["index_expected_by_fleet"])
+  @test report["log_catch_expected_by_fleet"] ≈ log.(report["catch_expected_by_fleet"])
+  @test report["spawning_biomass_ratio"] ≈
+        report["spawning_biomass"] ./ first(report["unfished_spawning_biomass"])
+  @test_throws ArgumentError evaluate_model(
+    parameters,
+    data,
+    merge(config, Dict(:selectivity_types => ["Logistic3D", "Logistic"])),
+  )
+  @test_throws ArgumentError evaluate_model(
+    parameters,
+    data,
+    merge(config, Dict(:recruitment => :unsupported)),
+  )
+
+  fixed_mask = falses(length(parameters))
+  random_mask = falses(length(parameters))
+  fixed_mask[13] = true
+  random_mask[15] = true
+  fit_config = merge(
+    config,
+    Dict(
+      :fixed_parameter_mask => fixed_mask,
+      :random_parameter_mask => random_mask,
+      :parameter_prior_components => ["log_rzero"],
+      :parameter_prior_indices => [1],
+      :parameter_prior_distributions => ["dnorm"],
+      :parameter_prior_means => [log(1000.0)],
+      :parameter_prior_sds => [1.5],
+    ),
+  )
+  fit_result = fit_model(parameters, data, fit_config)
+  @test fit_result["fixed_effect_count"] == 1
+  @test fit_result["random_effect_count"] == 1
+  @test isfinite(fit_result["nll"])
+  @test fit_result["joint_nll"] ≈ evaluate_nll(
+    fit_result["estimates"],
+    data,
+    merge(fit_config, Dict(:parameter_names => String.(propertynames(parameters)))),
+  )
+  @test fit_result["nll"] ≈
+        fit_result["joint_nll"] + 0.5 * log(fit_result["hessian"][15, 15]) -
+        0.5 * log(2π)
+  @test fit_result["convergence"]
+  @test fit_result["fixed_convergence"]
+  @test fit_result["random_convergence"]
+  @test fit_result["convergence_code"] == "converged"
+  @test length(fit_result["fixed_gradient"]) == 1
+
+  @testset "Gaussian prior-only Laplace and uncertainty oracle" begin
+    prior_only_data = Dict(
+      key => value for (key, value) in data if !startswith(string(key), "observed_")
+    )
+    component_names = propertynames(parameters)
+    log_q_component = findfirst(==(:log_q), component_names)
+    log_q_start = 1 + sum(
+      length(getproperty(parameters, name)) for name in component_names[1:(log_q_component - 1)]
+    )
+    gaussian_fixed_mask = falses(length(parameters))
+    gaussian_random_mask = falses(length(parameters))
+    gaussian_fixed_mask[log_q_start] = true
+    gaussian_random_mask[log_q_start + 1] = true
+    prior_means = [-2.0, -1.0]
+    prior_sds = [0.3, 0.7]
+    gaussian_config = merge(config, Dict(
+      :recruitment_process_active => false,
+      :fixed_parameter_mask => gaussian_fixed_mask,
+      :random_parameter_mask => gaussian_random_mask,
+      :parameter_prior_components => ["log_q", "log_q"],
+      :parameter_prior_indices => [1, 2],
+      :parameter_prior_distributions => ["dnorm", "dnorm"],
+      :parameter_prior_means => prior_means,
+      :parameter_prior_sds => prior_sds,
+    ))
+    gaussian_fit = fit_model(parameters, prior_only_data, gaussian_config)
+    @test gaussian_fit["convergence"]
+    @test gaussian_fit["estimates"]["log_q"] ≈ prior_means atol = 1e-6
+    @test gaussian_fit["joint_nll"] ≈ log(2π) + sum(log, prior_sds) atol = 1e-8
+    @test gaussian_fit["nll"] ≈ 0.5 * log(2π) + log(prior_sds[1]) atol = 1e-8
+    @test gaussian_fit["fixed_hessian"][1, 1] ≈ inv(prior_sds[1]^2) rtol = 1e-5
+    @test gaussian_fit["standard_errors"]["log_q"] ≈ prior_sds rtol = 1e-5
+    @test gaussian_fit["covariance"][log_q_start, log_q_start + 1] ≈ 0.0 atol = 1e-8
+    @test gaussian_fit["pd_hessian"]
+    active_indices = findall(gaussian_fixed_mask .| gaussian_random_mask)
+    full_joint_hessian = FIMSBackend.hessian(
+      values -> evaluate_nll(
+        FIMSBackend._named_component_array(values, parameters),
+        prior_only_data, gaussian_config,
+      ),
+      collect(parameters),
+    )
+    @test gaussian_fit["hessian"][active_indices, active_indices] ≈
+          full_joint_hessian[active_indices, active_indices]
+    @test all(isnan, gaussian_fit["hessian"][.!(
+      gaussian_fixed_mask .| gaussian_random_mask
+    ), :])
+
+    shifted_fixed = [prior_means[1] + 0.2]
+    @test FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, shifted_fixed,
+    ) ≈ 0.5 * log(2π) + log(prior_sds[1]) + 0.2^2 / (2 * prior_sds[1]^2)
+    @test FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, shifted_fixed, 1,
+    ) ≈ [0.2 / prior_sds[1]^2] rtol = 1e-5
+    @test FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, shifted_fixed, 2,
+    ) ≈ reshape([inv(prior_sds[1]^2)], 1, 1) rtol = 1e-5
+    shifted_report = FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, shifted_fixed, 3,
+    )
+    @test shifted_report["estimates"]["log_q"] ≈ [shifted_fixed[1], prior_means[2]]
+    @test_throws ArgumentError FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, [1.0, 2.0],
+    )
+    @test_throws ArgumentError FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, gaussian_config, [NaN],
+    )
+
+    fixed_only_config = merge(gaussian_config, Dict(
+      :fixed_parameter_mask => gaussian_fixed_mask .| gaussian_random_mask,
+      :random_parameter_mask => falses(length(parameters)),
+    ))
+    @test FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, fixed_only_config, prior_means, 1,
+    ) ≈ zeros(2) atol = 1e-8
+    @test diag(FIMSBackend.evaluate_fixed_objective(
+      parameters, prior_only_data, fixed_only_config, prior_means, 2,
+    )) ≈ inv.(prior_sds .^ 2)
+    random_only_config = merge(gaussian_config, Dict(
+      :fixed_parameter_mask => falses(length(parameters)),
+      :random_parameter_mask => gaussian_fixed_mask .| gaussian_random_mask,
+    ))
+    random_only_fit = fit_model(parameters, prior_only_data, random_only_config)
+    @test random_only_fit["convergence"]
+    @test random_only_fit["nll"] ≈ 0.0 atol = 1e-8
+    @test random_only_fit["standard_errors"]["log_q"] ≈ prior_sds
+    @test gaussian_fit["uncertainty_status"] == "available"
+    constant_fit = fit_model(parameters, prior_only_data, merge(gaussian_config, Dict(
+      :fixed_parameter_mask => falses(length(parameters)),
+      :random_parameter_mask => falses(length(parameters)),
+    )))
+    @test constant_fit["convergence"]
+    @test constant_fit["convergence_code"] == "no_estimable_parameters"
+    @test constant_fit["joint_nll"] ≈ evaluate_nll(parameters, prior_only_data, gaussian_config)
+    @test isempty(constant_fit["fixed_parameters"])
+    @test all(iszero, constant_fit["covariance"])
+    @test all(iszero, constant_fit["report_standard_errors_flat"])
+    no_uncertainty_fit = fit_model(
+      parameters, prior_only_data,
+      merge(gaussian_config, Dict(:compute_standard_errors => false)),
+    )
+    @test no_uncertainty_fit["uncertainty_status"] == "not_requested"
+    @test !no_uncertainty_fit["pd_hessian"]
+    @test all(isnan, no_uncertainty_fit["standard_errors"]["log_q"])
+    @test all(isnan, no_uncertainty_fit["covariance"][
+      [log_q_start, log_q_start + 1], [log_q_start, log_q_start + 1]
+    ])
+    singular_config = merge(gaussian_config, Dict(
+      :parameter_prior_components => ["log_q"],
+      :parameter_prior_indices => [2],
+      :parameter_prior_distributions => ["dnorm"],
+      :parameter_prior_means => [prior_means[2]],
+      :parameter_prior_sds => [prior_sds[2]],
+    ))
+    singular_fit = @test_logs (
+      :warn, r"Parameter Hessian is non-finite or not positive definite"
+    ) fit_model(parameters, prior_only_data, singular_config)
+    @test singular_fit["uncertainty_status"] == "invalid_hessian"
+    @test !singular_fit["pd_hessian"]
+    @test isnan(singular_fit["standard_errors"]["log_q"][1])
+    @test isnan(singular_fit["covariance"][log_q_start, log_q_start])
+  end
+
+  dictionary_parameters = Dict{String,Any}()
+  for name in reverse(propertynames(parameters))
+    dictionary_parameters[string(name)] = getproperty(parameters, name)
+  end
+  dictionary_fit_result = fit_model(
+    dictionary_parameters,
+    data,
+    merge(fit_config, Dict(:parameter_names => String.(propertynames(parameters)))),
+  )
+  @test dictionary_fit_result["estimates"]["log_rzero"] ≈ fit_result["estimates"]["log_rzero"]
+  @test dictionary_fit_result["estimates"]["log_devs"] ≈ fit_result["estimates"]["log_devs"]
+  @test dictionary_fit_result["nll"] ≈ fit_result["nll"]
+  fixed_covariance = inv(fit_result["fixed_hessian"])
+  random_conditional_covariance = inv(fit_result["hessian"][15:15, 15:15])
+  random_fixed_sensitivity =
+    -random_conditional_covariance * fit_result["hessian"][15:15, 13:13]
+  @test fit_result["covariance"][13, 13] ≈ fixed_covariance[1, 1]
+  @test fit_result["covariance"][13, 15] ≈
+        (fixed_covariance * random_fixed_sensitivity')[1, 1]
+  @test fit_result["covariance"][15, 15] ≈
+        (random_conditional_covariance +
+         random_fixed_sensitivity * fixed_covariance * random_fixed_sensitivity')[1, 1]
+  @test length(fit_result["report_standard_errors"]["biomass"]) ==
+        length(fit_result["report"]["biomass"])
+  @test all(
+    name -> haskey(fit_result["report_standard_errors"], name),
+    (
+      "agecomp_proportion",
+      "catch_numbers_at_length_by_fleet",
+      "catch_weight_by_fleet",
+      "index_numbers_at_length_by_fleet",
+      "index_weight_by_fleet",
+      "lengthcomp_proportion",
+      "log_catch_expected_by_fleet",
+      "log_index_expected_by_fleet",
+      "spawning_biomass_ratio",
+      "unfished_biomass",
+      "unfished_numbers_at_age",
+      "unfished_spawning_biomass",
+    ),
+  )
+  @test all(
+    value -> isnan(value) || value >= 0,
+    fit_result["report_standard_errors"]["biomass"],
+  )
+  fitted_parameter_vector = vcat((
+    begin
+      value = fit_result["estimates"][String(name)]
+      value isa Number ? [value] : vec(value)
+    end for name in propertynames(parameters)
+  )...)
+  report_uncertainty = FIMSBackend._report_standard_errors(
+    Float64.(fitted_parameter_vector),
+    parameters,
+    data,
+    merge(fit_config, Dict(:compute_report_covariance => true)),
+    fit_result["covariance"],
+  )
+  @test size(report_uncertainty.covariance) ==
+        (length(report_uncertainty.values), length(report_uncertainty.values))
+  @test diag(report_uncertainty.covariance) ≈ report_uncertainty.standard_errors_flat .^ 2
+  active_uncertainty = FIMSBackend._report_standard_errors(
+    Float64.(fitted_parameter_vector),
+    parameters,
+    data,
+    merge(fit_config, Dict(:compute_report_covariance => true)),
+    fit_result["covariance"],
+    findall(fixed_mask .| random_mask),
+  )
+  @test active_uncertainty.values == report_uncertainty.values
+  @test active_uncertainty.standard_errors_flat ≈ report_uncertainty.standard_errors_flat
+  @test active_uncertainty.covariance ≈ report_uncertainty.covariance
+end
+
+@testset "multinomial likelihood includes the sampling coefficient" begin
+  observed = [1.0 1.0; -999.0 -999.0]
+  expected = [0.25 0.75; 0.5 0.5]
+  @test isapprox(FIMSBackend.multinomial_nll(observed, expected), -log(2 * 0.25 * 0.75); atol = 1e-13)
+  @test FIMSBackend.multinomial_nll([0.0 2.0], [0.0 1.0]) == 0.0
+  @test FIMSBackend.multinomial_nll([1.0 1.0], [0.0 1.0]) == Inf
+end
+
+@testset "normal data likelihood" begin
+  expected_nll = 0.5 * log(2π) + log(0.5) + 2.0
+  @test isapprox(FIMSBackend.normal_nll([2.0], [1.0], 0.5), expected_nll; atol = 1e-10)
+  @test isapprox(
+    FIMSBackend.data_likelihood_nll([2.0], [1.0], 0.5, "dnorm"),
+    expected_nll;
+    atol = 1e-10,
+  )
+  @test_throws ArgumentError FIMSBackend.normal_nll([1.0], [1.0], 0.0)
+  @test_throws ArgumentError FIMSBackend.lognormal_nll([1.0], [1.0], -0.1)
+  @test_throws ArgumentError FIMSBackend.data_likelihood_nll([1.0], [1.0], 0.1, "dmultinom")
+end
+
+@testset "lognormal data likelihood does not drop out-of-support observations" begin
+  @test isinf(FIMSBackend.lognormal_nll([0.0], [1.0], 0.5))
+  @test isinf(FIMSBackend.lognormal_nll([-1.0], [1.0], 0.5))
+  @test isinf(FIMSBackend.lognormal_nll([1.0], [0.0], 0.5))
+  @test FIMSBackend.lognormal_nll([-999.0], [1.0], 0.5) == 0.0
+end
+
+@testset "lognormal recruitment process follows random-effect semantics" begin
+  expected = [0.25, 0.5]
+  observed = [2.0, 4.0]
+  sigma = [0.5, 1.0]
+  expected_nll = FIMSBackend.normal_nll(log.(observed), expected, sigma)
+
+  @test isapprox(
+    FIMSBackend.lognormal_random_effect_nll(observed, expected, sigma),
+    expected_nll;
+    atol = 1e-10,
+  )
+  @test_throws ArgumentError FIMSBackend.lognormal_random_effect_nll([1.0], [0.0], 0.0)
+  @test_throws DimensionMismatch FIMSBackend.lognormal_random_effect_nll([1.0], [0.0], [0.5, 1.0])
+end
+
+@testset "data likelihood supports family by observation" begin
+  observed = [2.0 2.0]
+  expected = [1.0 1.0]
+  sigma = [0.5 0.5]
+  families = ["dnorm" "dlnorm"]
+  expected_nll =
+    FIMSBackend.normal_nll([2.0], [1.0], 0.5) +
+    FIMSBackend.lognormal_nll([2.0], [1.0], 0.5)
+
+  @test isapprox(
+    FIMSBackend.data_likelihood_nll(observed, expected, sigma, families),
+    expected_nll;
+    atol = 1e-10,
+  )
+  @test_throws DimensionMismatch FIMSBackend.data_likelihood_nll(
+    observed,
+    expected,
+    sigma,
+    ["dnorm"],
+  )
+end
+
+@testset "data likelihood supports observation-specific uncertainty" begin
+  observed = [2.0 3.0; 4.0 -999.0]
+  expected = [1.0 1.0; 2.0 2.0]
+  sigma = [0.5 1.0; 2.0 3.0]
+  manual_nll = sum(
+    0.5 * log(2π) + log(sigma[index]) +
+    ((observed[index] - expected[index])^2) / (2 * sigma[index]^2)
+    for index in eachindex(observed) if observed[index] != -999
+  )
+
+  @test isapprox(FIMSBackend.normal_nll(observed, expected, sigma), manual_nll; atol = 1e-10)
+  @test_throws DimensionMismatch FIMSBackend.normal_nll(observed, expected, ones(3))
+end
+
+@testset "recruitment process accepts observation-specific standard deviations" begin
+  parameters = ComponentArray((
+    inflection_point = [2.0],
+    slope = [1.0],
+    inflection_point_asc = [2.0],
+    slope_asc = [1.0],
+    inflection_point_desc = [4.0],
+    slope_desc = [1.0],
+    log_rzero = log(1000.0),
+    logit_steep = 0.0,
+    log_devs = [0.0, 0.0],
+    log_r = [0.0, 0.0],
+    log_sd = log.([0.5, 1.0]),
+    log_init_naa = log.([1000.0, 500.0]),
+    log_M = fill(log(0.2), 3, 2),
+    log_Fmort = fill(-200.0, 3, 1),
+    log_q = [0.0],
+  ))
+  data = Dict(
+    :fleets => ["fish"],
+    :n_years => 3,
+    :n_ages => 2,
+    :n_lengths => 1,
+    :ages => [1.0, 2.0],
+    :lengths => [10.0],
+    :weights_at_age => repeat(reshape([1.0, 2.0], 1, 2), 3, 1),
+    :maturity_at_age => repeat(reshape([0.0, 1.0], 1, 2), 3, 1),
+    :proportion_female => ones(2),
+  )
+  config = Dict(
+    :selectivity_types => ["Logistic"],
+    :recruitment => :beverton_holt,
+    :recruitment_process_active => true,
+    :recruitment_process_distribution => "dnorm",
+    :recruitment_process_mode => "log_devs",
+  )
+  with_process = evaluate_model(parameters, data, config)["nll"]
+  without_process = evaluate_model(
+    parameters,
+    data,
+    merge(config, Dict(:recruitment_process_active => false)),
+  )["nll"]
+  expected_process = FIMSBackend.normal_nll([0.0, 0.0], [0.0, 0.0], [0.5, 1.0])
+
+  @test isapprox(with_process - without_process, expected_process; atol = 1e-10)
+
+  singleton_sd_parameters = Dict(
+    String(name) => getproperty(parameters, name) for name in propertynames(parameters)
+  )
+  singleton_sd_parameters["log_sd"] = [log(0.5)]
+  singleton_sd_config = merge(
+    config,
+    Dict(:parameter_names => String.(propertynames(parameters))),
+  )
+  singleton_sd_with_process =
+    evaluate_model(singleton_sd_parameters, data, singleton_sd_config)["nll"]
+  @test isapprox(
+    singleton_sd_with_process - without_process,
+    FIMSBackend.normal_nll([0.0, 0.0], [0.0, 0.0], 0.5);
+    atol = 1e-10,
+  )
+
+  scalar_sd_parameters = copy(singleton_sd_parameters)
+  scalar_sd_parameters["log_sd"] = log(0.5)
+  scalar_sd_with_process =
+    evaluate_model(scalar_sd_parameters, data, singleton_sd_config)["nll"]
+  @test isapprox(
+    scalar_sd_with_process - without_process,
+    FIMSBackend.normal_nll([0.0, 0.0], [0.0, 0.0], 0.5);
+    atol = 1e-10,
+  )
+end

@@ -26,7 +26,8 @@ The NOAA Fisheries Integrated Modeling System (FIMS) is a new modeling framework
 
 ### Loading the package
 
-Calling `library(FIMS)` loads the R package, Rcpp functions, and Rcpp modules into the R environment.
+Calling `library(FIMS)` loads the high-level R interface. Julia starts lazily
+when the first model is fitted; `setup_julia()` prepares its dependencies.
 ```{r library, warning=FALSE, message=FALSE}
 library(FIMS)
 library(ggplot2)
@@ -35,19 +36,16 @@ library(stockplotr)
 
 ### Getting help
 
-In addition to using the traditional method of getting help within R for functions, i.e., `?FIMS::fit_fims`, you can use `methods::show()` to access help information for the C++ functions that are exported via {Rcpp}. You will either be provided with a short description of the function or a link to the doxygen documentation for the C++ code that will provide information about the function.
-
-For example, `CreateTMBModel` is a C++ function that returns a boolean.
-```r
-methods::show(FIMS::CreateTMBModel)
-internal C++ function <0000014f7bd8ff00>
-    docstring : See the documentation for the Rcpp interface, https://noaa-fims.github.io/FIMS/doxygen/rcpp__interface_8hpp.html.
-    signature : bool CreateTMBModel()
-```
+Use R's help interface, for example `?FIMS::fit_fims` or
+`?FIMS::initialize_fims`. Native module constructors and native logging have
+been retired; configure models through the parameter tibble instead.
 
 ### Memory
 
-The C++ code is compiled upon installation, rather than loading, so the call to `library()` should be pretty fast. Users should always run `clear()` prior to modeling to ensure that the C++ memory from any previous FIMS model run is cleared out.
+FIMS does not compile native code at installation. Each input and fitted
+object owns its model configuration, so fitting another model does not
+invalidate existing objectives. `clear()` optionally releases shared bridge
+scratch input without starting Julia or invalidating fitted objects.
 ```{r clear-memory, warning=FALSE, message=FALSE}
 # clear memory
 clear()
@@ -63,7 +61,7 @@ The long format does lead to some information being duplicated. For example, the
 
 A sample data frame for a catch-at-age model with both ages and lengths is stored in the package as `data_big`. This data set is based on data that was used in [Li et al.](https://www.doi.org/10.7755/FB.119.2-3.5) for the Model Comparison Project ([github site](https://github.com/NOAA-FIMS/Age_Structured_Stock_Assessment_Model_Comparison)). The length data have since been added [data-raw/data_big.R](https://github.com/NOAA-FIMS/FIMS/blob/main/data-raw/data_big.R) based on an age-length conversion matrix.
 
-To see how this example data frame was created, see the R script here [R/data_big.R](https://github.com/NOAA-FIMS/FIMS/blob/main/R/data_big.R). To find out more about the columns that are present use `?data_big`.
+To see how this example data frame was created, see the R script here [data-raw/data_big.R](https://github.com/NOAA-FIMS/FIMS/blob/main/data-raw/data_big.R). To find out more about the columns that are present use `?data_big`.
 
 ### `FIMSFrame()`
 
@@ -114,7 +112,10 @@ The parameters that are in the model will depend on which modules are used from 
 
 ### `setup_default_parameters()`
 
-Modules that are available in FIMS are known as reference classes in the C++ code. Each reference class acts as an interface between R and the underlining C++ code that defines FIMS. Several reference classes exist and several more will be created in the future. The beauty of having modules rather than a control file really comes out when more reference classes are created because each reference class can be accessed through R by itself to build up a model rather than needing to modify a control file for future features.
+FIMS represents growth, maturity, selectivity, recruitment, and population
+dynamics as Julia modules. Configure these through the R parameter tibble
+returned by `setup_default_parameters()` rather than constructing mutable
+low-level module objects.
 
 By just passing the data to `setup_default_parameters()`, the default values for parameters that relate to fleet(s), recruitment, growth, and maturity modules can be created. For example,
 
@@ -132,7 +133,36 @@ default_parameters
 
 ### Update parameters
 
-Functions (e.g., `rows_*()`) from `{dplyr}` can be used to update the default parameters as needed.
+The default parameters created above include a mix of parameters that are fixed at their starting values, i.e., "constant"; estimated as fixed effects, i.e., "fixed_effects"; and estimated as random effects, i.e., "random_effects". Additionally, the parameter table can include specifications for empirical relationships that actually are not parameters at all, such as empirical weight at age. These empirical relationships will have an "estimation_type" of `NA`. Below is a summary of how many fall into each category.
+
+```{r explore-parameters}
+dplyr::count(default_parameters, estimation_type)
+```
+
+Using `dplyr::count()` to summarize parameter labels by module names is a good way to understand what default parameters have been defined based on the data in your FIMSFrame. Because there is empirical weight-at-age data in `data_big`, the default is to model growth empirically rather than with parameters, and thus, the label for the growth module is `NA`. See the [vignette on growth](fims-growth-vonb-schnute.html) for an example of how to estimate growth internally.
+```{r parameter-labels}
+dplyr::count(default_parameters, module_name, label)
+```
+
+The most important parameters to update will typically be those which are constant rather than estimated because, at this point, the default values are generic and not tailored to the species being modeled. For example, maturity parameters are assumed to follow a logistic relationship with a slope of 1.0 and an inflection point of 2.0. In the future, species-specific defaults may be available thanks to the [`{fishprior}` project](https://github.com/NOAA-FIMS/fishprior).
+
+Counting the constant parameters by `module_name`, `fleet`, `label`, and `value` helps identify which parameters to focus on first. Knowing how many years and ages are in your data will help you make sense of the parameter counts.
+```{r parameter-values}
+(n_years <- FIMS::get_n_years(data_4_model))
+(n_ages <- FIMS::get_n_ages(data_4_model))
+
+default_parameters |>
+  dplyr::filter(estimation_type == "constant") |>
+  dplyr::count(module_name, fleet, label, value)
+```
+
+Here we can see that the defaults for the constant parameters include `log_M` values (by age and time step, so for the `r n_ages` ages and `r n_years` years we get n = `r n_ages * n_years`) which are all equal to `log(0.2) =` `r round(log(0.2), 2)`, maturity intercept and slope values with values of 2.0 and 1.0, respectively, and the stock-recruit parameter `logit_steepness = 0.788`. These are all parameters which would be good to update to species- or stock-specific values in a real-world application.
+
+There are helper functions in FIMS to do the logit (`FIMS::logit(0.2, 1.0, 0.75)`, i.e., `-log(1.0 - 0.75) + log(0.75 - 0.2) = 0.788`) and the inverse-logit transformation (`FIMS::inv_logit(0.2, 1.0, 0.788)`, i.e., `(exp(0.788) + 0.2)/(1 + exp(0.788)) = 0.75`) for you. The first and second arguments of both functions are the lower and upper bounds of the transformation, which for steepness are 0.2 and 1.0, respectively.
+
+Other constant parameters will likely be fine at the default values for most models, including in this case the `log_Fmort = -200` parameters for the `survey1` fleet which has no associated catch for all of `r n_years` years in the model, where a tiny value is used to effectively set the fishing mortality to zero. Likewise `log_q = 0` parameter for the `fleet1` fishing fleet, which does not have an index of abundance, is also fine as a default. And for many stocks, a default of `proportion_female = 0.5` will be fine.
+
+Users can modify any of the default parameters as needed, including the initial values and the choice of which parameters are constant or estimated. Functions (e.g., `rows_*()`) from `{dplyr}` can be used to make these updates.
 
 In the code below, `rows_update()` is used to adjust the fishing mortality, selectivity, maturity, and population parameters from their default values.
 
@@ -143,7 +173,7 @@ parameters_4_model <- default_parameters |>
     tibble::tibble(
       fleet = "fleet1",
       label = "log_Fmort",
-      timing = seq(get_n_years(data_4_model)),
+      timing = seq(FIMS::get_n_years(data_4_model)),
       value = log(c(
         0.009459165, 0.027288858, 0.045063639,
         0.061017825, 0.048600752, 0.087420554,
@@ -159,7 +189,7 @@ parameters_4_model <- default_parameters |>
     ),
     by = c("fleet", "label", "timing")
   ) |>
-  # Update selectivity parameters and log_q for survey1
+  # Update log_q for survey1
   dplyr::rows_update(
     tibble::tibble(
       fleet = "survey1",
@@ -172,7 +202,7 @@ parameters_4_model <- default_parameters |>
   dplyr::rows_update(
     tibble::tibble(
       label = "log_devs",
-      timing = 2:get_n_years(data_4_model),
+      timing = 2:FIMS::get_n_years(data_4_model),
       value = c(
         0.43787763, -0.13299042, -0.43251973, 0.64861200, 0.50640852,
         -0.06958319, 0.30246260, -0.08257384, 0.20740372, 0.15289604,
@@ -206,7 +236,7 @@ parameters_4_model <- default_parameters |>
   dplyr::rows_update(
     tibble::tibble(
       label = "log_init_naa",
-      age = seq(get_n_ages(data_4_model)),
+      age = seq(FIMS::get_n_ages(data_4_model)),
       value = c(
         13.80944, 13.60690, 13.40217, 13.19525, 12.98692, 12.77791,
         12.56862, 12.35922, 12.14979, 11.94034, 11.73088, 13.18755
@@ -216,21 +246,39 @@ parameters_4_model <- default_parameters |>
   )
 ```
 
+If you are unsure of starting values to use for the initial numbers-at-age parameters you can use our internal helper function to calculate them based on natural mortality and unfished recruitment.
+```{r initial-numbers-at-age}
+FIMS:::setup_default_log_init_naa(
+  n_ages = n_ages,
+  log_rzero = dplyr::filter(default_parameters, label == "log_rzero") |>
+    dplyr::pull(value),
+  log(0.2)
+)
+```
+
 ## Fit
 
 With data and parameters in place, we can now initialize modules using `initialize_fims()` and fit the model using `fit_fims()`.
 
 ### `initialize_fims()`
 
-The tibble returned by `setup_default_parameters()` is just a data frame containing specifications. Nothing has been created in memory as of yet. To actually initialize the modules, `initialize_fims()` needs to be called. This function takes all of the specifications and matches them with the appropriate data to initialize a module and create the pointers to the memory.
+The tibble returned by `setup_default_parameters()` contains model specifications.
+`initialize_fims()` validates those specifications and matches them with the
+data, creating an independent R model input. Julia starts lazily when the model
+is evaluated or fitted; no native module pointers are created.
 
 ### `fit_fims()`
 
-The list returned from `initialize_fims()` can be passed to the parameter of `fit_fims()` called `input` to run a FIMS model. If `optimize = FALSE`, the model will not actually be optimized but instead just checked to ensure it is a viable model. When `optimize = TRUE`, the model will be fit using `stats::nlminb()` and an object of the class `FIMSFit` will be returned.
+Pass the result of `initialize_fims()` to `fit_fims()`. With `optimize = FALSE`,
+the model is evaluated at the supplied values without optimization. With
+`optimize = TRUE`, Julia's LBFGS optimizer estimates the parameters and returns
+a `FIMSFit` object. For random effects, the optimizer minimizes the
+Laplace-adjusted marginal objective; `get_report(fit)[["jnll"]]` contains the
+joint objective.
 
 ### Example
 
-```{r fit, max.height='100px', attr.output='.numberLines', eval=TRUE}
+```{r fit, max.height='100px', attr.output='.numberLines', eval=FALSE}
 # Run the model without optimization to help ensure a viable model
 test_fit <- parameters_4_model |>
   initialize_fims(data = data_4_model) |>
@@ -242,29 +290,57 @@ fit <- parameters_4_model |>
   fit_fims(optimize = TRUE)
 ```
 
-### Logging system
-
-You can look at the log file in R or write it to the disk but you must run `get_log()` before you run clear to obtain information about the model because clear removes everything from memory, including the log. `get_log()` returns the log information as a string. This string can be manipulated into a data frame using `jsonlite::fromJSON()`. There are three logging levels, "info", "warning", and "error". The log below will not have any error messages but if you were to have error messages and you want to know immediately upon the first error that there are problems, you can run `set_log_throw_on_error(TRUE)` prior to running your model. See the vignette on [FIMS logging](fims-logging.html) or the [doxygen documentation](https://noaa-fims.github.io/FIMS/doxygen/classfims_1_1FIMSLog.html) for more information.
-
-```{r example-log, eval = TRUE}
-log_json_string <- get_log()
-log_data_frame <- jsonlite::fromJSON(log_json_string)
-log_data_frame[1, ]
-dim(log_data_frame)
-# Print how many log entries there are of each type
-dplyr::count(log_data_frame, level)
-# Subset for just the warnings
-log_data_frame |> dplyr::filter(level == "warning")
-
-clear()
+```{r load-precomputed-fit, echo=FALSE}
+data("fit_big_optimized", package = "FIMS")
+fit_big_unoptimized <- FIMS:::fit_big_unoptimized
+test_fit <- fit_big_unoptimized
+fit <- fit_big_optimized
 ```
+
+### Oh no! My model didn't converge! 😨 HELP‼️
+
+If you find yourself in the unfortunate situation where your model didn't converge, there are several things that you can look at.
+
+#### Getting the non-converged fit output
+
+One of the things you can do is to inspect the fit output. You can start with the NLL (We are sorry these aren't named yet, it's in the list of things to add) by running `get_report(fit)$nll_components` which will give you a clue as to which part of these components might have caused your model to not converge.
+
+You can then do `names(get_report(fit))` to see the names of all the information you can look into specifically and then look at that. You can also look in `View(get_estimates(fit))` to look through the tibble and identify problem data. Also, see the [Viewing results](#viewing-results) section for more information on how to view and filter the results.
+
+#### Optimization and uncertainty diagnostics
+
+The retired native logging functions are not available with the Julia backend.
+Errors are raised in R, and convergence or uncertainty failures are reported
+explicitly. Inspect the optimizer summary, gradient, and uncertainty status:
+
+```{r fit-diagnostics, eval = FALSE}
+get_opt(fit)
+get_max_gradient(fit)
+get_sdreport(fit)[["uncertainty_status"]]
+summary(get_sdreport(fit), "fixed")
+```
+
+`clear()` releases shared bridge input without invalidating existing fitted
+objects or their objective functions.
+
+### Viewing results
 
 The results can be plotted with either base R, {ggplot2}, or {stockplotr}. Where, we recommend using {stockplotr} where possible.
 
-```{r fit-output}
+```{r fit-output, eval = FALSE}
 # Temporary manipulation to the returned estimates to get them
 # to work with stockplotr
 output <- get_estimates(fit) |>
+  dplyr::mutate(
+    uncertainty_label = "se",
+    year = year_i,
+    estimate = estimated
+  )
+```
+
+```{r load-precomputed-estimates, echo=FALSE}
+data("estimates_big_optimized", package = "FIMS")
+output <- estimates_big_optimized |>
   dplyr::mutate(
     uncertainty_label = "se",
     year = year_i,
@@ -380,6 +456,60 @@ clear()
 low_slope_fit <- parameters_low_slope |>
   initialize_fims(data = data_4_model) |>
   fit_fims(optimize = TRUE)
+
+clear()
+```
+
+#### Age-specific selectivity
+
+One could also change the default selectivity configuration for the survey, update default parameterization, and evaluate the ability to estimate a small number of age-specific parameter values.
+
+```{r age-specific-selectivity}
+# Update "survey1" selectivity from "Logistic" to "AgeSpecificSelectivity"
+# This function is also used by setup_default_parameters()
+age_specific_selectivity_default <- setup_default_Selectivity(
+  data = data_4_model,
+  fleet = "survey1",
+  module_type = "AgeSpecific"
+)
+age_specific_selectivity_default
+
+parameters_age_specific_selectivity <- parameters_4_model |>
+  dplyr::filter(!(fleet == "survey1" & module_name == "Selectivity")) |>
+  dplyr::bind_rows(age_specific_selectivity_default)
+
+# Look at updated default parameters
+parameters_age_specific_selectivity |>
+  dplyr::filter(fleet == "survey1", module_name == "Selectivity") |>
+  dplyr::select(module_type, fleet, label, age, value, estimation_type)
+
+# Update the age-specific selectivity parameterization to facilitate estimation
+# Values for first two ages are set to generic initial values and estimated
+# using "fixed_effects"
+# Other values are fixed to true approximate values used in generating demo data
+parameters_age_specific_selectivity <- parameters_age_specific_selectivity |>
+  dplyr::rows_update(
+    tibble::tibble(
+      fleet = "survey1",
+      label = "logit_sel_at_age",
+      age = seq(get_n_ages(data_4_model)),
+      value = c(
+        0, 0, 2.999999, 4.999993, 6.999946,
+        8.999956, 11.000085, 12.982599, 15.019483, 18.420681,
+        18.420681, 18.420681
+      ),
+      estimation_type = c(rep("fixed_effects", 2), rep("constant", 10))
+    ),
+    by = c("fleet", "label", "age")
+  )
+
+# Run the model and look at estimated parameter values
+# True parameter values for the first two ages are -1 and 1, respectively
+age_specific_selectivity_fit <- parameters_age_specific_selectivity |>
+  initialize_fims(data = data_4_model) |>
+  fit_fims(optimize = TRUE)
+get_estimates(age_specific_selectivity_fit) |>
+  dplyr::filter(module_name == "Selectivity", module_type == "AgeSpecific")
 
 clear()
 ```

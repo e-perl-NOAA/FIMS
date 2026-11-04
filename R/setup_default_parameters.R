@@ -23,6 +23,10 @@
 #' You can modify the returned tibble before fitting a model (for example,
 #' updating maturity and selectivity parameter values).
 #'
+#' Growth defaults are chosen from the data. Models with empirical weight-at-age
+#' data default to `"EWAA"`. Models without empirical weight-at-age data but with
+#' length-composition data default to `"VonBertalanffySchnute"`.
+#'
 #' To create the default initial numbers at age, this function uses the defaults
 #' from `setup_default_Population()` and `setup_default_Recruitment()`, which
 #' are passed to `setup_default_init_naa()` to calculate initial numbers at age.
@@ -35,13 +39,12 @@
 #' \describe{
 #'   \item{\code{module_name}:}{The name of the FIMS module (e.g.,
 #'     "Data", "Selectivity", "Recruitment", "Growth", "Maturity"). These
-#'     entries are always written in PascalCase to match the names used in the
-#'     C++ code.}
+#'     entries retain the established PascalCase R interface names.}
 #'   \item{\code{fleet}:}{The name of the fleet the module applies to. This
 #'     will be `NA` for non-fleet-specific modules like "Recruitment".}
 #'   \item{\code{module_type}:}{The specific type of the module (e.g.,
 #'     "Logistic" for a "Selectivity" module). This column will always be written
-#'     in PascalCase to match the names used in the C++ code.}
+#'     in PascalCase to retain the established R interface names.}
 #'   \item{\code{label}:}{The parameter name (e.g., "inflection_point").}
 #'   \item{\code{age}:}{The age the parameter applies to.}
 #'   \item{\code{length}:}{The length bin the parameter applies to.}
@@ -54,7 +57,7 @@
 #'     random effect but it does not fit to data, e.g., recruitment deviation.}
 #'   \item{\code{distribution}:}{The distribution name (e.g., "Dlnorm",
 #'     "Dmultinom"). This column will always be written
-#'     in PascalCase to match the names used in the C++ code.}
+#'     in PascalCase to retain the established R interface names.}
 #' }
 #' @export
 #' @keywords setup_default_parameters
@@ -129,7 +132,12 @@ setup_default_parameters <- function(data) {
   maturity_defaults <- setup_default_Maturity(data = data)
 
   # Create growth parameters
-  growth_defaults <- setup_default_Growth()
+  growth_module_type <- choose_default_Growth_module_type(data = data)
+
+  growth_defaults <- setup_default_Growth(
+    data = data,
+    module_type = growth_module_type
+  )
 
   # Suppress the known informational alert about log_init_naa being NA here,
   # because this function computes and sets log_init_naa immediately below.
@@ -232,7 +240,8 @@ setup_default_log_init_naa <- function(
 
   m <- rep(exp(log_M), length.out = n_ages)
   log_init_naa <- log_rzero - c(0, cumsum(m))[seq_len(n_ages)]
-  log_init_naa[n_ages] <- log_init_naa[n_ages] - log(m[n_ages])
+  # -expm1(-m) is 1 - exp(-m) without losing precision when m is small
+  log_init_naa[n_ages] <- log_init_naa[n_ages] - log(-expm1(-m[n_ages]))
   log_init_naa
 }
 
@@ -268,14 +277,65 @@ setup_default_parameters_template <- function(n_parameters = 1) {
     dplyr::slice(rep(1, each = n_parameters))
 }
 
+# Choose the default Growth module type from the user input data.
+# Empirical weight-at-age triggers EWAA. If empirical weight-at-age is absent,
+# length compositions trigger model-derived Growth.
+choose_default_Growth_module_type <- function(data) {
+  is.FIMSFrame(data)
+
+  has_weight_at_age <- any(data@data$type == "weight_at_age", na.rm = TRUE)
+  has_length_comp <- any(data@data$type == "length_comp", na.rm = TRUE)
+  has_fixed_age_length_conversion <- any(data@data$type == "age_to_length_conversion", na.rm = TRUE)
+
+  if (has_weight_at_age) {
+    cli::cli_inform(
+      "Empirical weight-at-age rows found. Growth defaults to {.val EWAA}."
+    )
+
+    return("EWAA")
+  }
+
+  if (has_length_comp && has_fixed_age_length_conversion) {
+    cli::cli_inform(c(
+      "Length compositions and fixed age-to-length conversion rows found, but empirical weight-at-age rows are absent.",
+      "i" = "Growth defaults to {.val VonBertalanffySchnute}; length compositions will use the Growth-derived age-to-length conversion, not the supplied fixed conversion.",
+      "i" = "Use {.fn setup_default_Growth} to choose a different Growth module explicitly."
+    ))
+
+    return("VonBertalanffySchnute")
+  }
+
+  if (has_length_comp) {
+    cli::cli_inform(c(
+      "Length compositions found and empirical weight-at-age rows are absent.",
+      "i" = "Growth defaults to {.val VonBertalanffySchnute}. Review Growth and length-weight parameter values before fitting.",
+      "i" = "Use {.fn setup_default_Growth} to choose a different Growth module explicitly."
+    ))
+
+    return("VonBertalanffySchnute")
+  }
+
+  cli::cli_abort(c(
+    "Empirical weight-at-age rows are absent and length compositions are absent.",
+    "x" = "FIMS cannot choose a default Growth module from the available data.",
+    "i" = paste(
+      "Use {.fn setup_default_Growth} to choose a Growth module explicitly,",
+      "or provide empirical weight-at-age data for the default {.val EWAA}",
+      "path or length-composition data for the default {.val VonBertalanffySchnute} path."
+    )
+  ))
+}
+
 #' Set up default growth parameters
 #'
 #' @description
 #' This function creates default growth parameters for a Fisheries Integrated
 #' Modeling System (FIMS) model. It generates a tibble with fields for
 #' module name, module type, label, value, and estimation type.
-#' @param module_type A character string specifying the type of growth module. The
-#' default is `"EWAA"`.
+#' @param data A `FIMSFrame` object returned from running [FIMSFrame()] on
+#'   your long input data. Required when `module_type = "VonBertalanffySchnute"`.
+#' @param module_type A character string specifying the type of growth module.
+#'   The default is `"EWAA"`.
 #' @return
 #' A tibble containing default growth parameters. See \code{\link{setup_default_parameters}}
 #' for full column descriptions.
@@ -289,18 +349,112 @@ setup_default_parameters_template <- function(n_parameters = 1) {
 #' default_growth_parameters <- setup_default_Growth()
 #' }
 setup_default_Growth <- function(
-  module_type = c("EWAA")
+  data = NULL,
+  module_type = c("EWAA", "VonBertalanffySchnute")
 ) {
   # Input check
   module_type <- rlang::arg_match(module_type)
 
-  default <- setup_default_parameters_template(
-    n_parameters = 1
-  ) |>
+  if (identical(module_type, "EWAA")) {
+    if (!is.null(data)) {
+      is.FIMSFrame(data)
+
+      has_weight_at_age <- any(data@data$type == "weight_at_age", na.rm = TRUE)
+
+      if (!has_weight_at_age) {
+        cli::cli_abort(c(
+          "{.val EWAA} Growth requires empirical weight-at-age data.",
+          "i" = "Provide {.val weight_at_age} rows or use {.fn setup_default_Growth} with {.code module_type = \"VonBertalanffySchnute\"}."
+        ))
+      }
+    }
+
+    default <- setup_default_parameters_template(
+      n_parameters = 1
+    ) |>
+      dplyr::mutate(
+        module_name = "Growth",
+        module_type = .env$module_type,
+        label = "weight_at_age"
+      )
+
+    return(default)
+  }
+
+  if (is.null(data)) {
+    cli::cli_abort(c(
+      "{.fn setup_default_Growth} requires {.var data} when {.code module_type = \"VonBertalanffySchnute\"}.",
+      "i" = "VonBertalanffySchnute defaults use the model ages to choose reference ages."
+    ))
+  }
+
+  is.FIMSFrame(data)
+
+  ages <- get_ages(data)
+  if (length(ages) == 0 || all(is.na(ages))) {
+    reference_age_for_length_young <- 0
+    n_ages <- get_n_ages(data)
+    reference_age_for_length_old <- if (n_ages > 0) n_ages - 1 else 0
+  } else {
+    reference_age_for_length_young <- min(ages, na.rm = TRUE)
+    reference_age_for_length_old <- max(ages, na.rm = TRUE)
+  }
+
+  # Use interpolation SD anchors as the default von Bertalanffy--Schnute variability path.
+  # The delta-method wiring is retained in the backend, but it is not used
+  # in the default setup until it is re-derived for the traditional Von
+  # Bertalanffy parameterization.
+  default <- setup_default_parameters_template(n_parameters = 9) |>
     dplyr::mutate(
       module_name = "Growth",
-      module_type = .env$module_type
+      module_type = "VonBertalanffySchnute",
+      label = c(
+        "mean_length_young",
+        "mean_length_old",
+        "growth_coefficient",
+        "reference_age_for_length_young",
+        "reference_age_for_length_old",
+        "length_weight_a",
+        "length_weight_b",
+        "length_at_age_sd_at_reference_ages",
+        "length_at_age_sd_at_reference_ages"
+      ),
+      age = c(
+        NA_real_,
+        NA_real_,
+        NA_real_,
+        NA_real_,
+        NA_real_,
+        NA_real_,
+        NA_real_,
+        reference_age_for_length_young,
+        reference_age_for_length_old
+      ),
+      value = c(
+        275,
+        725,
+        0.18,
+        reference_age_for_length_young,
+        reference_age_for_length_old,
+        2.5e-11,
+        3,
+        28,
+        73
+      ),
+      estimation_type = c(
+        "fixed_effects",
+        "fixed_effects",
+        "fixed_effects",
+        "constant",
+        "constant",
+        "constant",
+        "constant",
+        "constant",
+        "constant"
+      )
     )
+
+  return(default)
 }
 
 #' Set up default population parameters
@@ -315,9 +469,17 @@ setup_default_Growth <- function(
 #' @param log_M A numeric value or vector (length equal to the number of ages *
 #' number of years) specifying the log natural mortality rate. Default is `log(0.2)`.
 #' @param log_init_naa A numeric value or vector (length equal to the number of
-#' ages) specifying the log initial numbers at age. Default is `NA_real_`.
-#' @param proportion_female A numeric value between 0 and 1 specifying the
-#' proportion of females. Default is `0.5`.
+#' ages) specifying the log initial numbers at age. Default is `NA_real_`, in
+#' which case [setup_default_parameters()] fills it with the unfished
+#' equilibrium implied by unfished recruitment \eqn{R_0} and natural mortality
+#' \eqn{M}:
+#' \deqn{N_a = R_0 \exp\left(-\sum_{j < a} M_j\right)}
+#' for ages below the plus group, and for the plus group \eqn{A}, which
+#' accumulates survivors each year,
+#' \deqn{N_A = \frac{R_0 \exp\left(-\sum_{j < A} M_j\right)}{1 - \exp(-M_A)}.}
+#' @param proportion_female A numeric value or vector (length equal to the
+#' number of ages) between 0 and 1 specifying the proportion of each age that
+#' is female, which scales spawning biomass. Default is `0.5`.
 #' @inheritParams setup_default_parameters
 #' @return
 #' A tibble of default population configurations, including initial numbers at
@@ -364,16 +526,23 @@ setup_default_Population <- function(
     requirement = "a single numeric value or a vector of length equal to the number of ages"
   )
 
-  # Check proportion_female is a single numeric value between 0 and 1
-  if (!is.numeric(proportion_female) || length(proportion_female) != 1 || proportion_female < 0 || proportion_female > 1) {
-    local_bullets <- c(
-      "i" = "{.var proportion_female} argument must be a single numeric value between 0 and 1.",
-      "x" = "{.var proportion_female} has a length of {length(proportion_female)}.",
-      "x" = "{.var proportion_female} is of the class {class(proportion_female)}."
-    )
-    names(local_bullets)[2] <- ifelse(length(proportion_female) > 1, "x", "i")
-    names(local_bullets)[3] <- ifelse(inherits(proportion_female, "numeric"), "i", "x")
-    cli::cli_abort(local_bullets)
+  # Check proportion_female is a scalar or a full age vector between 0 and 1.
+  assert_numeric_length(
+    x = proportion_female,
+    x_name = "proportion_female",
+    valid_lengths = c(1, n_ages),
+    requirement = "a single numeric value or a vector of length equal to the number of ages"
+  )
+  invalid_proportion <- is.na(proportion_female) |
+    proportion_female < 0 |
+    proportion_female > 1
+  if (any(invalid_proportion)) {
+    cli::cli_abort(c(
+      "x" = "{.var proportion_female} has values that are missing or outside
+      0 to 1: {.val {proportion_female[invalid_proportion]}}.",
+      "i" = "{.var proportion_female} is the proportion of each age that is
+      female, so every value must be between 0 and 1."
+    ))
   }
 
   # If log_init_naa is NA, print a message to the user and advise them to set it
@@ -404,6 +573,7 @@ setup_default_Population <- function(
     ) |>
     dplyr::add_row(
       label = "proportion_female",
+      age = if (length(proportion_female) == 1) NA else ages,
       value = .env$proportion_female,
       estimation_type = "constant"
     ) |>
@@ -474,6 +644,42 @@ setup_default_DoubleLogistic <- function() {
     )
 }
 
+#' Create default age-specific selectivity parameters
+#'
+#' @description
+#' This function sets up default parameters for age-specific selectivity.
+#' Defaults based on what would be realized for a logistic curve with
+#' inflection point=2 and slope=1.
+#' Following recommended practices for age-specific selectivity, default
+#' realized selectivity at ages >= 10 is functionally equal to 1.
+#' The default estimation type for the max age selectivity parameter
+#' is also set to "constant".
+#' @return
+#' A tibble containing the default age-specific parameters on the logit scale.
+#' Number of parameters is equal to the number of age classes
+#' @seealso
+#' * [setup_default_parameters()]
+#' @noRd
+#' @examples
+#' \dontrun{
+#' default_age_specific_parameters <- FIMS:::setup_default_AgeSpecific()
+#' }
+setup_default_AgeSpecific <- function(
+  data
+) {
+  default <- setup_default_parameters_template(n_parameters = get_n_ages(data)) |>
+    dplyr::mutate(
+      module_type = "AgeSpecific",
+      label = "logit_sel_at_age",
+      age = get_ages(data),
+      value = qlogis(1 / (1 + (exp(-1 * (get_ages(data) - 2))))),
+      estimation_type = c(
+        rep("fixed_effects", length(get_ages(data)) - 1),
+        "constant"
+      )
+    )
+}
+
 #' Set up default selectivity parameters
 #'
 #' @description
@@ -503,7 +709,7 @@ setup_default_DoubleLogistic <- function() {
 setup_default_Selectivity <- function(
   data,
   fleet,
-  module_type = c("Logistic", "DoubleLogistic")
+  module_type = c("Logistic", "DoubleLogistic", "AgeSpecific")
 ) {
   # Input checks
   is.FIMSFrame(data)
@@ -515,7 +721,8 @@ setup_default_Selectivity <- function(
   # `switch`
   default <- switch(module_type,
     "Logistic" = setup_default_Logistic(),
-    "DoubleLogistic" = setup_default_DoubleLogistic()
+    "DoubleLogistic" = setup_default_DoubleLogistic(),
+    "AgeSpecific" = setup_default_AgeSpecific(data)
   ) |>
     dplyr::mutate(
       module_name = "Selectivity",
