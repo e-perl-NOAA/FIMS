@@ -38,7 +38,7 @@ run_modified_pars_fims <- function(
   module_name = NULL,
   parameters,
   data,
-  backend = c("tmb", "julia"),
+  backend = "julia",
   priors = NULL
 ) {
   backend <- match.arg(backend)
@@ -139,7 +139,7 @@ run_modified_data_fims <- function(
   years_to_remove = 0,
   data,
   parameters,
-  backend = c("tmb", "julia"),
+  backend = "julia",
   priors = NULL
 ) {
   backend <- match.arg(backend)

@@ -17,8 +17,10 @@ test_that("`get_obj()` works with correct inputs", {
     obj <- get_obj(fit)
     #' @description Test that `get_obj()` returns the FIMSFit object slot.
     expect_equal(obj, fit@obj)
-    #' @description Test that `get_obj()` preserves the current TMB object structure.
-    expect_named(obj, names(fit@obj))
+    #' @description Test that `get_obj()` exposes the supported Julia objective methods.
+    expect_true(all(c("par", "fn", "gr", "he", "report", "simulate", "env") %in% names(obj)))
+    expect_identical(obj[["method"]], "JuliaCall")
+    expect_length(obj[["par"]], get_number_of_parameters(fit)[["fixed_effects"]])
   }
 })
 

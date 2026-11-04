@@ -89,13 +89,15 @@ Its \code{jnll} is the joint negative log likelihood at the fitted parameters;
 the optimizer objective includes the Laplace adjustment for random effects.
 
 \code{\link[=get_obj]{get_obj()}} returns the backend objective stored in the fit.
-For Julia fits, \code{par} contains fixed effects only. The \code{fn},
-\code{gr}, \code{he}, and \code{report} functions accept a fixed-effect vector
-and evaluate the model at those values, optimizing random effects
-conditionally when present. Simulation through this objective is not implemented.
+For Julia fits, \code{par} contains fixed effects only. The \code{fn}, \code{gr}, \code{he},
+and \code{report} functions accept a fixed-effect vector and evaluate the model
+at those values, optimizing random effects conditionally when present.
+Its \code{simulate(par = par, complete = FALSE)} function draws observation data
+conditional on the supplied fixed effects and conditional random-effect modes.
 
-\code{\link[=get_opt]{get_opt()}} returns the output from \code{\link[=nlminb]{nlminb()}}, which is the minimizer used
-in \code{\link[=fit_fims]{fit_fims()}}.
+\code{\link[=get_opt]{get_opt()}} returns a summary of Julia's LBFGS optimization with \code{par},
+\code{objective}, \code{convergence}, and \code{message} fields. A zero convergence code
+means that both fixed- and random-effect optimization converged.
 
 \code{\link[=get_max_gradient]{get_max_gradient()}} returns the maximum gradient found when optimizing the
 model.
@@ -103,7 +105,7 @@ model.
 \code{\link[=get_gradient]{get_gradient()}} returns the per-parameter gradient vector at the MLE as
 stored during fitting. Unlike calling \code{get_obj(x)[["gr"]](get_opt(x)[["par"]])}
 this function is safe to call after \code{\link[=clear]{clear()}} because it reads
-from a stored R vector rather than the compiled C++ objective function.
+from a stored R vector. Julia objectives remain usable after \code{\link[=clear]{clear()}}.
 
 \code{\link[=get_sdreport]{get_sdreport()}} returns the backend's uncertainty report, or an empty list
 when uncertainty reporting was disabled or not retained.
@@ -113,6 +115,9 @@ uncertainties from a fitted model. The \code{year_i} column is a position that
 starts at 1, and the \code{age} and \code{length} columns are the ages and length bins
 from the data. \code{age} is \code{NA} if populations have different ages, and both
 are \code{NA} for fits saved before they were added to the output.
+Rows with \code{type = "likelihood"} contain one negative-log-likelihood component
+in \code{estimated} and its log-likelihood in \code{lpdf}, including priors and
+recruitment processes. Their \code{lpdf} values sum to the joint log-likelihood.
 
 \code{\link[=get_number_of_parameters]{get_number_of_parameters()}} returns a vector of integers specifying the
 number of fixed-effect parameters and the number of random-effect parameters

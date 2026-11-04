@@ -2,90 +2,34 @@
 % Please edit documentation in R/initialize_modules.R
 \name{initialize_fims}
 \alias{initialize_fims}
-\title{Initialize modules for a FIMS model}
+\title{Initialize a FIMS model}
 \usage{
-initialize_fims(parameters, data, backend = c("tmb", "julia"), priors = NULL)
+initialize_fims(parameters, data, backend = "julia", priors = NULL)
 }
 \arguments{
-\item{parameters}{A tibble returned from \code{\link[=setup_default_parameters]{setup_default_parameters()}}. It
-is the primary source of information for what is initialized. That is, if a
-fleet exists in the data but parameter information for how to specify
-selectivity for that fleet is not provided, then selectivity will not be
-initialized for that fleet.}
+\item{parameters}{Parameter tibble returned by \code{\link[=setup_default_parameters]{setup_default_parameters()}}.}
 
-\item{data}{An S4 object with the \code{FIMSFrame} class, which is returned from
-\code{\link[=FIMSFrame]{FIMSFrame()}}. Passing the data is required because initialization of the
-modules requires passing the data and information regarding the uncertainty
-of that data, i.e., input sample sizes for the multinomial distribution.}
+\item{data}{A \code{\link[=FIMSFrame]{FIMSFrame()}} object.}
 
-\item{backend}{A character scalar specifying the execution backend to prepare.
-Use \code{"TMB"} for the current C++/TMB backend or \code{"julia"} to prepare Julia
-backend input objects and skip TMB setup.}
+\item{backend}{The model backend. Only \code{"julia"} is supported.}
 
-\item{priors}{An optional tibble for the Julia backend with columns
-\code{module_name}, \code{fleet}, \code{label}, \code{timing}, \code{age}, \code{distribution}, \code{mean},
-and \code{sd}. The first five columns identify one row of \code{parameters}.
-\code{distribution} supports \code{"Dnorm"} and \code{"Dlnorm"}; for \code{"Dlnorm"}, \code{mean}
-and \code{sd} are the mean and standard deviation on the log scale. Not used
-with the TMB backend. Julia supports the Selectivity, Fleet, Recruitment, and
-Population layouts (including scalar or age-specific
-\code{proportion_female}), plus Logistic Maturity and VonBertalanffySchnute
-Growth parameters. Growth priors are evaluated on natural-scale parameter
-values, including parameters stored internally on the log scale.}
+\item{priors}{Optional prior tibble with \code{module_name}, \code{fleet}, \code{label},
+\code{timing}, \code{age}, \code{distribution}, \code{mean}, and \code{sd}. Normal and lognormal
+priors are supported on the parameter's documented natural scale.}
 }
 \value{
-A list is returned with two elements, \code{parameters} and \code{model}. The list can
-be passed to the \code{input} argument of \code{\link[=fit_fims]{fit_fims()}} to fit the model. The first
-element of the list can also be passed to the \code{parameters} argument of
-\code{\link[TMB:MakeADFun]{TMB::MakeADFun()}} if you wish to have more control over the model-fitting
-process.
-The model element of the returned list stores the instantiated C++ model
-module, e.g., the results of \code{methods::new(CatchAtAge)} for a catch-at-age
-model.
-It is important that you only have one FIMS model initialized in your R
-workspace at a time. Thus, after you initialize and fit the model, you should
-run \code{\link[=clear]{clear()}}.
+An input list for \code{\link[=fit_fims]{fit_fims()}}, retaining its parameters, data,
+configuration and priors independently of other models.
 }
 \description{
-This function uses a parameter tibble and a \code{FIMSFrame} object to prepare
-the modules and inputs required by the selected backend. The required
-modules differ by model type; for example, a catch-at-age model uses
-recruitment, growth, maturity, fleet, and population modules.
+Prepare a self-contained Julia model from the parameter tibble and data.
+Julia is initialized lazily when the model is fitted. The former native
+module API and \code{backend = "tmb"} have been retired.
 }
 \examples{
 \dontrun{
-# Prepare data for FIMS model
-data("data_big", package = "FIMS")
-data_4_model <- FIMSFrame(data_big)
-# Instantiate modules
-parameters_list <- setup_default_parameters(data = data_4_model) |>
-  initialize_fims(data = data_4_model)
-# Prepare Julia inputs and a normal prior on fleet selectivity
-julia_parameters <- setup_default_parameters(data = data_4_model)
-slope_prior <- tibble::tibble(
-  module_name = "Selectivity",
-  fleet = "fleet1",
-  label = "slope",
-  timing = NA_integer_,
-  age = NA_real_,
-  distribution = "Dnorm",
-  mean = 1.5,
-  sd = 3
-)
-julia_parameters_list <- initialize_fims(
-  parameters = julia_parameters,
-  data = data_4_model,
-  backend = "julia",
-  priors = slope_prior
-)
-clear()
-}
-}
-\seealso{
-\itemize{
-\item \code{\link[=setup_default_parameters]{setup_default_parameters()}}
-\item \code{\link[=FIMSFrame]{FIMSFrame()}}
-\item \code{\link[=fit_fims]{fit_fims()}}
-\item \code{\link[=clear]{clear()}}
+data <- FIMSFrame(data_big)
+input <- setup_default_parameters(data) |> initialize_fims(data)
+fit <- fit_fims(input)
 }
 }

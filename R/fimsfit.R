@@ -17,6 +17,7 @@
 methods::setOldClass(Classes = "package_version")
 methods::setOldClass(Classes = "difftime")
 methods::setOldClass(Classes = "sdreport")
+methods::setOldClass(Classes = c("FIMSSdreport", "sdreport"))
 # Join sdreport and list into a class in case the sdreport is not created
 methods::setClassUnion("sdreportOrList", members = c("sdreport", "list"))
 
@@ -150,7 +151,8 @@ methods::setMethod("get_report", "FIMSFit", function(x) x@report)
 #' For Julia fits, `par` contains fixed effects only. The `fn`, `gr`, `he`,
 #' and `report` functions accept a fixed-effect vector and evaluate the model
 #' at those values, optimizing random effects conditionally when present.
-#' Simulation through this objective is not implemented.
+#' Its `simulate(par = par, complete = FALSE)` function draws observation data
+#' conditional on the supplied fixed effects and conditional random-effect modes.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -160,8 +162,9 @@ methods::setGeneric("get_obj", function(x) standardGeneric("get_obj"))
 methods::setMethod("get_obj", "FIMSFit", function(x) x@obj)
 
 #' @return
-#' [get_opt()] returns the output from [nlminb()], which is the minimizer used
-#' in [fit_fims()].
+#' [get_opt()] returns a summary of Julia's LBFGS optimization with `par`,
+#' `objective`, `convergence`, and `message` fields. A zero convergence code
+#' means that both fixed- and random-effect optimization converged.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -185,7 +188,7 @@ methods::setMethod("get_max_gradient", "FIMSFit", function(x) x@max_gradient)
 #' [get_gradient()] returns the per-parameter gradient vector at the MLE as
 #' stored during fitting. Unlike calling `get_obj(x)[["gr"]](get_opt(x)[["par"]])`
 #' this function is safe to call after [clear()] because it reads
-#' from a stored R vector rather than the compiled C++ objective function.
+#' from a stored R vector. Julia objectives remain usable after [clear()].
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -211,6 +214,9 @@ methods::setMethod("get_sdreport", "FIMSFit", function(x) x@sdreport)
 #' starts at 1, and the `age` and `length` columns are the ages and length bins
 #' from the data. `age` is `NA` if populations have different ages, and both
 #' are `NA` for fits saved before they were added to the output.
+#' Rows with `type = "likelihood"` contain one negative-log-likelihood component
+#' in `estimated` and its log-likelihood in `lpdf`, including priors and
+#' recruitment processes. Their `lpdf` values sum to the joint log-likelihood.
 #' @export
 #' @rdname get_FIMSFit
 #' @keywords fit_fims
@@ -225,57 +231,9 @@ methods::setMethod(
       return(get_input(x)[["julia_estimates"]])
     }
 
-    # Helper function
-    add_unique_id <- function(data) {
-      dplyr::group_by(data, .data$label) |>
-        dplyr::mutate(
-          unique_id = paste(
-            .data$label,
-            dplyr::if_else(
-              is.na(.data$parameter_id),
-              seq_len(dplyr::n()),
-              .data$parameter_id
-            ),
-            sep = "_"
-          )
-        ) |>
-        dplyr::ungroup()
-    }
-    # Extract the core TMB components (object, sdreport, optimization result)
-    # from the fit object.
-    obj <- get_obj(x)
-    sdreport <- get_sdreport(x)
-    opt <- get_opt(x)
-    parameter_names <- get_obj(x)[["par"]] |>
-      names()
-
-    # Reshape the TMB output into a standardized data frame.
-    # This serves as the "expected" result to compare against.
-    tmb_output <- reshape_tmb_estimates(
-      obj = obj,
-      sdreport = sdreport,
-      opt = opt,
-      parameter_names = parameter_names,
-      precomputed_gradient = get_gradient(x)
-    ) |>
-      add_unique_id()
-
-    # Extract the model_output, which contains the JSON-like structure.
-    model_output <- get_model_output(x)
-    # Reshape the output from the JSON structure into a data frame.
-    json_output <- reshape_json_estimates(model_output) |>
-      add_unique_id()
-
-    # Join the two outputs on parameter_id to compare and consolidate information.
-    estimates <- dplyr::left_join(
-      # There are more rows in json_estimates than tmb_estimates
-      x = json_output,
-      y = tmb_output |>
-        dplyr::select(dplyr::all_of(c("unique_id", "uncertainty", "log_like_cv", "gradient"))),
-      by = c("unique_id")
-    ) |>
-      dplyr::select(-dplyr::all_of("unique_id")) |>
-      dplyr::relocate(dplyr::all_of("uncertainty"), .after = dplyr::all_of("estimation_type"))
+    cli::cli_abort(
+      "This fit uses the retired native backend. Refit it with initialize_fims() and fit_fims()."
+    )
   }
 )
 
@@ -337,21 +295,10 @@ methods::setValidity(
   method = function(object) {
     errors <- character()
 
-    if (is_julia_backend_input(object@input)) {
-      return(TRUE)
-    }
-
-    # Check that obj is from TMB::MakeADFun()
-    TMB_MakeADFun_names <- c(
-      "par", "fn", "gr", "he", "hessian", "method", "retape", "env", "report",
-      "simulate"
-    )
-    if (!setequal(names(object@obj), TMB_MakeADFun_names)) {
-      errors <- c(
-        errors,
-        "obj must be a list returned from TMB::MakeADFun() but it does not
-        appear to be so because it does not have the standard names."
-      )
+    required <- c("par", "fn", "gr", "he", "report", "simulate", "env")
+    if (!all(required %in% names(object@obj)) ||
+      !all(vapply(object@obj[c("fn", "gr", "he", "report", "simulate")], is.function, logical(1)))) {
+      errors <- c(errors, "obj must contain the Julia objective, derivative, report and simulation functions.")
     }
 
     # Return
@@ -601,6 +548,8 @@ build_julia_backend_report <- function(julia_input, fit_result) {
     log_index_expected_by_fleet = optional_report_array("log_index_expected_by_fleet"),
     log_catch_expected_by_fleet = optional_report_array("log_catch_expected_by_fleet"),
     nll_components = as_julia_backend_numeric(report[["nll_components"]]),
+    nll_component_labels = as.character(report[["nll_component_labels"]]),
+    nll_component_fleets = as.character(report[["nll_component_fleets"]]),
     jnll = as.numeric(fit_result[["joint_nll"]] %||% fit_result[["nll"]])
   )
 }
@@ -1127,6 +1076,27 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
     }
   }
 
+  component_labels <- report[["nll_component_labels"]]
+  if (length(component_labels) > 0L) {
+    component_values <- report[["nll_components"]]
+    component_fleets <- report[["nll_component_fleets"]]
+    if (length(component_values) != length(component_labels) ||
+      length(component_fleets) != length(component_labels)) {
+      cli::cli_abort("Likelihood component values, labels and fleets must have matching lengths.")
+    }
+    output[[length(output) + 1L]] <- tibble::tibble(
+      module_name = "Likelihood",
+      label = component_labels,
+      fleet = dplyr::na_if(component_fleets, ""),
+      type = "likelihood",
+      type_id = seq_along(component_values),
+      estimation_type = "likelihood",
+      input_type = "likelihood",
+      estimated = component_values,
+      lpdf = -component_values,
+      likelihood = exp(-component_values)
+    )
+  }
   dplyr::bind_rows(output)
 }
 
@@ -1182,12 +1152,12 @@ build_julia_backend_sdreport <- function(input, fit_result) {
       uncertainty_status = fit_result[["uncertainty_status"]],
       unbiased = list(value = NULL, sd = NULL)
     ),
-    class = "sdreport"
+    class = c("FIMSSdreport", "sdreport")
   )
 }
 
 build_julia_backend_obj <- function(parameters, report, fit_result,
-                                     julia_input, model_config) {
+                                    julia_input, model_config) {
   parameters <- parameters[names(julia_input[["parameters"]])]
   parameter_vector <- purrr::flatten_dbl(parameters)
   fixed_indices <- which(as.logical(model_config[["fixed_parameter_mask"]]))
@@ -1249,9 +1219,20 @@ build_julia_backend_obj <- function(parameters, report, fit_result,
     report_input[["parameters"]] <- evaluated[["estimates"]]
     build_julia_backend_report(report_input, evaluated)
   }
-  par_list_function <- function(...) list(
-    p = fixed_parameters, re = parameter_vector[random_indices]
-  )
+  par_list_function <- function(...) {
+    list(
+      p = fixed_parameters, re = parameter_vector[random_indices]
+    )
+  }
+  joint_hessian_function <- function(random = FALSE) {
+    joint_hessian <- fit_result[["hessian"]]
+    if (is.null(joint_hessian) ||
+      identical(fit_result[["convergence_code"]], "not_optimized")) {
+      cli::cli_abort("A fitted model is required to inspect the joint Hessian.")
+    }
+    indices <- if (isTRUE(random)) random_indices else c(fixed_indices, random_indices)
+    as.matrix(joint_hessian)[indices, indices, drop = FALSE]
+  }
 
   list(
     par = fixed_parameters,
@@ -1265,12 +1246,15 @@ build_julia_backend_obj <- function(parameters, report, fit_result,
       last.par.best = parameter_vector,
       parameters = par_list_function(),
       parList = par_list_function,
-      random = random_indices
+      random = random_indices,
+      spHess = joint_hessian_function
     ),
     report = report_function,
-    simulate = function(...) cli::cli_abort(
-      "Simulation through the Julia objective is not implemented."
-    )
+    simulate = function(par = fixed_parameters, complete = FALSE) {
+      par <- validate_parameters(par)
+      evaluated <- evaluate(par, 3L)
+      simulate_julia_observations(julia_input[["data"]], model_config, evaluated[["report"]], complete)
+    }
   )
 }
 
@@ -1377,81 +1361,19 @@ FIMSFit <- function(
       sdreport = sdreport,
       number_of_parameters = c(
         fixed_effects = fixed_effect_count,
-          random_effects = as.integer(input[["julia_random_parameter_count"]] %||% 0L)
+        random_effects = as.integer(input[["julia_random_parameter_count"]] %||% 0L)
       ),
       run_time = run_time,
       version = version,
       model_output = as.character(
-        jsonlite::toJSON(list(backend = "julia"), auto_unbox = TRUE)
+        jsonlite::toJSON(list(backend = "julia", estimates = input[["julia_estimates"]], report = obj[["report"]]()), auto_unbox = TRUE, na = "null", digits = NA)
       )
     ))
   }
 
-  # Determine the number of parameters
-  n_total <- length(obj[["env"]][["last.par.best"]])
-  n_fixed_effects <- length(obj[["par"]])
-  n_random_effects <- length(obj[["env"]]$parList()[["re"]])
-  number_of_parameters <- c(
-    fixed_effects = n_fixed_effects,
-    random_effects = n_random_effects
+  cli::cli_abort(
+    "FIMSFit requires Julia input from initialize_fims(); native model objects are no longer supported."
   )
-  rm(n_total, n_fixed_effects, n_random_effects)
-
-  # Compute the full per-parameter gradient vector once at construction time.
-  # max_gradient is derived from it so obj$gr() is only ever called here.
-  # Storing gradient_vec in the FIMSFit slot means get_estimates() and the
-  # broom methods (tidy, augment, glance) can read from x@gradient instead of
-  # calling obj$gr() again - which segfaults after clear() frees C++ memory.
-  # as.numeric() is required because TMB's obj$gr() returns a matrix (1xn)
-  # in some call patterns, which would fail the "numeric" slot type check.
-  gradient_vector <- if (length(opt) > 0) {
-    as.numeric(obj[["gr"]](opt[["par"]]))
-  } else {
-    rep(NA_real_, length(obj[["par"]]))
-  }
-  max_gradient <- if (length(opt) > 0) max(abs(gradient_vector)) else NA_real_
-
-  # Rename parameters instead of "p"
-  parameter_names <- names(get_parameter_names(obj[["par"]]))
-  names(obj[["par"]]) <- parameter_names
-  random_effects_names <- names(get_random_names(obj[["env"]]$parList()[["re"]]))
-
-  # Get the report
-  report <- if (length(opt) == 0) {
-    obj[["report"]](obj[["env"]][["last.par.best"]])
-  } else {
-    obj[["report"]]()
-  }
-
-  if (length(sdreport) > 0) {
-    # rename the sdreport
-    names(sdreport[["par.fixed"]]) <- parameter_names
-    dimnames(sdreport[["cov.fixed"]]) <- list(parameter_names, parameter_names)
-    # Skipped when there are no random effects or some are mapped off
-    if (length(sdreport[["par.random"]]) > 0 &&
-      length(random_effects_names) == length(sdreport[["par.random"]])) {
-      names(sdreport[["par.random"]]) <- random_effects_names
-    }
-  }
-
-  model_output <- input[["model"]]$get_output()
-
-
-  fit <- methods::new(
-    "FIMSFit",
-    input = input,
-    obj = obj,
-    opt = opt,
-    max_gradient = max_gradient,
-    gradient = gradient_vector,
-    report = report,
-    sdreport = sdreport,
-    number_of_parameters = number_of_parameters,
-    run_time = run_time,
-    version = version,
-    model_output = model_output
-  )
-  fit
 }
 
 #' Fit a FIMS model (BETA)
@@ -1470,10 +1392,9 @@ FIMSFit <- function(
 #'   a list containing the obj and report slot.
 #' @param number_of_newton_steps The number of Newton steps using the inverse
 #'   Hessian to do after optimization. Not yet implemented.
-#' @param control A list of optimizer settings passed to [stats::nlminb()] for
-#'   the TMB backend. The default is a list with `eval.max = 10000`,
-#'   `iter.max = 10000`, and `trace = 0`. The Julia backend maps these three
-#'   settings to its optimizer and rejects other `nlminb` control fields.
+#' @param control A list with `eval.max = 10000`, `iter.max = 10000`, and
+#'   `trace = 0` by default. These settings are mapped to Julia's optimizer.
+#'   Other control fields are rejected explicitly.
 #' @param filename Character string giving a file name to save the fitted
 #'   object as an RDS object. Defaults to 'fit.RDS', and a value of NULL
 #'   indicates not to save it. If specified, it must end in .RDS. The file is
@@ -1507,347 +1428,200 @@ fit_fims <- function(input,
                      ),
                      filename = NULL,
                      getReportCovariance = FALSE) {
-                       if (number_of_newton_steps > 0) {
-                         cli::cli_abort(c(
-                           "x" = "Newton steps are not implemented yet.",
-                           "i" = "Use {.code number_of_newton_steps = 0}. To improve the gradient, increase {.arg number_of_loops} instead."
-                         ))
-                       }
-                       if (length(number_of_loops) != 1L ||
-                         !is.numeric(number_of_loops) ||
-                         !is.finite(number_of_loops) ||
-                         number_of_loops < 0 ||
-                         number_of_loops > .Machine$integer.max ||
-                         number_of_loops != as.integer(number_of_loops)) {
-                         cli::cli_abort("number_of_loops must be a non-negative integer.")
-                       }
-                       if (is_julia_backend_input(input)) {
-                         if (!initialize_julia_backend()) {
-                           cli::cli_abort(c(
-                             "Julia backend initialization failed before fitting.",
-                             "i" = "Julia startup is disabled by {.code options(FIMS.disable_julia = TRUE)}; unset this option before fitting."
-                           ))
-                         }
-
-                         julia_input <- attr(input, "julia_input")
-                         julia_model_config <- attr(input, "julia_model_config")
-                         if (!is.list(control)) {
-                           cli::cli_abort("{.arg control} must be a list for the Julia backend.")
-                         }
-                         if (length(control) > 0L &&
-                           (is.null(names(control)) || anyNA(names(control)) ||
-                             any(names(control) == "") || anyDuplicated(names(control)) > 0L)) {
-                           cli::cli_abort("{.arg control} must have unique, non-empty names for the Julia backend.")
-                         }
-                         unsupported_control <- setdiff(
-                           names(control),
-                           c("eval.max", "iter.max", "trace")
-                         )
-                         if (length(unsupported_control) > 0L) {
-                           cli::cli_abort(
-                             "Julia backend does not support optimizer control fields: {toString(unsupported_control)}."
-                           )
-                         }
-                         optimizer_eval_max <- control[["eval.max"]] %||% 10000
-                         optimizer_iter_max <- control[["iter.max"]] %||% 10000
-                         optimizer_trace <- control[["trace"]] %||% 0
-                         if (length(optimizer_eval_max) != 1L ||
-                           !is.numeric(optimizer_eval_max) ||
-                           !is.finite(optimizer_eval_max) ||
-                           optimizer_eval_max < 1 ||
-                           optimizer_eval_max > .Machine$integer.max ||
-                           optimizer_eval_max != as.integer(optimizer_eval_max)) {
-                           cli::cli_abort("{.field control$eval.max} must be a positive integer for the Julia backend.")
-                         }
-                         if (length(optimizer_iter_max) != 1L ||
-                           !is.numeric(optimizer_iter_max) ||
-                           !is.finite(optimizer_iter_max) ||
-                           optimizer_iter_max < 1 ||
-                           optimizer_iter_max > .Machine$integer.max ||
-                           optimizer_iter_max != as.integer(optimizer_iter_max)) {
-                           cli::cli_abort("{.field control$iter.max} must be a positive integer for the Julia backend.")
-                         }
-                         if (length(optimizer_trace) != 1L ||
-                           !is.numeric(optimizer_trace) ||
-                           !is.finite(optimizer_trace) ||
-                           optimizer_trace < 0) {
-                           cli::cli_abort("{.field control$trace} must be a non-negative number for the Julia backend.")
-                         }
-                         if (!is_fims_verbose()) {
-                           optimizer_trace <- 0
-                         }
-                         julia_model_config[["optimizer_max_evaluations"]] <-
-                           as.integer(optimizer_eval_max)
-                         julia_model_config[["optimizer_max_iterations"]] <-
-                           as.integer(optimizer_iter_max)
-                         julia_model_config[["optimizer_trace"]] <-
-                           optimizer_trace > 0
-                         julia_model_config[["optimizer_restarts"]] <-
-                           as.integer(number_of_loops)
-                         julia_model_config[["compute_standard_errors"]] <- isTRUE(get_sd)
-                         julia_model_config[["compute_report_covariance"]] <-
-                           isTRUE(get_sd) && isTRUE(getReportCovariance)
-                         assign_julia_backend_input(julia_input)
-
-                         t0 <- Sys.time()
-                         fit_result <- if (optimize) {
-                           fit_julia_backend_model(
-                             julia_input = julia_input,
-                             model_config = julia_model_config
-                           )
-                         } else {
-                           evaluated <- evaluate_julia_backend_model(
-                             julia_input = julia_input,
-                             model_config = julia_model_config
-                           )
-                           parameter_template <- julia_input[["parameters"]]
-                           list(
-                             estimates = parameter_template,
-                             standard_errors = purrr::map(parameter_template, \(x) rep(NA_real_, length(as_julia_backend_numeric(x)))),
-                             gradient = rep(NA_real_, length(purrr::flatten_dbl(parameter_template))),
-                             fixed_gradient = rep(NA_real_, sum(julia_model_config[["fixed_parameter_mask"]])),
-                             fixed_effect_count = sum(julia_model_config[["fixed_parameter_mask"]]),
-                             random_effect_count = sum(julia_model_config[["random_parameter_mask"]]),
-                             hessian = diag(length(purrr::flatten_dbl(parameter_template))),
-                             nll = evaluated[["nll"]],
-                             report = evaluated[["report"]],
-                             convergence = TRUE,
-                             convergence_code = "not_optimized",
-                             iterations = 0L
-                           )
-                         }
-                         time_optimization <- Sys.time() - t0
-
-                         report_input <- julia_input
-                         report_input[["parameters"]] <- fit_result[["estimates"]]
-                         report <- build_julia_backend_report(
-                           julia_input = report_input,
-                           fit_result = fit_result
-                         )
-                         input[["julia_estimates"]] <- build_julia_backend_estimates(
-                           input = input,
-                           fit_result = fit_result,
-                           report = report
-                         )
-
-                         optimized_parameters <- if (!is.null(fit_result[["fixed_parameters"]])) {
-                           as.numeric(fit_result[["fixed_parameters"]])
-                         } else {
-                           purrr::flatten_dbl(fit_result[["estimates"]])
-                         }
-                         input[["julia_fixed_parameter_count"]] <-
-                           fit_result[["fixed_effect_count"]] %||% length(optimized_parameters)
-                         input[["julia_random_parameter_count"]] <-
-                           fit_result[["random_effect_count"]] %||% 0L
-
-                         obj <- build_julia_backend_obj(
-                           parameters = if (!is.null(fit_result[["estimates"]])) fit_result[["estimates"]] else julia_input[["parameters"]],
-                           report = report,
-                           fit_result = fit_result,
-                           julia_input = julia_input,
-                           model_config = julia_model_config
-                         )
-
-                         run_time <- c(
-                           time_optimization = time_optimization,
-                           time_sdreport = as.difftime(0, units = "secs"),
-                           time_total = Sys.time() - t0
-                         )
-                         sdreport <- if (optimize && get_sd && save_sd) {
-                           build_julia_backend_sdreport(input, fit_result)
-                         } else {
-                           list()
-                         }
-                         fit <- FIMSFit(
-                           input = input,
-                           obj = obj,
-                           opt = if (optimize) {
-                             list(
-                               par = optimized_parameters,
-                               fixed_effect_count = input[["julia_fixed_parameter_count"]],
-                               random_effect_count = input[["julia_random_parameter_count"]],
-                               objective = as.numeric(fit_result[["nll"]]),
-                               convergence = if (isTRUE(fit_result[["convergence"]])) 0L else 1L,
-                               message = fit_result[["convergence_code"]]
-                             )
-                           } else {
-                             list()
-                           },
-                           sdreport = sdreport,
-                           run_time = run_time
-                         )
-                         if (optimize) {
-                           print(fit)
-                         }
-                         return(fit)
-                       }
-
-  require_fims_cpp_backend(
-    context = cli::format_inline("Fitting the default TMB backend via {.fun fit_fims}"),
-    guidance = c(
-      "i" = "Fit Julia-backed models with input created using {.code backend = \"julia\"}."
-    )
-  )
-
-  # See issue 455 of sdmTMB to see what should be used.
-  # https://github.com/pbs-assess/sdmTMB/issues/455
-  # NOTE: When we add implementation for newton step we need to
-  # review the above github issue to make sure we maintain continuity
-  # between outputs as last.par may not equal last.par.best due to
-  # the smallest newton gradient solution not matching the smallest
-  # likelihood value. This can cause sanity issues in output reporting.
-  # If the estimation_type of all parameters is constant, FIMS will abort if
-  # optimize is set to TRUE
-  if (optimize == TRUE & all(purrr::map_vec(input[["parameters"]], length) == 0)) {
-    cli::cli_abort("FIMS must have at least one parameter to optimize.")
-  }
-
-  obj <- TMB::MakeADFun(
-    data = list(),
-    parameters = input$parameters,
-    map = input$map,
-    random = "re",
-    DLL = "FIMS",
-    silent = TRUE
-  )
-  if (!optimize) {
-    initial_fit <- FIMSFit(
-      input = input,
-      obj = obj,
-      run_time = c("time_total" = as.difftime(0, units = "secs"))
-    )
-    return(initial_fit)
-  }
-  if (!is_fims_verbose()) {
-    control[["trace"]] <- 0
-  }
-  ## optimize and compare
-  cli::cli_inform(c("v" = "Starting optimization ..."))
-  t0 <- Sys.time()
-  opt <- try_nlminb(
-    object = obj,
-    control_list = control,
-    starting_values = obj[["par"]]
-  )
-
-  if (is.null(opt)) {
-    failed_nlminb_object <- return_failed_nlminb(obj)
-    failed_fit <- fit <- FIMSFit(
-      input = input,
-      obj = obj,
-      opt = failed_nlminb_object[["opt"]],
-      sdreport = list(),
-      run_time = failed_nlminb_object[["run_time"]]
-    )
-    return(failed_fit)
-  }
-
-  gradient <- as.numeric(obj[["gr"]](opt[["par"]]))
-  maxgrad0 <- maxgrad <- max(abs(gradient))
-  if (number_of_loops > 0) {
-    cli::cli_inform(c(
-      "i" = "Restarting optimizer {number_of_loops} time{?s} to improve
-            gradient."
+  if (number_of_newton_steps > 0) {
+    cli::cli_abort(c(
+      "x" = "Newton steps are not implemented yet.",
+      "i" = "Use {.code number_of_newton_steps = 0}. To improve the gradient, increase {.arg number_of_loops} instead."
     ))
-    # control$trace is reset to zero regardless of verbosity because the
-    # differences in values printed out using control$trace will be
-    # negligible between these different runs and is not worth printing
-    control$trace <- 0
-    for (ii in 1:number_of_loops) {
-      opt <- try_nlminb(
-        object = obj,
-        control_list = control,
-        starting_values = opt[["par"]]
-      )
-      # Handle hard failures where try_nlminb did not return a list
-      if (is.null(opt)) {
-        cli::cli_inform(message = c(
-          "!" = "{.fn nlminb} failed during loop {ii}.",
-          "i" = "The model successfully converged before this loop.",
-          "i" = "The failed results are being returned."
-        ))
-        failed_nlminb_object <- return_failed_nlminb(obj)
-        failed_fit <- fit <- FIMSFit(
-          input = input,
-          obj = obj,
-          opt = failed_nlminb_object[["opt"]],
-          sdreport = list(),
-          run_time = failed_nlminb_object[["run_time"]]
-        )
-        return(failed_fit)
-      }
-      gradient <- as.numeric(obj[["gr"]](opt[["par"]]))
-      maxgrad <- max(abs(gradient))
+  }
+  if (length(number_of_loops) != 1L ||
+    !is.numeric(number_of_loops) ||
+    !is.finite(number_of_loops) ||
+    number_of_loops < 0 ||
+    number_of_loops > .Machine$integer.max ||
+    number_of_loops != as.integer(number_of_loops)) {
+    cli::cli_abort("number_of_loops must be a non-negative integer.")
+  }
+  if (is_julia_backend_input(input)) {
+    if (!initialize_julia_backend()) {
+      cli::cli_abort(c(
+        "Julia backend initialization failed before fitting.",
+        "i" = "Julia startup is disabled by {.code options(FIMS.disable_julia = TRUE)}; unset this option before fitting."
+      ))
     }
-    div_digit <- cli::cli_div(theme = list(.val = list(digits = 5)))
-    cli::cli_inform(c(
-      "i" = "Maximum gradient went from {.val {maxgrad0}} to
-            {.val {maxgrad}} after {number_of_loops} steps."
-    ))
-    cli::cli_end(div_digit)
-  }
-  time_optimization <- Sys.time() - t0
-  cli::cli_inform(c("v" = "Finished optimization"))
 
-  # Named here while the C++ Information object is still populated; TMB names
-  # every fixed effect "p" and every random effect "re"
-  parameter_names <- names(get_parameter_names(obj[["par"]]))
-  random_effects_names <- if (length(obj[["env"]][["random"]]) > 0) {
-    names(get_random_names(obj[["env"]]$parList()[["re"]]))
-  }
-  check_mle_convergence(
-    input,
-    obj,
-    opt,
-    maxgrad,
-    gradient = gradient,
-    parameter_names = parameter_names
-  )
-
-  FIMS::set_fixed(opt[["par"]])
-
-  time_sdreport <- NA
-  if (get_sd) {
-    t2 <- Sys.time()
-    sdreport <- TMB::sdreport(
-      obj,
-      getReportCovariance = getReportCovariance
+    julia_input <- attr(input, "julia_input")
+    julia_model_config <- attr(input, "julia_model_config")
+    if (!is.list(control)) {
+      cli::cli_abort("{.arg control} must be a list for the Julia backend.")
+    }
+    if (length(control) > 0L &&
+      (is.null(names(control)) || anyNA(names(control)) ||
+        any(names(control) == "") || anyDuplicated(names(control)) > 0L)) {
+      cli::cli_abort("{.arg control} must have unique, non-empty names for the Julia backend.")
+    }
+    unsupported_control <- setdiff(
+      names(control),
+      c("eval.max", "iter.max", "trace")
     )
-    cli::cli_inform(c("v" = "Finished sdreport"))
-    time_sdreport <- Sys.time() - t2
-    check_sdreport_convergence(
-      input,
-      obj,
-      opt,
-      sdreport,
-      parameter_names = parameter_names,
-      random_effects_names = random_effects_names
+    if (length(unsupported_control) > 0L) {
+      cli::cli_abort(
+        "Julia backend does not support optimizer control fields: {toString(unsupported_control)}."
+      )
+    }
+    optimizer_eval_max <- control[["eval.max"]] %||% 10000
+    optimizer_iter_max <- control[["iter.max"]] %||% 10000
+    optimizer_trace <- control[["trace"]] %||% 0
+    if (length(optimizer_eval_max) != 1L ||
+      !is.numeric(optimizer_eval_max) ||
+      !is.finite(optimizer_eval_max) ||
+      optimizer_eval_max < 1 ||
+      optimizer_eval_max > .Machine$integer.max ||
+      optimizer_eval_max != as.integer(optimizer_eval_max)) {
+      cli::cli_abort("{.field control$eval.max} must be a positive integer for the Julia backend.")
+    }
+    if (length(optimizer_iter_max) != 1L ||
+      !is.numeric(optimizer_iter_max) ||
+      !is.finite(optimizer_iter_max) ||
+      optimizer_iter_max < 1 ||
+      optimizer_iter_max > .Machine$integer.max ||
+      optimizer_iter_max != as.integer(optimizer_iter_max)) {
+      cli::cli_abort("{.field control$iter.max} must be a positive integer for the Julia backend.")
+    }
+    if (length(optimizer_trace) != 1L ||
+      !is.numeric(optimizer_trace) ||
+      !is.finite(optimizer_trace) ||
+      optimizer_trace < 0) {
+      cli::cli_abort("{.field control$trace} must be a non-negative number for the Julia backend.")
+    }
+    if (!is_fims_verbose()) {
+      optimizer_trace <- 0
+    }
+    julia_model_config[["optimizer_max_evaluations"]] <-
+      as.integer(optimizer_eval_max)
+    julia_model_config[["optimizer_max_iterations"]] <-
+      as.integer(optimizer_iter_max)
+    julia_model_config[["optimizer_trace"]] <-
+      optimizer_trace > 0
+    julia_model_config[["optimizer_restarts"]] <-
+      as.integer(number_of_loops)
+    julia_model_config[["compute_standard_errors"]] <- isTRUE(get_sd)
+    julia_model_config[["compute_report_covariance"]] <-
+      isTRUE(get_sd) && isTRUE(getReportCovariance)
+    assign_julia_backend_input(julia_input)
+
+    t0 <- Sys.time()
+    fit_result <- if (optimize) {
+      fit_julia_backend_model(
+        julia_input = julia_input,
+        model_config = julia_model_config
+      )
+    } else {
+      evaluated <- evaluate_julia_backend_model(
+        julia_input = julia_input,
+        model_config = julia_model_config
+      )
+      parameter_template <- julia_input[["parameters"]]
+      list(
+        estimates = parameter_template,
+        standard_errors = purrr::map(parameter_template, \(x) rep(NA_real_, length(as_julia_backend_numeric(x)))),
+        gradient = rep(NA_real_, length(purrr::flatten_dbl(parameter_template))),
+        fixed_gradient = rep(NA_real_, sum(julia_model_config[["fixed_parameter_mask"]])),
+        fixed_effect_count = sum(julia_model_config[["fixed_parameter_mask"]]),
+        random_effect_count = sum(julia_model_config[["random_parameter_mask"]]),
+        hessian = diag(length(purrr::flatten_dbl(parameter_template))),
+        nll = evaluated[["nll"]],
+        report = evaluated[["report"]],
+        convergence = TRUE,
+        convergence_code = "not_optimized",
+        iterations = 0L
+      )
+    }
+    time_optimization <- Sys.time() - t0
+
+    report_input <- julia_input
+    report_input[["parameters"]] <- fit_result[["estimates"]]
+    report <- build_julia_backend_report(
+      julia_input = report_input,
+      fit_result = fit_result
     )
-  } else {
-    sdreport <- list()
-    time_sdreport <- as.difftime(0, units = "secs")
+    input[["julia_estimates"]] <- build_julia_backend_estimates(
+      input = input,
+      fit_result = fit_result,
+      report = report
+    )
+
+    optimized_parameters <- if (!is.null(fit_result[["fixed_parameters"]])) {
+      as.numeric(fit_result[["fixed_parameters"]])
+    } else {
+      purrr::flatten_dbl(fit_result[["estimates"]])
+    }
+    input[["julia_fixed_parameter_count"]] <-
+      fit_result[["fixed_effect_count"]] %||% length(optimized_parameters)
+    input[["julia_random_parameter_count"]] <-
+      fit_result[["random_effect_count"]] %||% 0L
+
+    obj <- build_julia_backend_obj(
+      parameters = if (!is.null(fit_result[["estimates"]])) fit_result[["estimates"]] else julia_input[["parameters"]],
+      report = report,
+      fit_result = fit_result,
+      julia_input = julia_input,
+      model_config = julia_model_config
+    )
+
+    run_time <- c(
+      time_optimization = time_optimization,
+      time_sdreport = as.difftime(0, units = "secs"),
+      time_total = Sys.time() - t0
+    )
+    sdreport <- if (optimize && get_sd && save_sd) {
+      build_julia_backend_sdreport(input, fit_result)
+    } else {
+      list()
+    }
+    fit <- FIMSFit(
+      input = input,
+      obj = obj,
+      opt = if (optimize) {
+        list(
+          par = optimized_parameters,
+          fixed_effect_count = input[["julia_fixed_parameter_count"]],
+          random_effect_count = input[["julia_random_parameter_count"]],
+          objective = as.numeric(fit_result[["nll"]]),
+          convergence = if (isTRUE(fit_result[["convergence"]])) 0L else 1L,
+          message = fit_result[["convergence_code"]]
+        )
+      } else {
+        list()
+      },
+      sdreport = sdreport,
+      run_time = run_time
+    )
+    if (optimize) {
+      if (is.finite(get_max_gradient(fit))) {
+        check_mle_convergence(
+          input, obj, get_opt(fit), get_max_gradient(fit),
+          gradient = get_gradient(fit),
+          parameter_names = names(sdreport[["par.fixed"]])
+        )
+      } else if (!isTRUE(fit_result[["convergence"]])) {
+        cli::cli_warn(
+          "Optimization failed convergence checks: {fit_result[['convergence_code']]}. Results are for diagnostics only."
+        )
+      }
+      if (length(sdreport) > 0L && sum(get_number_of_parameters(fit)) > 0L) {
+        check_sdreport_convergence(
+          input, obj, get_opt(fit), sdreport,
+          parameter_names = names(sdreport[["par.fixed"]]),
+          random_effects_names = names(sdreport[["par.random"]])
+        )
+      }
+      print(fit)
+    }
+    return(fit)
   }
 
-  run_time <- c(
-    time_optimization = time_optimization,
-    time_sdreport = time_sdreport,
-    time_total = Sys.time() - t0
-  )
-  fit <- FIMSFit(
-    input = input,
-    obj = obj,
-    opt = opt,
-    sdreport = sdreport,
-    run_time = run_time
-  )
-  print(fit)
-  if (!is.null(filename)) {
-    cli::cli_warn(c(
-      "i" = "Saving output to file is not yet implemented."
-    ))
-    # saveRDS(fit, file=file.path(input[["path"]], filename))
-  }
-  return(fit)
+  cli::cli_abort("fit_fims requires Julia input from initialize_fims(); native model objects are no longer supported.")
 }
 
 # we create an as.list method for this new FIMSFit

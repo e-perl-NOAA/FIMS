@@ -31,3 +31,18 @@ jobs:
         run: |
           R --version
           Rscript --version
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.10"
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgload
+          needs: check
+
+      - name: Prepare Julia bridge
+        shell: Rscript {0}
+        run: |
+          pkgload::load_all(quiet = TRUE, helpers = FALSE)
+          setup_julia()

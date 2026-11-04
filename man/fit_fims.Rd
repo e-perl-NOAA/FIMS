@@ -23,9 +23,9 @@ fit_fims(
 standard errors should be calculated.}
 
 \item{save_sd}{A logical, with the default \code{TRUE}, indicating whether the
-uncertainty report is retained in the output. If \code{FALSE}, the
-\code{sdreport} slot will be empty. For Julia fits, uncertainty values in
-\code{estimates} are retained.}
+uncertainty report is retained in the output. If \code{FALSE}, the \code{sdreport}
+slot will be empty. For Julia fits, uncertainty values in \code{estimates} are
+retained.}
 
 \item{number_of_loops}{A non-negative integer specifying the number of
 iterations of the optimizer that will be performed to improve the
@@ -37,10 +37,9 @@ a list containing the obj and report slot.}
 \item{number_of_newton_steps}{The number of Newton steps using the inverse
 Hessian to do after optimization. Not yet implemented.}
 
-\item{control}{A list of optimizer settings passed to \code{\link[stats:nlminb]{stats::nlminb()}} for
-the TMB backend. The default is a list with \code{eval.max = 10000},
-\code{iter.max = 10000}, and \code{trace = 0}. The Julia backend maps these
-three settings to its optimizer and rejects other \code{nlminb} control fields.}
+\item{control}{A list with \code{eval.max = 10000}, \code{iter.max = 10000}, and
+\code{trace = 0} by default. These settings are mapped to Julia's optimizer.
+Other control fields are rejected explicitly.}
 
 \item{filename}{Character string giving a file name to save the fitted
 object as an RDS object. Defaults to 'fit.RDS', and a value of NULL
@@ -48,10 +47,10 @@ indicates not to save it. If specified, it must end in .RDS. The file is
 written to folder given by \code{input[["path"]]}. Not yet implemented.}
 
 \item{getReportCovariance}{A logical, with the default \code{FALSE}. Standard
-errors of all parameters and derived quantities are calculated either way. If
-\code{TRUE}, the full covariance matrix of the derived quantities is also
-calculated and stored as \code{cov} in the \code{sdreport}; it grows with the
-square of the number of derived quantities and can use several GB of memory. If
+errors of all parameters and derived quantities are calculated either way.
+If \code{TRUE}, the full covariance matrix of the derived quantities is also
+calculated and stored as \code{cov} in the \code{sdreport}; it grows with the square
+of the number of derived quantities and can use several GB of memory. If
 \code{FALSE}, \code{cov} is \code{NA}.}
 }
 \value{

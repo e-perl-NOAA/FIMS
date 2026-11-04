@@ -10,7 +10,6 @@ on:
       - 'DESCRIPTION'
       - 'NAMESPACE'
       - 'R/**'
-      - 'src/**'
       - 'tests/**'
       - 'inst/**'
       - 'data/**'
@@ -43,7 +42,6 @@ jobs:
         test_type:
           - slow
           - integration-caa
-          - integration-fims-bayesian
           - integration-fims-estimation-random-effects
           - integration-proportion
           - integration-unfished-equilibrium
@@ -52,7 +50,6 @@ jobs:
           - fims_retrospective
           - fimsfit
           - projections-looped
-          - reshape_json_estimates
           - run_modified_pars_fims
 
     name: ${{ matrix.os }} (${{ matrix.test_type }})
@@ -60,6 +57,7 @@ jobs:
     
     env:
       RUN_SLOW_TESTS: "true"
+      FIMS_RUN_JULIA_INTEGRATION: "true"
       GITHUB_PAT: ${{ secrets.PAT }}
 
     steps:
@@ -88,6 +86,12 @@ jobs:
           # physical RAM.
           sudo swapon /swapfile
 
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.10"
+
+      - uses: julia-actions/cache@v2
+
       - uses: r-lib/actions/setup-r@v2
         with:
           use-public-rspm: true
@@ -104,11 +108,9 @@ jobs:
           TEST_FILTER: ${{ matrix.test_type }}
         shell: Rscript {0}
         run: |
-          # Windows-specific fix for the "files too big" error
-          if (Sys.info()[["sysname"]] == "Windows") {
-            withr::local_options(pkg.build_extra_flags = FALSE)
-          }
-
+          Sys.setenv(JULIA_HOME = dirname(Sys.which("julia")))
+          pkgload::load_all(quiet = TRUE, helpers = FALSE)
+          setup_julia()
           filter_pattern <- Sys.getenv("TEST_FILTER")
           message(paste("Running test suite matching filter:", filter_pattern))
           devtools::test(filter = filter_pattern)

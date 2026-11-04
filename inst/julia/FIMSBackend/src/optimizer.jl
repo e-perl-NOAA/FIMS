@@ -102,6 +102,51 @@ function _numerical_hessian(objective, x)
   hessian_matrix
 end
 
+function _numerical_gradient_hessian(objective_gradient, x)
+  result = Matrix{Float64}(undef, length(x), length(x))
+  for index in eachindex(x)
+    step = cbrt(eps(Float64)) * max(abs(x[index]), 1.0)
+    upper = copy(x)
+    lower = copy(x)
+    upper[index] += step
+    lower[index] -= step
+    result[:, index] .= (objective_gradient(upper) - objective_gradient(lower)) / (2 * step)
+  end
+  Matrix(Symmetric((result + result') / 2))
+end
+
+function _laplace_gradient(joint_objective, parameters, fixed_indices, random_indices)
+  isempty(fixed_indices) && return Float64[]
+  fixed_count = length(fixed_indices)
+  active_indices = vcat(fixed_indices, random_indices)
+  active_parameters = parameters[active_indices]
+  active_joint = values -> joint_objective(_compose_parameter_vector(
+    parameters, fixed_indices, values[1:fixed_count],
+    random_indices, values[(fixed_count + 1):end],
+  ))
+  laplace_integrand = values -> begin
+    fixed_values = values[1:fixed_count]
+    random_values = values[(fixed_count + 1):end]
+    random_objective = random -> joint_objective(_compose_parameter_vector(
+      parameters, fixed_indices, fixed_values, random_indices, random,
+    ))
+    active_joint(values) + 0.5 * _positive_definite_logdet(
+      hessian(random_objective, random_values),
+    )
+  end
+  joint_curvature = hessian(active_joint, active_parameters)
+  random_positions = (fixed_count + 1):length(active_indices)
+  # Apply the implicit derivative of the conditional mode; holding that mode
+  # fixed would omit its contribution to the log-determinant derivative.
+  mode_sensitivity = -(
+    Symmetric(joint_curvature[random_positions, random_positions]) \
+    joint_curvature[random_positions, 1:fixed_count]
+  )
+  integrand_gradient = gradient(laplace_integrand, active_parameters)
+  integrand_gradient[1:fixed_count] +
+    mode_sensitivity' * integrand_gradient[random_positions]
+end
+
 function _positive_definite_logdet(hessian_matrix)
   factorization = try
     cholesky(Symmetric(hessian_matrix))
@@ -205,6 +250,14 @@ function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, 
       throw(ArgumentError("Random-effect optimization did not converge while evaluating the objective."))
     result.marginal_nll
   end
+  objective_gradient = fixed -> begin
+    result = _conditional_mode(
+      x0, fixed_indices, fixed, random_indices, joint_objective, options,
+    )
+    result.converged ||
+      throw(ArgumentError("Random-effect optimization did not converge while evaluating the gradient."))
+    _laplace_gradient(joint_objective, result.parameters, fixed_indices, random_indices)
+  end
   if derivative_order == 3
     result = _conditional_mode(
       x0, fixed_indices, values, random_indices, joint_objective, options,
@@ -216,9 +269,10 @@ function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, 
     evaluated["estimates"] = _result_dict(parameters)
     return evaluated
   elseif derivative_order == 1
-    return isempty(random_indices) ? gradient(objective, values) : _numerical_gradient(objective, values)
+    return isempty(random_indices) ? gradient(objective, values) : objective_gradient(values)
   elseif derivative_order == 2
-    return isempty(random_indices) ? hessian(objective, values) : _numerical_hessian(objective, values)
+    return isempty(random_indices) ? hessian(objective, values) :
+      _numerical_gradient_hessian(objective_gradient, values)
   end
   objective(values)
 end
@@ -229,6 +283,7 @@ function _report_standard_errors(
   data_dict,
   config,
   covariance,
+  parameter_indices = collect(eachindex(parameters)),
 )
   report = evaluate_model(_named_component_array(parameters, parameter_layout), data_dict, config)["report"]
   report_standard_error_fields = Set([
@@ -279,9 +334,12 @@ function _report_standard_errors(
     value = report[name]
     value isa Real ? 1 : length(value)
   end
-  flatten_reports = parameters -> begin
+  flatten_reports = active_parameters -> begin
+    full_parameters = _compose_parameter_vector(
+      parameters, parameter_indices, active_parameters, Int[], Float64[],
+    )
     evaluated_report =
-      evaluate_model(_named_component_array(parameters, parameter_layout), data_dict, config)["report"]
+      evaluate_model(_named_component_array(full_parameters, parameter_layout), data_dict, config)["report"]
     vcat(
       (
         evaluated_report[name] isa Real ?
@@ -291,8 +349,11 @@ function _report_standard_errors(
       )...,
     )
   end
-  report_jacobian = ForwardDiff.jacobian(flatten_reports, parameters)
-  weighted_jacobian = report_jacobian * covariance
+  report_jacobian = isempty(parameter_indices) ?
+    zeros(Float64, sum(report_lengths), 0) :
+    ForwardDiff.jacobian(flatten_reports, parameters[parameter_indices])
+  active_covariance = covariance[parameter_indices, parameter_indices]
+  weighted_jacobian = report_jacobian * active_covariance
   report_variances = vec(sum(weighted_jacobian .* report_jacobian, dims = 2))
   report_standard_errors = map(report_variances) do variance
     isfinite(variance) && variance >= 0 ? sqrt(variance) : NaN
@@ -317,7 +378,7 @@ function _report_standard_errors(
   end
   report_covariance =
     Bool(get(config, :compute_report_covariance, false)) ?
-    report_jacobian * covariance * report_jacobian' :
+    report_jacobian * active_covariance * report_jacobian' :
     nothing
   (
     standard_errors = output,
@@ -352,8 +413,7 @@ function fit_model(init_params, data_dict, config = Dict())
 
   fixed_indices = findall(fixed_mask)
   random_indices = findall(random_mask)
-  isempty(fixed_indices) && isempty(random_indices) &&
-    throw(ArgumentError("The model has no fixed or random parameters to fit."))
+  active_indices = findall(fixed_mask .| random_mask)
   fixed_start = x0[fixed_indices]
   joint_objective = parameters ->
     evaluate_nll(_named_component_array(parameters, parameter_layout), data_dict, objective_config)
@@ -365,11 +425,15 @@ function fit_model(init_params, data_dict, config = Dict())
   end
 
   marginal_objective = fixed_values -> conditional_mode(fixed_values).marginal_nll
+  marginal_gradient = fixed_values -> begin
+    result = conditional_mode(fixed_values)
+    _laplace_gradient(joint_objective, result.parameters, fixed_indices, random_indices)
+  end
   outer_gradient! = (storage, fixed_values) -> begin
     values = if isempty(random_indices)
       gradient(marginal_objective, fixed_values)
     else
-      _numerical_gradient(marginal_objective, fixed_values)
+      marginal_gradient(fixed_values)
     end
     copyto!(storage, values)
   end
@@ -399,14 +463,23 @@ function fit_model(init_params, data_dict, config = Dict())
   estimate_components = _named_component_array(xhat, parameter_layout)
   evaluated_model = evaluate_model(estimate_components, data_dict, objective_config)
 
-  joint_hessian = hessian(joint_objective, xhat)
+  # Constants have no sampling uncertainty. Leave their unevaluated curvature
+  # explicitly unavailable instead of differentiating the entire input.
+  joint_hessian = fill(NaN, length(xhat), length(xhat))
+  if !isempty(active_indices)
+    active_objective = values -> joint_objective(_compose_parameter_vector(
+      xhat, active_indices, values, Int[], Float64[],
+    ))
+    joint_hessian[active_indices, active_indices] .=
+      hessian(active_objective, xhat[active_indices])
+  end
   compute_standard_errors = Bool(get(objective_config, :compute_standard_errors, true))
   fixed_hessian = if isempty(fixed_indices)
     zeros(Float64, 0, 0)
   elseif isempty(random_indices)
     Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   elseif compute_standard_errors
-    _numerical_hessian(marginal_objective, fixed_hat)
+    _numerical_gradient_hessian(marginal_gradient, fixed_hat)
   else
     Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   end
@@ -452,7 +525,9 @@ function fit_model(init_params, data_dict, config = Dict())
   se_components = _named_component_array(standard_errors, parameter_layout)
   report_uncertainty =
     compute_standard_errors ?
-    _report_standard_errors(xhat, parameter_layout, data_dict, objective_config, covariance) :
+    _report_standard_errors(
+      xhat, parameter_layout, data_dict, objective_config, covariance, active_indices,
+    ) :
     (
       standard_errors = Dict{String, Any}(),
       standard_errors_flat = Float64[],
@@ -466,7 +541,7 @@ function fit_model(init_params, data_dict, config = Dict())
     fixed_gradient = if isempty(random_indices)
       gradient(marginal_objective, fixed_hat)
     else
-      _numerical_gradient(marginal_objective, fixed_hat)
+      marginal_gradient(fixed_hat)
     end
     fit_gradient[fixed_indices] .= fixed_gradient
   end
@@ -475,6 +550,7 @@ function fit_model(init_params, data_dict, config = Dict())
   random_converged = conditional_result.converged
   fit_converged = fixed_converged && random_converged
   convergence_code = if fixed_converged && random_converged
+    isempty(active_indices) ? "no_estimable_parameters" :
     isnothing(outer_result) ? "random_effects_converged" : "converged"
   elseif !fixed_converged && !random_converged
     "fixed_and_random_effects_not_converged"

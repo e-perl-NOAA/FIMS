@@ -84,9 +84,6 @@ diagnostic tool helps assess parameter uncertainty, identifiability, and
 potential local minima in the likelihood surface.
 }
 \details{
-Julia refits use separate R sessions rather than forked workers when
-running in parallel.
-
 Run Likelihood Profile for a FIMS Model
 
 Likelihood profiling involves systematically varying a parameter of interest
@@ -105,6 +102,8 @@ Models are run in parallel for computational efficiency. Use \code{module_name}
 when the same parameter label exists in more than 1 module. Parameters with
 more than 1 row in a module (for example, 1 per fleet, year, or age) cannot
 be profiled yet.
+Julia refits use separate R sessions rather than forked workers when
+running in parallel.
 }
 \examples{
 \dontrun{

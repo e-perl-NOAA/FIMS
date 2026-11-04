@@ -3,22 +3,12 @@
 
 reset_julia_backend_state <- function() {
   state_environment <- getFromNamespace(".fims_julia_backend_state", "FIMS")
-  original_state <- state_environment$initialized
-  withr::defer(state_environment$initialized <- original_state, envir = parent.frame())
+  original_state <- as.list(state_environment)
+  withr::defer({
+    rm(list = ls(state_environment, all.names = TRUE), envir = state_environment)
+    list2env(original_state, envir = state_environment)
+  }, envir = parent.frame())
   state_environment$initialized <- FALSE
-}
-
-reset_cpp_backend_state <- function() {
-  state_environment <- getFromNamespace(".fims_cpp_backend_state", "FIMS")
-  original_state <- state_environment$available
-  withr::defer(state_environment$available <- original_state, envir = parent.frame())
-  state_environment$available <- FALSE
-}
-
-clear_cpp_backend_test_state <- function() {
-  if (FIMS:::is_fims_cpp_backend_available()) {
-    FIMS::clear()
-  }
 }
 
 test_that("reset_julia_backend_state restores the Julia initialization flag", {
@@ -32,226 +22,25 @@ test_that("reset_julia_backend_state restores the Julia initialization flag", {
   expect_true(state_environment$initialized)
 })
 
-test_that("load_fims_cpp_backend installs placeholders when the C++ module is unavailable", {
-  reset_cpp_backend_state()
-  placeholder_env <- new.env(parent = emptyenv())
-
+test_that("setup_julia rejects missing, invalid and unsupported runtimes", {
+  expect_error(FIMS::setup_julia(julia = tempfile()), "Julia is not available")
+  expect_error(FIMS::setup_julia(julia = tempdir()), "Julia is not available")
+  executable <- tempfile()
+  writeLines("mock runtime", executable)
+  withr::defer(unlink(executable))
+  version_output <- "julia version 1.9.4"
   testthat::local_mocked_bindings(
-    loadModule = function(..., loadNow) {
-      expect_true(loadNow)
-      stop("missing compiled backend")
+    system2 = function(command, args, ...) {
+      expect_identical(args, c("--startup-file=no", "--version"))
+      version_output
     },
-    .package = "Rcpp"
+    .package = "base"
   )
-
-  loaded <- FIMS:::.load_fims_cpp_backend(ns = placeholder_env)
-
-  #' @description Test that the optional C++ backend loader returns FALSE when Rcpp module loading fails.
-  expect_false(loaded)
-  #' @description Test that the optional C++ backend loader marks the compiled backend as unavailable after a failed load.
-  expect_false(FIMS:::is_fims_cpp_backend_available())
-  #' @description Test that the optional C++ backend loader installs exported placeholders when the compiled backend is unavailable.
-  expect_true(exists("CreateTMBModel", envir = placeholder_env, inherits = FALSE))
-  expect_true(exists("AgeSpecificSelectivity", envir = placeholder_env, inherits = FALSE))
-  expect_true(exists("VonBertalanffySchnuteGrowth", envir = placeholder_env, inherits = FALSE))
-  #' @description Test that compiled-backend placeholders emit an informative Julia fallback message when called.
-  expect_error(
-    placeholder_env$CreateTMBModel(),
-    regexp = "backend = \"julia\""
-  )
-})
-
-test_that("load_fims_cpp_backend loads native exports synchronously when available", {
-  reset_cpp_backend_state()
-  module_env <- new.env(parent = emptyenv())
-  testthat::local_mocked_bindings(
-    loadModule = function(module, what, env, loadNow) {
-      expect_identical(module, "fims")
-      expect_true(loadNow)
-      assign("CreateTMBModel", function() "native", envir = env)
-    },
-    .package = "Rcpp"
-  )
-
-  expect_true(FIMS:::.load_fims_cpp_backend(ns = module_env))
-  expect_true(FIMS:::is_fims_cpp_backend_available())
-  expect_identical(module_env[["CreateTMBModel"]](), "native")
-})
-
-test_that("Julia and native objectives and reports agree at identical fixed parameters", {
-  skip_if(
-    Sys.getenv("FIMS_RUN_BACKEND_PARITY") != "true",
-    "Set FIMS_RUN_BACKEND_PARITY=true to run both real backends."
-  )
-  expect_true(FIMS:::is_fims_cpp_backend_available())
-  withr::local_options(list(FIMS.disable_julia = FALSE))
-  withr::defer(FIMS::clear())
-
-  data <- FIMS::FIMSFrame(data_big)
-  report_fields <- c(
-    "numbers_at_age", "biomass", "spawning_biomass", "expected_recruitment",
-    "mortality_F", "mortality_M", "mortality_Z", "proportion_mature_at_age",
-    "catch_expected", "index_expected", "unfished_biomass",
-    "unfished_numbers_at_age", "unfished_spawning_biomass",
-    "spawning_biomass_ratio", "agecomp_expected", "lengthcomp_expected"
-  )
-  for (growth_type in c("EWAA", "VonBertalanffySchnute")) {
-    parameters <- FIMS::setup_default_parameters(data = data)
-    if (growth_type != "EWAA") {
-      parameters <- parameters |>
-        dplyr::filter(.data$module_name != "Growth") |>
-        dplyr::bind_rows(FIMS::setup_default_Growth(
-          data = data,
-          module_type = growth_type
-        ))
-    }
-    # Compare joint objectives, without backend-specific random-effect solvers.
-    parameters <- parameters |>
-      dplyr::mutate(estimation_type = dplyr::if_else(
-        .data$estimation_type == "random_effects",
-        "fixed_effects",
-        .data$estimation_type
-      ))
-    for (shift in c(0, 0.01)) {
-      comparison_parameters <- parameters |>
-        dplyr::mutate(value = dplyr::if_else(
-          .data$module_name == "Fleet" & .data$label == "log_Fmort",
-          .data$value + shift,
-          .data$value
-        ))
-      context <- paste(growth_type, "log_Fmort shift", shift)
-      native_input <- FIMS::initialize_fims(
-        parameters = comparison_parameters, data = data, backend = "tmb"
-      )
-      native_object <- TMB::MakeADFun(
-        data = list(),
-        parameters = native_input[["parameters"]],
-        map = native_input[["map"]],
-        random = "re",
-        DLL = "FIMS",
-        silent = TRUE
-      )
-      native_nll <- native_object[["fn"]](native_object[["par"]])
-      native_report <- native_object[["report"]]()
-
-      julia_input <- FIMS::initialize_fims(
-        parameters = comparison_parameters, data = data, backend = "julia"
-      )
-      evaluated <- FIMS:::evaluate_julia_backend_model(
-        attr(julia_input, "julia_input"),
-        attr(julia_input, "julia_model_config")
-      )
-      julia_report <- FIMS:::build_julia_backend_report(
-        attr(julia_input, "julia_input"), evaluated
-      )
-      expect_true(is.finite(native_nll), info = context)
-      expect_true(is.finite(evaluated[["nll"]]), info = context)
-      expect_equal(
-        as.numeric(evaluated[["nll"]]), as.numeric(native_nll),
-        tolerance = 1e-8, info = context
-      )
-      compared_fields <- if (growth_type == "VonBertalanffySchnute") {
-        c(report_fields, "growth_mean_LAA", "growth_sd_LAA", "growth_mean_WAA")
-      } else {
-        report_fields
-      }
-      for (field in compared_fields) {
-        native_values <- unlist(native_report[[field]], use.names = FALSE)
-        julia_values <- unlist(julia_report[[field]], use.names = FALSE)
-        field_context <- paste(context, field)
-        expect_true(length(native_values) > 0L, info = field_context)
-        expect_equal(length(julia_values), length(native_values), info = field_context)
-        expect_true(all(is.finite(native_values)), info = field_context)
-        expect_true(all(is.finite(julia_values)), info = field_context)
-        expect_equal(
-          julia_values, native_values,
-          tolerance = 1e-8, info = field_context
-        )
-      }
-    }
-  }
-})
-
-test_that("optimized Julia fits and uncertainty agree with native fits", {
-  skip_if(
-    Sys.getenv("FIMS_RUN_BACKEND_PARITY") != "true",
-    "Set FIMS_RUN_BACKEND_PARITY=true to run both real backends."
-  )
-  expect_true(FIMS:::is_fims_cpp_backend_available())
-  withr::local_options(list(FIMS.disable_julia = FALSE))
-  withr::defer(FIMS::clear())
-  data <- FIMS::FIMSFrame(data_big)
-  for (growth_type in c("EWAA", "VonBertalanffySchnute")) {
-    parameters <- FIMS::setup_default_parameters(data = data)
-    if (growth_type != "EWAA") {
-      parameters <- parameters |>
-        dplyr::filter(.data$module_name != "Growth") |>
-        dplyr::bind_rows(FIMS::setup_default_Growth(
-          data = data, module_type = growth_type
-        ))
-    }
-    fixed_row <- which(
-      parameters[["label"]] == "log_q" &
-        parameters[["estimation_type"]] == "fixed_effects"
-    )[[1]]
-    random_row <- which(parameters[["label"]] == "log_devs")[[1]]
-    for (use_random_effect in c(FALSE, TRUE)) {
-      comparison_parameters <- parameters |>
-        dplyr::mutate(estimation_type = "constant")
-      comparison_parameters[["estimation_type"]][fixed_row] <- "fixed_effects"
-      if (use_random_effect) {
-        comparison_parameters[["estimation_type"]][random_row] <- "random_effects"
-      }
-      inactive_process_rows <- which(
-        comparison_parameters[["module_name"]] == "Recruitment" &
-          comparison_parameters[["distribution_type"]] == "process" &
-          (!use_random_effect |
-            (comparison_parameters[["label"]] == "log_devs" &
-              comparison_parameters[["estimation_type"]] == "constant"))
-      )
-      comparison_parameters[["distribution"]][inactive_process_rows] <- NA_character_
-      comparison_parameters[["distribution_type"]][inactive_process_rows] <- NA_character_
-      context <- paste(growth_type, "random effect", use_random_effect)
-      native_fit <- comparison_parameters |>
-        FIMS::initialize_fims(data = data, backend = "tmb") |>
-        FIMS::fit_fims(number_of_loops = 0, get_sd = TRUE)
-      julia_fit <- comparison_parameters |>
-        FIMS::initialize_fims(data = data, backend = "julia") |>
-        FIMS::fit_fims(number_of_loops = 0, get_sd = TRUE)
-      expect_equal(FIMS::get_opt(native_fit)[["convergence"]], 0L, info = context)
-      expect_equal(FIMS::get_opt(julia_fit)[["convergence"]], 0L, info = context)
-      expect_true(FIMS::get_sdreport(native_fit)[["pdHess"]], info = context)
-      expect_true(FIMS::get_sdreport(julia_fit)[["pdHess"]], info = context)
-      expect_equal(
-        FIMS::get_opt(julia_fit)[["objective"]],
-        FIMS::get_opt(native_fit)[["objective"]],
-        tolerance = 1e-6, info = context
-      )
-      expect_equal(
-        FIMS::get_report(julia_fit)[["jnll"]],
-        FIMS::get_report(native_fit)[["jnll"]],
-        tolerance = 1e-6, info = context
-      )
-      estimates <- lapply(list(native_fit, julia_fit), function(fit) {
-        FIMS::get_estimates(fit) |>
-          dplyr::filter(.data$estimation_type %in% c("fixed_effects", "random_effects")) |>
-          dplyr::arrange(.data$module_name, .data$fleet, .data$label) |>
-          dplyr::mutate(uncertainty = unname(.data$uncertainty)) |>
-          dplyr::select(
-            dplyr::all_of(c("module_name", "fleet", "label", "estimated", "uncertainty"))
-          )
-      })
-      expect_equal(nrow(estimates[[1]]), 1L + as.integer(use_random_effect), info = context)
-      expect_equal(nrow(estimates[[2]]), 1L + as.integer(use_random_effect), info = context)
-      expect_true(all(is.finite(estimates[[1]][["uncertainty"]])), info = context)
-      expect_true(all(is.finite(estimates[[2]][["uncertainty"]])), info = context)
-      expect_equal(
-        estimates[[2]], estimates[[1]], tolerance = 1e-4, info = context
-      )
-      expect_lt(FIMS::get_max_gradient(native_fit), 1e-3)
-      expect_lt(FIMS::get_max_gradient(julia_fit), 1e-3)
-    }
-  }
+  expect_error(FIMS::setup_julia(julia = executable), "requires Julia 1.10 or later")
+  version_output <- "not a Julia version"
+  expect_error(FIMS::setup_julia(julia = executable), "could not report its version")
+  version_output <- structure("runtime failed", status = 1L)
+  expect_error(FIMS::setup_julia(julia = executable), "runtime failed")
 })
 
 test_that("diagnostic refit helpers forward the selected backend and priors", {
@@ -286,7 +75,7 @@ test_that("diagnostic refit helpers forward the selected backend and priors", {
   expect_identical(captured[["backend"]], "julia")
   expect_identical(captured[["priors"]], priors)
   FIMS::run_modified_data_fims(data = data_big, parameters = parameters)
-  expect_identical(captured[["backend"]], "tmb")
+  expect_identical(captured[["backend"]], "julia")
   expect_null(captured[["priors"]])
 })
 
@@ -343,6 +132,10 @@ test_that("retrospective analyses forward backend and priors to every peel", {
 })
 
 test_that("parallel Julia diagnostics use separate R sessions rather than forks", {
+  reset_julia_backend_state()
+  state <- getFromNamespace(".fims_julia_backend_state", "FIMS")
+  state[["julia"]] <- "an explicitly selected Julia executable"
+  runtimes <- list()
   strategies <- list()
   testthat::local_mocked_bindings(
     plan = function(strategy, ...) {
@@ -356,6 +149,10 @@ test_that("parallel Julia diagnostics use separate R sessions rather than forks"
     .package = "furrr"
   )
   testthat::local_mocked_bindings(
+    setup_julia = function(julia = NULL) {
+      runtimes <<- append(runtimes, list(julia))
+      "prepared project"
+    },
     get_input = function(...) structure(list(), backend = "julia"),
     get_estimates = function(...) tibble::tibble(
       module_name = "Recruitment", label = "log_rzero", estimated = 12
@@ -371,13 +168,16 @@ test_that("parallel Julia diagnostics use separate R sessions rather than forks"
   )
   expect_identical(strategies[[1]], future::multisession)
   expect_identical(strategies[[2]], future::sequential)
+  expect_identical(runtimes, c(list(NULL), rep(list(state[["julia"]]), 3)))
   strategies <- list()
+  runtimes <- list()
   FIMS::run_fims_retrospective(
     years_to_remove = 0:1, data = data_big, parameters = tibble::tibble(),
     n_cores = 2, backend = "julia"
   )
   expect_identical(strategies[[1]], future::multisession)
   expect_identical(strategies[[2]], future::sequential)
+  expect_identical(runtimes, c(list(NULL), rep(list(state[["julia"]]), 2)))
 })
 
 test_that("Julia objective methods evaluate changed fixed parameters instead of cached values", {
@@ -407,7 +207,8 @@ test_that("Julia objective methods evaluate changed fixed parameters instead of 
     # Julia dictionaries need not preserve serialization order.
     parameters = rev(parameters),
     report = list(fixed = 2),
-    fit_result = list(nll = 4, fixed_gradient = 4, fixed_hessian = matrix(2)),
+    fit_result = list(nll = 4, fixed_gradient = 4, fixed_hessian = matrix(2),
+      hessian = diag(c(2, 0, 5))),
     julia_input = list(parameters = parameters),
     model_config = config
   )
@@ -417,6 +218,8 @@ test_that("Julia objective methods evaluate changed fixed parameters instead of 
   expect_equal(obj[["fn"]](), 4)
   expect_equal(obj[["gr"]](), 4)
   expect_equal(obj[["he"]](), matrix(2))
+  expect_equal(obj[["env"]][["spHess"]](random = TRUE), matrix(5))
+  expect_equal(obj[["env"]][["spHess"]](), diag(c(2, 5)))
   expect_null(captured)
   expect_equal(obj[["fn"]](3), 9)
   expect_identical(captured[["order"]], 0L)
@@ -429,7 +232,7 @@ test_that("Julia objective methods evaluate changed fixed parameters instead of 
   for (invalid_parameters in list(c(1, 2), NA_real_, Inf, "3")) {
     expect_error(obj[["fn"]](invalid_parameters), "fixed-effect count")
   }
-  expect_error(obj[["simulate"]](), "not implemented")
+
 })
 
 test_that("Julia fixed objective bridge forwards derivative requests and runtime failures", {
@@ -551,7 +354,7 @@ test_that("Julia backend helpers return package paths", {
   )
 })
 
-test_that("initialize_julia_backend installs and instantiates its runtime on demand", {
+test_that("initialize_julia_backend uses the prepared environment without embedded installation", {
   reset_julia_backend_state()
   package_path <- withr::local_tempdir()
   module_path <- file.path(package_path, "src", "FIMSBackend.jl")
@@ -563,20 +366,25 @@ test_that("initialize_julia_backend installs and instantiates its runtime on dem
   testthat::local_mocked_bindings(
     julia_backend_module_path = function(...) module_path,
     julia_backend_package_path = function(...) package_path,
+    setup_julia = function(...) {
+      state_environment <- getFromNamespace(".fims_julia_backend_state", "FIMS")
+      state_environment[["julia"]] <- file.path(package_path, "julia")
+      package_path
+    },
     .package = "FIMS"
   )
   testthat::local_mocked_bindings(
     julia_setup = function(...) setup_arguments <<- list(...),
+    julia_eval = function(...) file.path(package_path, "Project.toml"),
     julia_command = function(command, ...) julia_commands <<- c(julia_commands, command),
     .package = "JuliaCall"
   )
 
   expect_true(FIMS:::initialize_julia_backend())
-  expect_true(setup_arguments[["installJulia"]])
-  expect_equal(setup_arguments[["version"]], "latest")
-  expect_true(any(grepl("Pkg.activate", julia_commands, fixed = TRUE)))
-  expect_true("Pkg.instantiate()" %in% julia_commands)
-  expect_true(any(grepl("using .FIMSBackend", julia_commands, fixed = TRUE)))
+  expect_false(setup_arguments[["installJulia"]])
+  expect_false(setup_arguments[["install"]])
+  expect_false(any(grepl("Pkg.", julia_commands, fixed = TRUE)))
+  expect_true("using FIMSBackend" %in% julia_commands)
   expect_true(FIMS:::.fims_julia_backend_state$initialized)
 })
 
@@ -590,6 +398,11 @@ test_that("initialize_julia_backend surfaces Julia runtime errors", {
   testthat::local_mocked_bindings(
     julia_backend_module_path = function(...) module_path,
     julia_backend_package_path = function(...) package_path,
+    setup_julia = function(...) {
+      state_environment <- getFromNamespace(".fims_julia_backend_state", "FIMS")
+      state_environment[["julia"]] <- file.path(package_path, "julia")
+      package_path
+    },
     .package = "FIMS"
   )
   testthat::local_mocked_bindings(
@@ -608,221 +421,16 @@ test_that("initialize_fims validates backend selection", {
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
 
-  #' @description Test that initialize_fims keeps the default TMB backend when no backend is specified.
-  if (FIMS:::is_fims_cpp_backend_available()) {
-    expect_null(attr(FIMS::initialize_fims(parameters = parameters, data = data), "backend"))
-  } else {
-    expect_error(
-      FIMS::initialize_fims(parameters = parameters, data = data),
-      regexp = "requires the optional C\\+\\+/TMB backend"
-    )
-  }
+  expect_identical(
+    attr(FIMS::initialize_fims(parameters = parameters, data = data), "backend"),
+    "julia"
+  )
   #' @description Test that initialize_fims rejects unsupported backend values.
   expect_error(
     FIMS::initialize_fims(parameters = parameters, data = data, backend = "bogus"),
-    regexp = "arg"
+    regexp = "retired|Julia"
   )
 
-  clear_cpp_backend_test_state()
-})
-
-test_that("default initialize_fims errors cleanly when the C++ backend is unavailable", {
-  data <- FIMS::FIMSFrame(data_big)
-  parameters <- FIMS::setup_default_parameters(data = data)
-
-  testthat::local_mocked_bindings(
-    is_fims_cpp_backend_available = function() FALSE,
-    .package = "FIMS"
-  )
-
-  #' @description Test that the default initialize_fims path emits an informative error when the compiled backend is unavailable.
-  expect_error(
-    FIMS::initialize_fims(parameters = parameters, data = data),
-    regexp = "requires the optional C\\+\\+/TMB backend"
-  )
-  #' @description Test that the default initialize_fims path preserves Julia fallback guidance in the unavailable-backend error.
-  expect_error(
-    FIMS::initialize_fims(parameters = parameters, data = data),
-    regexp = "backend = \"julia\""
-  )
-})
-
-test_that("default fit_fims errors cleanly when the C++ backend is unavailable", {
-  testthat::local_mocked_bindings(
-    is_fims_cpp_backend_available = function() FALSE,
-    .package = "FIMS"
-  )
-
-  #' @description Test that the default fit_fims path emits an informative error when the compiled backend is unavailable.
-  expect_error(
-    FIMS::fit_fims(input = list(parameters = list(a = 1), model = NULL), optimize = TRUE),
-    regexp = "requires the optional C\\+\\+/TMB backend"
-  )
-  #' @description Test that the default fit_fims path points callers to Julia-backed input when the compiled backend is unavailable.
-  expect_error(
-    FIMS::fit_fims(input = list(parameters = list(a = 1), model = NULL), optimize = TRUE),
-    regexp = "Fit Julia-backed models"
-  )
-})
-
-test_that("low-level compiled distribution helpers error cleanly when the C++ backend is unavailable", {
-  testthat::local_mocked_bindings(
-    is_fims_cpp_backend_available = function() FALSE,
-    .package = "FIMS"
-  )
-
-  #' @description Test that initialize_data_distribution() emits an informative unavailable-backend error before touching compiled distribution types.
-  expect_error(
-    FIMS::initialize_data_distribution(
-      module = NULL,
-      data_type = "catch",
-      uncertainty = "~dlnorm(meanlog = log_catch_expected, sdlog = 0.1)"
-    ),
-    regexp = "requires the optional C\\+\\+/TMB backend"
-  )
-  #' @description Test that initialize_process_distribution() emits an informative unavailable-backend error before touching compiled process distribution types.
-  expect_error(
-    FIMS::initialize_process_distribution(
-      module = NULL,
-      par = "log_devs",
-      family = gaussian(),
-      sd = list(value = 1, estimation_type = "constant")
-    ),
-    regexp = "requires the optional C\\+\\+/TMB backend"
-  )
-  #' @description Test that initialize_process_structure() emits an informative unavailable-backend error before touching compiled process structure types.
-  expect_error(
-    FIMS::initialize_process_structure(
-      module = NULL,
-      par = "log_devs"
-    ),
-    regexp = "requires the optional C\\+\\+/TMB backend"
-  )
-})
-
-test_that("low-level compiled module helpers error cleanly when the C++ backend is unavailable", {
-  data <- FIMS::FIMSFrame(data_big)
-
-  testthat::local_mocked_bindings(
-    is_fims_cpp_backend_available = function() FALSE,
-    .package = "FIMS"
-  )
-
-  #' @description Test that initialize_comp() emits an informative unavailable-backend error before touching compiled composition types.
-  expect_error(
-    FIMS:::initialize_comp(data = data, fleet = "fleet1", type = "AgeComp"),
-    regexp = "requires the optional C\\+\\+/TMB backend"
-  )
-  #' @description Test that initialize_catch() emits an informative unavailable-backend error before touching compiled catch types.
-  expect_error(
-    FIMS:::initialize_catch(data = data, fleet = "fleet1"),
-    regexp = "requires the optional C\\+\\+/TMB backend"
-  )
-})
-
-test_that("Julia backend input preparation preserves existing initialize_fims output shape", {
-  reset_julia_backend_state()
-  testthat::local_mocked_bindings(
-    initialize_julia_backend = function(...) FALSE,
-    .package = "FIMS"
-  )
-  data <- FIMS::FIMSFrame(data_big)
-  parameters <- FIMS::setup_default_parameters(data = data)
-  result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
-  julia_input <- attr(result, "julia_input")
-
-  #' @description Test that Julia backend initialization still returns the standard two-element list.
-  expect_named(result, c("parameters", "model"))
-  #' @description Test that Julia backend initialization stores backend metadata as an attribute.
-  expect_equal(attr(result, "backend"), "julia")
-  #' @description Test that Julia backend initialization stores Julia input metadata as an attribute.
-  expect_true(is.list(julia_input))
-  #' @description Test that Julia backend initialization stores Julia input data and parameters.
-  expect_named(julia_input, c("data", "parameters"))
-  #' @description Test that Julia backend initialization now stores the Julia parameter payload directly in the returned list.
-  expect_equal(result[["parameters"]], julia_input[["parameters"]])
-  #' @description Test that Julia backend initialization no longer requires a TMB model object.
-  expect_null(result[["model"]])
-  #' @description Test that Julia backend input preserves the number of modeled years.
-  expect_equal(julia_input[["data"]][["n_years"]], get_n_years(data))
-  #' @description Test that Julia backend input preserves the modeled age bins.
-  expect_equal(julia_input[["data"]][["ages"]], get_ages(data))
-  #' @description Test that Julia backend input now includes weight-at-age and maturity matrices.
-  expect_true(all(c("weights_at_age", "maturity_at_age") %in% names(julia_input[["data"]])))
-  #' @description Test that Julia backend input includes serialized population and observation values.
-  expect_true(all(c("proportion_female", "fleet_has_catch", "observed_catch", "observed_age_comp", "observed_length_comp", "age_to_length_conversion") %in% names(julia_input[["data"]])))
-  #' @description Test that Julia backend parameters are serialized to the named structure expected by the Julia objective scaffold.
-  expect_true(all(c("log_Fmort", "log_M", "log_init_naa", "proportion_female", "log_rzero", "logit_steep") %in% names(julia_input[["parameters"]])))
-  #' @description Test that the Julia backend weight-at-age matrix has one row per modeled year and one column per age.
-  expect_equal(dim(julia_input[["data"]][["weights_at_age"]]), c(get_n_years(data), get_n_ages(data)))
-  #' @description Test that the Julia backend maturity-at-age matrix has one row per modeled year and one column per age.
-  expect_equal(dim(julia_input[["data"]][["maturity_at_age"]]), c(get_n_years(data), get_n_ages(data)))
-  #' @description Test that the serialized fishing mortality vector spans every year-age cell.
-  expect_equal(dim(julia_input[["parameters"]][["log_Fmort"]]), c(get_n_years(data), length(get_fleets(data))))
-  #' @description Test that the serialized natural mortality vector spans every year-age cell.
-  expect_equal(dim(julia_input[["parameters"]][["log_M"]]), c(get_n_years(data), get_n_ages(data)))
-  #' @description Test that the default scalar proportion-female parameter remains scalar in the Julia parameter payload.
-  expect_length(julia_input[["parameters"]][["proportion_female"]], 1L)
-  #' @description Test that the serialized initial numbers-at-age preserve the original parameter order.
-  expect_equal(
-    julia_input[["parameters"]][["log_init_naa"]],
-    parameters |>
-      dplyr::filter(.data$module_name == "Population", .data$label == "log_init_naa") |>
-      dplyr::pull(.data$value)
-  )
-  #' @description Test that the serialized fishing mortality preserves the original parameter order.
-  expect_equal(
-    julia_input[["parameters"]][["log_Fmort"]][, match("fleet1", get_fleets(data))],
-    parameters |>
-      dplyr::filter(.data$module_name == "Fleet", .data$fleet == "fleet1", .data$label == "log_Fmort") |>
-      dplyr::pull(.data$value)
-  )
-
-  clear_cpp_backend_test_state()
-})
-
-test_that("Julia backend initialize_fims skips TMB setup helpers", {
-  reset_julia_backend_state()
-  testthat::local_mocked_bindings(
-    initialize_julia_backend = function(...) FALSE,
-    CreateTMBModel = function(...) stop("CreateTMBModel should not be called"),
-    get_fixed = function(...) stop("get_fixed should not be called"),
-    get_random = function(...) stop("get_random should not be called"),
-    .package = "FIMS"
-  )
-  data <- FIMS::FIMSFrame(data_big)
-  parameters <- FIMS::setup_default_parameters(data = data)
-
-  #' @description Test that initialize_fims() can prepare the Julia backend without calling the TMB setup helpers.
-  expect_no_error(
-    result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
-  )
-  #' @description Test that the Julia backend still records its backend metadata when TMB setup is skipped.
-  expect_equal(attr(result, "backend"), "julia")
-
-  clear_cpp_backend_test_state()
-})
-
-test_that("Julia backend initialize_fims returns before C++ initialization begins", {
-  reset_julia_backend_state()
-  data <- FIMS::FIMSFrame(data_big)
-  parameters <- FIMS::setup_default_parameters(data = data)
-
-  testthat::local_mocked_bindings(
-    clear = function(...) cli::cli_abort("clear should not run for the Julia backend initialize path"),
-    initialize_selectivity = function(...) cli::cli_abort("C++ module initialization should not run for the Julia backend initialize path"),
-    initialize_julia_backend = function(...) FALSE,
-    .package = "FIMS"
-  )
-
-  result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
-
-  #' @description Test that the Julia initialize path no longer calls clear() or C++ module initialization before returning.
-  expect_equal(attr(result, "backend"), "julia")
-  #' @description Test that the Julia initialize path still returns the serialized Julia parameter payload directly.
-  expect_equal(result[["parameters"]], attr(result, "julia_input")[["parameters"]])
-  #' @description Test that the Julia initialize path still omits the TMB model object.
-  expect_null(result[["model"]])
 })
 
 test_that("Julia backend serializer omits unavailable observed data entries", {
@@ -840,7 +448,6 @@ test_that("Julia backend serializer omits unavailable observed data entries", {
   #' @description Test that missing age-composition data are omitted from the Julia serializer output.
   expect_false("observed_age_comp" %in% names(julia_input[["data"]]))
 
-  clear_cpp_backend_test_state()
 })
 
 test_that("Julia backend serializer preserves multiple fleets and composition streams", {
@@ -871,7 +478,6 @@ test_that("Julia backend serializer preserves multiple fleets and composition st
   agecomp_input <- FIMS:::prepare_julia_backend_input(parameters = agecomp_parameters, data = agecomp_data)
   expect_equal(dim(agecomp_input[["data"]][["observed_age_comp"]]), c(get_n_years(agecomp_data), get_n_ages(agecomp_data), length(get_fleets(agecomp_data))))
 
-  clear_cpp_backend_test_state()
 })
 
 test_that("Julia backend serializes maturity parameters and estimation masks", {
@@ -1849,6 +1455,8 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
     rlib_message_verbosity = "verbose"
   ))
   captured_optimizer_config <- NULL
+  mock_gradient_value <- 0
+  mock_pd_hessian <- TRUE
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
   result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
@@ -1957,9 +1565,10 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
        fixed_parameters = purrr::flatten_dbl(julia_input[["parameters"]])[
          as.logical(model_config[["fixed_parameter_mask"]])
        ],
-       pd_hessian = TRUE,
-       gradient = rep(0, flattened_parameter_count),
+       pd_hessian = mock_pd_hessian,
+       gradient = rep(mock_gradient_value, flattened_parameter_count),
        hessian = diag(flattened_parameter_count),
+       fixed_hessian = diag(sum(model_config[["fixed_parameter_mask"]])),
        nll = 12.5,
        joint_nll = 13.5,
        convergence = TRUE,
@@ -2143,6 +1752,15 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
   fit_without_sd <- FIMS::fit_fims(result, optimize = TRUE, get_sd = FALSE)
   expect_true(all(is.na(FIMS::get_estimates(fit_without_sd)[["uncertainty"]])))
 
+  mock_gradient_value <- 0.02
+  expect_warning(FIMS::fit_fims(result), "Optimization resulted in high gradients")
+  mock_gradient_value <- 2
+  expect_warning(FIMS::fit_fims(result), "Maximum absolute gradient")
+  mock_gradient_value <- 0
+  mock_pd_hessian <- FALSE
+  expect_warning(FIMS::fit_fims(result), "Standard error calculations failed convergence checks")
+  mock_pd_hessian <- TRUE
+
   testthat::local_mocked_bindings(
     evaluate_julia_backend_model = function(...) list(
       nll = 13.5, report = mocked_report
@@ -2157,7 +1775,6 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
   expect_true(all(is.na(FIMS::get_gradient(initial_fit))))
   expect_equal(FIMS::get_report(initial_fit)[["jnll"]], 13.5)
 
-  clear_cpp_backend_test_state()
 })
 
 test_that("Julia backend fit_fims errors cleanly when Julia cannot initialize", {
@@ -2189,10 +1806,9 @@ test_that("Julia backend initialization stays shaped correctly when Julia startu
   #' @description Test that disabling Julia startup still preserves Julia input metadata.
   expect_true(is.list(attr(result, "julia_input")))
 
-  clear_cpp_backend_test_state()
 })
 
-test_that("Julia backend initialization assigns prepared input when Julia startup succeeds", {
+test_that("Julia backend initialization retains input without changing runtime state", {
   reset_julia_backend_state()
   data <- FIMS::FIMSFrame(data_big)
   parameters <- FIMS::setup_default_parameters(data = data)
@@ -2211,18 +1827,13 @@ test_that("Julia backend initialization assigns prepared input when Julia startu
 
   result <- FIMS::initialize_fims(parameters = parameters, data = data, backend = "julia")
 
-  #' @description Test that the Julia assignment branch is reached when Julia startup succeeds.
-  expect_true(assigned)
-  #' @description Test that the Julia assignment branch receives the same serialized input attached to the returned object.
-  expect_equal(assigned_input, attr(result, "julia_input"))
-  #' @description Test that the Julia assignment branch preserves the serialized data payload structure.
-  expect_named(assigned_input[["data"]], names(attr(result, "julia_input")[["data"]]))
-  #' @description Test that the Julia assignment branch preserves the serialized parameter payload structure.
-  expect_named(assigned_input[["parameters"]], names(attr(result, "julia_input")[["parameters"]]))
+  expect_false(assigned)
+  expect_null(assigned_input)
+  expect_true(is.list(attr(result, "julia_input")[["data"]]))
+  expect_true(is.list(attr(result, "julia_input")[["parameters"]]))
   #' @description Test that the Julia backend success branch still preserves backend metadata.
   expect_equal(attr(result, "backend"), "julia")
 
-  clear_cpp_backend_test_state()
 })
 
 test_that("assign_julia_backend_input calls the Julia-side backend setter", {
@@ -2274,5 +1885,194 @@ test_that("Julia backend initialization skips assignment when Julia startup does
   #' @description Test that the Julia backend still records the backend metadata when initialization is skipped.
   expect_equal(attr(result, "backend"), "julia")
 
-  clear_cpp_backend_test_state()
+})
+
+test_that("Julia observation simulation preserves layouts, missingness and R seeds", {
+  data <- list(
+    observed_catch = matrix(c(1, -999, 2, 3), 2),
+    observed_index = matrix(c(1, 2, 3, 4), 2),
+    observed_age_comp = array(c(2, 4, 3, 5, 5, 1, -999, 2, -999, 3, -999, 5), c(2, 3, 2))
+  )
+  config <- list(
+    catch_distribution = "dnorm", catch_sigma = 0,
+    index_distribution = "dlnorm", index_sigma = 0
+  )
+  report <- list(
+    catch_expected_by_fleet = matrix(10, 2, 2),
+    index_expected_by_fleet = matrix(20, 2, 2),
+    agecomp_proportion = array(1 / 3, c(2, 3, 2))
+  )
+  set.seed(143)
+  first <- FIMS:::simulate_julia_observations(data, config, report)
+  set.seed(143)
+  expect_identical(FIMS:::simulate_julia_observations(data, config, report), first)
+  expect_equal(first[["observed_catch"]], matrix(c(10, -999, 10, 10), 2))
+  expect_equal(first[["observed_index"]], matrix(20, 2, 2))
+  expect_identical(dim(first[["observed_age_comp"]]), c(2L, 3L, 2L))
+  expect_equal(apply(first[["observed_age_comp"]], c(1, 3), sum),
+    apply(data[["observed_age_comp"]], c(1, 3), sum))
+  expect_equal(first[["observed_age_comp"]][1, , 2], rep(-999, 3))
+  expect_true("agecomp_proportion" %in%
+    names(FIMS:::simulate_julia_observations(data, config, report, complete = TRUE)))
+  expect_error(FIMS:::simulate_julia_observations(data, config, report, complete = NA), "TRUE or FALSE")
+  invalid_report <- report
+  invalid_report[["agecomp_proportion"]] <- 1
+  expect_error(
+    FIMS:::simulate_julia_observations(data, config, invalid_report),
+    "composition dimensions do not match"
+  )
+})
+
+test_that("real Julia evaluation retains the saved native deterministic oracle", {
+  skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
+    "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise the real Julia bridge.")
+  oracle <- readRDS(testthat::test_path("fixtures", "native-backend-oracle.rds"))
+  for (case in oracle[["deterministic"]]) {
+    parameters <- case[["parameters"]] |>
+      dplyr::mutate(estimation_type = "constant")
+    input <- initialize_fims(parameters, FIMSFrame(oracle[["data"]]))
+    fit <- fit_fims(input, optimize = FALSE, get_sd = FALSE)
+    report <- get_report(fit)
+    expect_equal(report[["jnll"]], as.numeric(case[["nll"]]), tolerance = 1e-8)
+    fields <- c(
+      "numbers_at_age", "biomass", "spawning_biomass", "expected_recruitment",
+      "mortality_F", "mortality_M", "mortality_Z", "proportion_mature_at_age",
+      "catch_expected", "index_expected", "unfished_biomass",
+      "unfished_numbers_at_age", "unfished_spawning_biomass",
+      "spawning_biomass_ratio", "agecomp_expected", "lengthcomp_expected",
+      "total_catch_numbers", "total_catch_weight"
+    )
+    if (grepl("VonBertalanffySchnute", case[["name"]], fixed = TRUE)) {
+      fields <- c(fields, "growth_mean_LAA", "growth_sd_LAA", "growth_mean_WAA")
+    }
+    for (field in fields) {
+      actual <- unname(unlist(report[[field]]))
+      expected <- unname(unlist(case[["report"]][[field]]))
+      expect_true(length(expected) > 0L)
+      expect_true(all(is.finite(actual)))
+      expect_equal(actual, expected, tolerance = 1e-8,
+        info = paste("Saved native oracle:", case[["name"]], field))
+    }
+  }
+  parameters <- get_obj(fit)[["par"]]
+  set.seed(42)
+  simulated <- get_obj(fit)[["simulate"]](parameters)
+  set.seed(42)
+  expect_identical(get_obj(fit)[["simulate"]](parameters), simulated)
+  expect_identical(dim(simulated[["observed_age_comp"]]),
+    dim(attr(input, "julia_input")[["data"]][["observed_age_comp"]]))
+  clear()
+  expect_equal(get_obj(fit)[["fn"]](parameters), report[["jnll"]])
+  json <- jsonlite::fromJSON(get_model_output(fit))
+  expect_identical(json[["backend"]], "julia")
+  expect_true(all(c("estimates", "report") %in% names(json)))
+})
+
+test_that("real Julia fits retain the saved optimized native comparisons", {
+  skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
+    "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise the real Julia bridge.")
+  oracle <- readRDS(testthat::test_path("fixtures", "native-backend-oracle.rds"))
+  for (case in oracle[["optimized"]]) {
+    fit <- initialize_fims(case[["parameters"]], FIMSFrame(oracle[["data"]])) |>
+      fit_fims(number_of_loops = 0)
+    expect_equal(get_opt(fit)[["convergence"]], 0L, info = case[["name"]])
+    expect_true(get_sdreport(fit)[["pdHess"]], info = case[["name"]])
+    expect_equal(get_opt(fit)[["objective"]], case[["marginal"]],
+      tolerance = 1e-6, info = case[["name"]])
+    expect_equal(get_report(fit)[["jnll"]], case[["joint"]],
+      tolerance = 1e-6, info = case[["name"]])
+    estimates <- get_estimates(fit) |>
+      dplyr::filter(.data$estimation_type %in% c("fixed_effects", "random_effects")) |>
+      dplyr::arrange(.data$module_name, .data$fleet, .data$label) |>
+      dplyr::mutate(uncertainty = unname(.data$uncertainty)) |>
+      dplyr::select(dplyr::all_of(c("module_name", "fleet", "label", "estimated", "uncertainty")))
+    expect_true(all(is.finite(estimates[["uncertainty"]])))
+    expect_equal(estimates, case[["estimates"]], tolerance = 1e-4, info = case[["name"]])
+    expect_lt(get_max_gradient(fit), 1e-3)
+    expect_equal(nrow(summary(get_sdreport(fit), "fixed")),
+      get_number_of_parameters(fit)[["fixed_effects"]])
+    objective <- get_obj(fit)
+    changed_parameters <- objective[["par"]] + 0.01
+    changed_value <- objective[["fn"]](changed_parameters)
+    clear()
+    expect_equal(objective[["fn"]](changed_parameters), changed_value)
+    if (grepl("FALSE", case[["name"]], fixed = TRUE)) {
+      set.seed(19)
+      original <- objective[["simulate"]]()
+      set.seed(19)
+      changed <- objective[["simulate"]](changed_parameters)
+      index <- original[["observed_index"]]
+      present <- is.finite(index) & index != -999
+      expect_equal(changed[["observed_index"]][present],
+        index[present] * exp(0.01))
+    }
+  }
+})
+
+test_that("Julia likelihood plots count equal-valued components separately", {
+  estimates <- tibble::tibble(
+    value_log_rzero = rep(c(1, 2), each = 3),
+    label = rep(c("catch_expected", "catch_expected", "parameter_prior"), 2),
+    type = "likelihood", lpdf = c(-1, -1, -2, -3, -3, -4)
+  )
+  expect_no_warning(plot <- plot_likelihood(list(vec = c(1, 2), estimates = estimates)))
+  totals <- plot[["data"]] |>
+    dplyr::filter(.data$group_clean == "Total")
+  expect_equal(totals[["total_like"]], c(-4, -10))
+  expect_equal(totals[["total_like_change"]], c(0, 6))
+})
+
+test_that("real Julia profiles and retrospective refits retain their priors", {
+  skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
+    "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia diagnostics.")
+  raw <- data_big |>
+    dplyr::filter(
+      !.data$type %in% c("length_comp", "age_to_length_conversion"),
+      dplyr::if_else(.data$type == "weight_at_age", .data$timing <= 6, .data$timing <= 5)
+    )
+  data <- FIMSFrame(raw)
+  parameters <- setup_default_parameters(data) |>
+    dplyr::mutate(
+      estimation_type = dplyr::if_else(.data$label == "log_rzero", "fixed_effects", "constant"),
+      distribution_type = NA_character_, distribution = NA_character_
+    )
+  priors <- tibble::tibble(
+    module_name = "Recruitment", fleet = NA_character_, label = "log_rzero",
+    timing = NA_real_, age = NA_real_, distribution = "dnorm",
+    mean = log(1e6), sd = 0.5
+  )
+  fit <- initialize_fims(parameters, data, priors = priors) |>
+    fit_fims(number_of_loops = 0)
+  expect_equal(get_opt(fit)[["convergence"]], 0L)
+  expect_true(get_sdreport(fit)[["pdHess"]])
+  components <- get_estimates(fit) |>
+    dplyr::filter(.data$type == "likelihood")
+  expect_true(nrow(components) > 0L)
+  expect_equal(-sum(components[["lpdf"]]), get_report(fit)[["jnll"]])
+  expect_true("parameter_prior" %in% components[["label"]])
+  profile <- run_fims_likelihood(
+    fit, parameters, raw, parameter_name = "log_rzero",
+    n_cores = 1, min = -0.01, max = 0.01, length = 3
+  )
+  optimum <- get_estimates(fit) |>
+    dplyr::filter(.data$label == "log_rzero") |>
+    dplyr::pull(.data$estimated)
+  expect_equal(profile[["vec"]], optimum + c(-0.01, 0, 0.01))
+  profiled_estimates <- profile[["estimates"]] |>
+    dplyr::filter(.data$label == "log_rzero")
+  expect_equal(profiled_estimates[["estimated"]], profile[["vec"]])
+  expect_true(all(profiled_estimates[["estimation_type"]] == "constant"))
+  expect_no_warning(plot <- plot_likelihood(profile))
+  expect_s3_class(plot, "ggplot")
+  expect_true(nrow(plot[["data"]]) > 0L)
+  retrospective <- run_fims_retrospective(
+    0:1, raw, parameters, n_cores = 1, priors = priors
+  )
+  expect_setequal(unique(retrospective[["estimates"]][["retrospective_peel"]]), 0:1)
+  retrospective_parameters <- retrospective[["estimates"]] |>
+    dplyr::filter(.data$label == "log_rzero")
+  expect_equal(nrow(retrospective_parameters), 2L)
+  expect_true(all(is.finite(retrospective_parameters[["estimated"]])))
+  expect_identical(attr(get_input(fit), "julia_priors"), priors)
+  expect_true(is.finite(generics::glance(fit)[["marginal_nll"]]))
 })

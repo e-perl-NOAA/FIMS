@@ -1,3 +1,20 @@
+# FIMS (development version)
+
+* The Julia-only cutover below is work in progress, not release-ready.
+  Shipped optimized and internal example fits still require genuine Julia
+  regeneration. Full-model optimized parity and a complete compiler-disabled
+  R CMD check remain unverified. Final validation of the latest singleton-prior,
+  likelihood-component, and parallel-runtime changes is incomplete.
+* Julia is now the sole backend. The high-level R workflow remains available;
+  low-level native modules, mutable parameter vectors, native logging, and
+  native module-ID JSON have been retired. Saved native fits must be refitted.
+* FIMS no longer ships C++ sources, headers, registration, native build tooling,
+  or direct Rcpp/TMB dependencies. JuliaCall has its own compiled dependencies.
+* `setup_julia()` prepares dependencies outside the embedded runtime in a
+  writable user cache and configures RCall for the selected R installation.
+* Objective simulation uses R's RNG to draw observations conditional on
+  parameters and random-effect modes. Uncertainty summaries no longer use TMB.
+
 # FIMS 0.11.0
 
 ## Bug Fixes

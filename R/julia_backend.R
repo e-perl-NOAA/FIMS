@@ -65,7 +65,8 @@ julia_backend_module_path <- function(libname = NULL, pkgname = "FIMS") {
 #' @param libname Library path passed from `.onLoad()`.
 #' @param pkgname Package name passed from `.onLoad()`.
 #' @return Invisibly returns `TRUE` when Julia is initialized, or `FALSE` when Julia is disabled by option.
-#' @details JuliaCall installs Julia when it is unavailable. Initialization errors are reported to the caller.
+#' @details Dependencies are prepared outside the embedded runtime in a writable
+#' user project. Initialization errors are reported to the caller.
 #' @noRd
 initialize_julia_backend <- function(libname = NULL, pkgname = "FIMS") {
   if (.fims_julia_backend_state$initialized) {
@@ -88,21 +89,44 @@ initialize_julia_backend <- function(libname = NULL, pkgname = "FIMS") {
 
   tryCatch(
     {
-      JuliaCall::julia_setup(installJulia = TRUE, version = "latest")
-      JuliaCall::julia_command("using Pkg")
-      JuliaCall::julia_command(
-        sprintf('Pkg.activate(raw"%s")', normalizePath(package_path, "/"))
+      project <- setup_julia()
+      original_project <- Sys.getenv("JULIA_PROJECT", unset = NA_character_)
+      on.exit({
+        if (is.na(original_project)) Sys.unsetenv("JULIA_PROJECT") else
+          Sys.setenv(JULIA_PROJECT = original_project)
+      }, add = TRUE)
+      Sys.setenv(JULIA_PROJECT = project)
+      # JuliaCall's released Linux loader can otherwise use R's incompatible
+      # libunwind on Ubuntu 24.04. Load Julia's bundled copy globally first.
+      if (identical(Sys.info()[["sysname"]], "Linux")) {
+        unwind <- file.path(
+          dirname(.fims_julia_backend_state[["julia"]]),
+          "..", "lib", "julia", "libunwind.so.8"
+        )
+        if (file.exists(unwind)) {
+          dyn.load(unwind, local = FALSE)
+        }
+      }
+      JuliaCall::julia_setup(
+        JULIA_HOME = dirname(.fims_julia_backend_state[["julia"]]),
+        installJulia = FALSE, install = FALSE
       )
-      JuliaCall::julia_command("Pkg.instantiate()")
-      JuliaCall::julia_command(
-        sprintf("Base.include(Main, raw\"%s\")", normalizePath(module_path, "/"))
-      )
-      JuliaCall::julia_command("using .FIMSBackend")
+      active_project <- JuliaCall::julia_eval("Base.active_project()")
+      expected_project <- file.path(project, "Project.toml")
+      if (!identical(
+        normalizePath(active_project, "/", mustWork = FALSE),
+        normalizePath(expected_project, "/", mustWork = FALSE)
+      )) {
+        cli::cli_abort(
+          "Julia is already using a different project. Restart R and initialize FIMS before using JuliaCall directly."
+        )
+      }
+      JuliaCall::julia_command("using FIMSBackend")
     },
     error = function(error) {
       cli::cli_abort(c(
         "Julia backend initialization failed.",
-        "i" = "JuliaCall could not install or start Julia, resolve FIMSBackend dependencies, or load the backend.",
+        "i" = "Julia dependencies could not be prepared, or JuliaCall could not start Julia or load FIMSBackend.",
         "i" = "Underlying error: {conditionMessage(error)}"
       ))
     }
@@ -199,7 +223,7 @@ as_julia_fims_data <- function(data, parameters) {
 
   maturity_parameters <- parameters |>
     dplyr::filter(.data$module_name == "Maturity", .data$label %in% c("inflection_point", "slope")) |>
-    dplyr::select(label, value)
+    dplyr::select(dplyr::all_of(c("label", "value")))
   maturity_inflection <- maturity_parameters |>
     dplyr::filter(.data$label == "inflection_point") |>
     dplyr::pull(.data$value) |>

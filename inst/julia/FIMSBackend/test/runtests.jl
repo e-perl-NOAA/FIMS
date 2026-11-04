@@ -28,6 +28,14 @@ using SpecialFunctions: erf
   @test components[2] ≈
         0.5 * log(2π) + log(0.4) + log(3.0) + (log(3.0) - log(2.0))^2 / (2 * 0.4^2)
   @test components[3] ≈ 0.5 * log(2π) + log(0.5) + 2.0
+  for index in eachindex(components)
+    singleton_config = Dict(key => values[index] for (key, values) in config)
+    @test only(FIMSBackend.parameter_prior_nll_components(parameters, singleton_config)) ≈
+          components[index]
+  end
+  @test_throws DimensionMismatch FIMSBackend.parameter_prior_nll_components(
+    parameters, merge(config, Dict(:parameter_prior_means => 1.0)),
+  )
   @test_throws ArgumentError FIMSBackend.parameter_prior_nll_components(
     parameters,
     merge(config, Dict(:parameter_prior_transforms => ["identity", "exp", "sqrt"])),
@@ -54,6 +62,51 @@ end
   @test all(isnan, FIMSBackend._hessian_covariance([-1.0 0.0; 0.0 1.0]))
   @test all(isnan, FIMSBackend._hessian_covariance(reshape([NaN], 1, 1)))
   @test size(FIMSBackend._hessian_covariance(zeros(0, 0))) == (0, 0)
+end
+
+@testset "implicit Laplace derivatives with coupled random effects" begin
+  fixed_indices = [3, 2]
+  random_indices = [4, 1]
+  mode_parameters = fixed -> begin
+    first, second = fixed[2], fixed[1]
+    center = [2 * first + second^2 + 0.025, first^2 - first + second]
+    [center[1], first, second, center[2], 0.1]
+  end
+  joint_objective = parameters -> begin
+    first, second = parameters[2], parameters[3]
+    center = [
+      2 * first + second^2 + 0.25 * parameters[5],
+      first^2 - first + second,
+    ]
+    transformed = [1.0 0.3; 0.2 1.0] * (
+      parameters[[1, 4]] - center
+    )
+    0.5 * (first^2 / 0.16 + second^2 / 0.49) +
+      exp(first) * (exp(transformed[1]) - transformed[1]) +
+      0.5 * exp(-first) * transformed[2]^2
+  end
+  fixed = [-0.2, 0.4]
+  parameters = mode_parameters(fixed)
+  marginal = values ->
+    0.5 * (values[2]^2 / 0.16 + values[1]^2 / 0.49) +
+    exp(values[2]) + log(0.94) - log(2π)
+  marginal_gradient = values -> FIMSBackend._laplace_gradient(
+    joint_objective, mode_parameters(values), fixed_indices, random_indices,
+  )
+  @test marginal_gradient(fixed) ≈
+        [fixed[1] / 0.49, fixed[2] / 0.16 + exp(fixed[2])] atol = 1e-10
+  @test marginal_gradient(fixed) ≈
+        FIMSBackend._numerical_gradient(marginal, fixed) rtol = 1e-8
+  @test FIMSBackend._numerical_gradient_hessian(marginal_gradient, fixed) ≈
+        [inv(0.49) 0.0; 0.0 inv(0.16) + exp(fixed[2])] rtol = 1e-8
+  options = FIMSBackend._optimizer_options(Dict())
+  conditional = FIMSBackend._conditional_mode(
+    parameters, fixed_indices, fixed, random_indices,
+    joint_objective, options,
+  )
+  @test conditional.converged
+  @test conditional.parameters ≈ parameters atol = 1e-8
+  @test conditional.marginal_nll ≈ marginal(fixed) atol = 1e-8
 end
 
 @testset "population proportion-female parameter layouts" begin
@@ -329,6 +382,11 @@ end
   @test report["catch_numbers_at_age_by_fleet"][1, :, 1] ≈
     expected_catch_numbers rtol = 1e-13
   @test length(report["nll_components"]) == 5
+  @test report["nll_component_labels"] == [
+    "recruitment_process", "catch_expected", "agecomp_expected",
+    "lengthcomp_expected", "index_expected",
+  ]
+  @test report["nll_component_fleets"] == ["", "fish", "fish", "fish", "survey"]
   @test sum(report["nll_components"]) ≈ result["nll"]
   vonb_result = evaluate_model(
     vonb_parameters,
@@ -875,6 +933,19 @@ end
     @test gaussian_fit["standard_errors"]["log_q"] ≈ prior_sds rtol = 1e-5
     @test gaussian_fit["covariance"][log_q_start, log_q_start + 1] ≈ 0.0 atol = 1e-8
     @test gaussian_fit["pd_hessian"]
+    active_indices = findall(gaussian_fixed_mask .| gaussian_random_mask)
+    full_joint_hessian = FIMSBackend.hessian(
+      values -> evaluate_nll(
+        FIMSBackend._named_component_array(values, parameters),
+        prior_only_data, gaussian_config,
+      ),
+      collect(parameters),
+    )
+    @test gaussian_fit["hessian"][active_indices, active_indices] ≈
+          full_joint_hessian[active_indices, active_indices]
+    @test all(isnan, gaussian_fit["hessian"][.!(
+      gaussian_fixed_mask .| gaussian_random_mask
+    ), :])
 
     shifted_fixed = [prior_means[1] + 0.2]
     @test FIMSBackend.evaluate_fixed_objective(
@@ -916,6 +987,16 @@ end
     @test random_only_fit["nll"] ≈ 0.0 atol = 1e-8
     @test random_only_fit["standard_errors"]["log_q"] ≈ prior_sds
     @test gaussian_fit["uncertainty_status"] == "available"
+    constant_fit = fit_model(parameters, prior_only_data, merge(gaussian_config, Dict(
+      :fixed_parameter_mask => falses(length(parameters)),
+      :random_parameter_mask => falses(length(parameters)),
+    )))
+    @test constant_fit["convergence"]
+    @test constant_fit["convergence_code"] == "no_estimable_parameters"
+    @test constant_fit["joint_nll"] ≈ evaluate_nll(parameters, prior_only_data, gaussian_config)
+    @test isempty(constant_fit["fixed_parameters"])
+    @test all(iszero, constant_fit["covariance"])
+    @test all(iszero, constant_fit["report_standard_errors_flat"])
     no_uncertainty_fit = fit_model(
       parameters, prior_only_data,
       merge(gaussian_config, Dict(:compute_standard_errors => false)),
@@ -1003,6 +1084,17 @@ end
   @test size(report_uncertainty.covariance) ==
         (length(report_uncertainty.values), length(report_uncertainty.values))
   @test diag(report_uncertainty.covariance) ≈ report_uncertainty.standard_errors_flat .^ 2
+  active_uncertainty = FIMSBackend._report_standard_errors(
+    Float64.(fitted_parameter_vector),
+    parameters,
+    data,
+    merge(fit_config, Dict(:compute_report_covariance => true)),
+    fit_result["covariance"],
+    findall(fixed_mask .| random_mask),
+  )
+  @test active_uncertainty.values == report_uncertainty.values
+  @test active_uncertainty.standard_errors_flat ≈ report_uncertainty.standard_errors_flat
+  @test active_uncertainty.covariance ≈ report_uncertainty.covariance
 end
 
 @testset "multinomial likelihood includes the sampling coefficient" begin

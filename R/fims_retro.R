@@ -110,7 +110,7 @@ run_fims_retrospective <- function(
   data,
   parameters,
   n_cores = NULL,
-  backend = c("tmb", "julia"),
+  backend = "julia",
   priors = NULL
 ) {
   backend <- match.arg(backend)
@@ -133,12 +133,13 @@ run_fims_retrospective <- function(
     }
     n_cores_to_use <- as.integer(n_cores)
   }
+  julia <- NULL
   if (n_cores_to_use == 1) {
     future::plan(future::sequential)
-  } else if (backend == "julia" || Sys.info()[["sysname"]] == "Windows") {
-    future::plan(future::multisession, workers = n_cores_to_use)
   } else {
-    future::plan(future::multicore, workers = n_cores_to_use)
+    setup_julia()
+    julia <- .fims_julia_backend_state[["julia"]]
+    future::plan(future::multisession, workers = n_cores_to_use)
   }
 
   if (n_cores_to_use == 1) {
@@ -152,6 +153,9 @@ run_fims_retrospective <- function(
   estimates_list <- furrr::future_map(
     .x = years_to_remove,
     .f = function(years) {
+      if (!is.null(julia)) {
+        setup_julia(julia = julia)
+      }
       fit <- run_modified_data_fims(
         years_to_remove = years,
         data = data,

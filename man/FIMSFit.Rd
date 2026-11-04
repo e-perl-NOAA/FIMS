@@ -27,7 +27,7 @@ backend.}
 \item{run_time}{A vector of at least length one, where all entries are of the
 \code{timediff} class and at least one is named "time_total". This information
 is available in \code{\link[=fit_fims]{fit_fims()}} and added to this argument internally but if
-you are a power user you can calculate the time it took to run your model
+you are a more advanced user you can calculate the time it took to run your model
 by subtracting two \code{\link[=Sys.time]{Sys.time()}} objects.}
 
 \item{version}{The version of FIMS that was used to optimize the model. If
@@ -56,7 +56,7 @@ A list containing the model report from \code{obj[["report"]]()}.
 }
 \item{\code{sdreport}:}{
 An object with the \code{sdreport} class containing the output from
-the backend uncertainty calculation.
+The backend uncertainty report.
 }
 \item{\code{run_time}:}{
 The length of time it took to run the model if it was optimized.

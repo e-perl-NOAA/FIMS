@@ -7,7 +7,12 @@
 
 # Overview
 
-FIMS is an R package for fitting integrated statistical population-dynamics models to fishery data. The back end is written in C++, and the use of Rcpp allows users to easily interact with the models using R. The package is unique because it includes multiple model types, e.g., surplus production and catch-at-age models. This reduces the burden of learning a new framework when exploring major changes in model structure. Stay tuned for the addition of even more model types.
+> **Cutover in progress:** this branch is not release-ready. Bundled fitted
+> examples still need regeneration with Julia; full-model optimized parity,
+> final workflow regressions, and a complete compiler-disabled `R CMD check`
+> have not been verified. See the development notes in `NEWS.md`.
+
+FIMS is an R package for fitting integrated statistical population-dynamics models to fishery data. Julia implements the population model, likelihood, automatic differentiation, optimization, and uncertainty calculations. The high-level R data, parameter, fitting, and diagnostic interfaces remain available.
 
 If you are new to FIMS, the best place to start is the <a href="https://noaa-fims.github.io/FIMS/articles/fims-demo.html" target="_blank">"Introducing FIMS"</a> vignette.
 
@@ -27,17 +32,25 @@ install.packages(
   )
 )
 
-# Compile and install it yourself, where you can specify the branch
+# Install from source, where you can specify the branch
 pak::pak("NOAA-FIMS/FIMS@main")
 ```
 
-<details>
-<summary><strong>Expand this section if you want to use `load_all()`</strong></summary>
+Install [Julia 1.10 or later](https://julialang.org/downloads/), then run:
 
-Developers who are interested in building FIMS can clone this repository, e.g., `git clone https://github.com/NOAA-FIMS/FIMS.git` and build it with `devtools::install()`, which builds the package from the cloned files and installs the R library. Installing with `devtools::load_all()` is not recommended because it uses shim files for things like `system.file()`, which can cause FIMS to not function as expected. For example, if you try to optimize the same model twice, you will more than likely not get estimates of uncertainty from the second model run. Additionally, `devtools::load_all()` adds the debugger flag `-O0 -g` which leads to Windows users seeing `Fatal error: can't write <xxx> bytes to section .text of FIMS.o: 'file too big`. Thus, Windows users need to run `withr::local_options(pkg.build_extra_flags = FALSE)` at the beginning of every R session before calling `devtools::load_all()`. If you want to compile FIMS with the debugger turned on you will need to run the {withr} function in addition to manually modifying the call to PKG_CXXFLAGS in the [src/Makevars.win](https://github.com/NOAA-FIMS/FIMS/blob/main/src/Makevars.win) file to include `-O1 -g`. 
+```r
+library(FIMS)
+# If Julia is not on PATH, supply its executable explicitly:
+# setup_julia(julia = "C:/path/to/Julia/bin/julia.exe")
+setup_julia()
+```
 
-A comprehensive list of all the tools needed to build, test, and document FIMS can be found [here](https://github.com/nmfs-ost/on-off-boarding/blob/211d3895afb892ac2fba919935eb27d933e4d048/.github/workflows/onboard-fims.yml#L22). Additionally, information on best practices regarding how to install each requirement can be found on the [NOAA Fisheries Office of Science and Technology on- and off-boarding repository](https://nmfs-ost.github.io/on-off-boarding/).
-</details>
+First setup needs internet access and precompiles the backend and bridge together.
+Dependencies are cached in `tools::R_user_dir("FIMS", "cache")`, not in the
+installed package. FIMS has no C++ sources, LinkingTo dependencies, or native
+compilation step; a compiler, Rtools, TMB, CMake, and Doxygen are not needed to
+build FIMS itself. Some third-party R dependencies, including JuliaCall, have
+their own compiled code; use binary packages where available.
 
 ## Cheatsheet
 
@@ -61,91 +74,66 @@ clear()
 
 ## Troubleshooting
 
-### Backend migration checks
+### Julia runtime and compatibility
 
-The Julia backend is selected with `initialize_fims(..., backend = "julia")`.
-The native backend remains the default while numerical and R-interface parity
-are being established.
+`initialize_fims()` now defaults to Julia and prepares input without starting
+the runtime. `fit_fims()` starts Julia on first use. `setup_julia()` lets you
+prepare dependencies and diagnose installation separately. Set `JULIA_HOME` to
+Julia's **bin directory** to select a runtime, or supply an executable to
+`setup_julia()`. Restart R after changing Julia or R versions.
 
-The **Test Julia backend** workflow runs Julia package tests and a separate
-R-to-Julia/native comparison job. The comparison uses the same parameter
-tibble for both backends, converts random effects to fixed effects to compare
-joint objectives without inner optimization, and checks population and fleet
-reports for EWAA and VonBertalanffySchnute growth at two deterministic starting
-points. Its relative numerical tolerance is `1e-8`; missing report fields and
-non-finite values fail the comparison. JUnit results are retained as a workflow
-artifact. A second comparison fits one catchability parameter with and without
-a recruitment random effect under each growth model, checking convergence,
-joint and marginal objectives, parameter estimates, and standard errors. These
-limited cases do not establish parity across all supported model configurations.
+Setup runs in standalone Julia, binds RCall to the selected R installation
+using project-scoped preferences,
+and strictly precompiles dependencies before embedding Julia. This avoids
+installing packages inside an embedded runtime and resolves shared dependencies
+in one environment. Startup failures report the underlying error. On Linux,
+FIMS loads Julia's bundled libunwind before starting JuliaCall.
+First-time preparation precompiles one dependency at a time to limit memory
+use; an explicit `JULIA_NUM_PRECOMPILE_TASKS` setting takes precedence.
 
-Julia growth calculations retain the native backend's smooth absolute-value and
-maximum approximations, including its delta-method gradient convention. Replacing
-these with hard floors changes predictions even away from the floor. Catch uses
-the unperturbed Baranov mortality denominator, with its continuous zero-mortality
-limit, rather than adding an epsilon that biases expected catches.
-Multinomial likelihoods likewise use the unperturbed probabilities: zero counts
-contribute zero, and positive counts in a zero-probability bin give infinite NLL.
-With a partially estimated recruitment process, constant deviations may omit both
-distribution fields, as for the native backend; the process density still
-includes those constant values.
+### Migration and numerical guarantees
 
-Julia uncertainty requires finite, positive-definite parameter Hessians; singular
-or indefinite Hessians are not replaced with pseudoinverses. Invalid curvature
-emits a warning and leaves affected covariance and standard errors unavailable.
-Inner and outer optimizer line searches use norm-scaled initial steps to avoid
-extreme trials when likelihood gradients are large; Hessian checks remain strict.
-The Julia `get_sdreport()` result includes `uncertainty_status`: `"available"`,
-`"invalid_hessian"`, or `"not_requested"`. Its `pdHess` is `FALSE` when uncertainty
-is invalid or was not requested; optimizer convergence alone does not establish
-valid uncertainty.
+The low-level native API has been retired: native module constructors,
+`CreateTMBModel()`, mutable parameter vectors, native logging, native distribution
+initializers, and `get_fixed()`/`get_random()` are no longer available.
+Use `FIMSFrame()`, `setup_default_parameters()`, `initialize_fims()`, and
+`fit_fims()`. Refit saved native `FIMSFit` objects before extracting estimates.
+The `get_model_output()` JSON now contains `backend`, `estimates`, and `report`;
+the native module-ID JSON schema is retired.
 
-Likelihood profiles retain the backend and priors of their base fit.
-Retrospective analyses and direct refit helpers accept `backend = "julia"` and
-`priors` explicitly. Parallel Julia diagnostics use separate R worker sessions
-to avoid forking an initialized Julia runtime.
+Native-versus-Julia comparisons passed for deterministic EWAA and
+VonBertalanffySchnute models and narrow catchability fits, with and without a
+recruitment random effect. Those checks do not prove every supported combination.
+The historical native implementation and comparison job remain available at
+commit `1e5a64a8`; the Julia-only suite retains numerical and analytic regressions.
+Do not interpret mocked bridge tests as numerical or real bridge evidence.
 
-To run the comparison locally with both backends available:
+Julia retains the native growth smoothing and delta-method conventions. Catch
+uses the continuous zero-mortality Baranov limit; multinomial likelihoods do not
+perturb probabilities. Hessians must be finite and positive definite: invalid
+curvature produces unavailable covariance, never pseudoinverses.
+`get_sdreport()` exposes `uncertainty_status` and `pdHess`; its `summary()` method
+does not require TMB. Convergence alone does not establish valid uncertainty.
+`get_estimates()` includes one `type = "likelihood"` row per likelihood
+component, with its log-likelihood in `lpdf`. Profiles include observation,
+recruitment-process, and prior contributions without deduplicating equal values.
 
-```r
-# Set this to the bin directory of the Julia installation being compared.
-Sys.setenv(JULIA_HOME = dirname(Sys.which("julia")))
-JuliaCall::julia_setup(installJulia = FALSE)
-stopifnot(JuliaCall::julia_eval("1 + 1") == 2)
-Sys.setenv(FIMS_RUN_BACKEND_PARITY = "true")
-devtools::test(filter = "^julia-backend$")
-```
+Curvature and report derivatives are evaluated only for estimable parameters;
+constant-parameter rows and columns in the internal joint Hessian are `NaN`
+(not calculated). Refits with all parameters held constant evaluate the model
+without running an optimizer, allowing profiles of a single-parameter model.
+Laplace gradients include the conditional random-mode sensitivity through
+implicit differentiation. Marginal curvature uses centered differences of
+these gradients rather than repeated finite differences of conditional fits.
 
-JuliaCall selects an explicitly configured runtime using `JULIA_HOME`, not
-`JULIA_BINDIR`. Run the check in a fresh R session after changing Julia versions.
-The comparison workflow runs the bridge smoke test in a separate R process so
-startup failures can be distinguished from model or numerical comparison failures.
-On Ubuntu 24.04, JuliaCall 0.17.6 can segfault during startup because of a
-libunwind library conflict. The comparison workflow pins JuliaCall to upstream
-commit `f7878f0371c6114493c3d067b8fb24cf6160c1cb`, which includes the
-[JuliaInterop/JuliaCall#265](https://github.com/JuliaInterop/JuliaCall/pull/265)
-fix that loads Julia's bundled libunwind before initializing Julia.
-The workflow also installs `Suppressor` and `RCall` and rebuilds `RCall` for the
-selected R installation in a standalone Julia process before embedding Julia.
-This keeps package installation and precompilation outside the embedded R
-process and refreshes cached RCall builds. Preparation does not initialize an
-embedded R session inside standalone Julia: the separate R-to-Julia smoke test
-checks the embedding direction FIMS actually uses, including vector conversion.
-Both R workflow steps disable JuliaCall's dependency installer because these
-dependencies have already been prepared. Verbose RCall build output and stage
-markers are retained in the `julia-bridge-setup.log` workflow artifact, including
-on preparation failure.
-FIMSBackend's own Julia environment is also instantiated, strictly precompiled,
-and loaded in standalone Julia before the R steps. The bridge smoke test then
-loads FIMSBackend inside R, so a successful scalar bridge check alone cannot
-hide model dependency-loading failures. Backend setup output is retained as
-`julia-fims-setup.log`; numerical comparisons and their tolerances are unchanged.
-The R bridge starts in a dedicated Julia project that resolves `RCall`,
-`Suppressor`, and the local FIMSBackend together. Resolving the bridge separately
-can load a different version of a shared dependency before FIMS activates its
-project (for example, LogExpFunctions 1.x versus 0.3.x); switching projects cannot
-replace a package already loaded into Julia. CI checks shared dependency versions
-and source hashes against the backend environment before starting R.
+Objective `simulate(par, complete = FALSE)` draws observations conditional on
+fixed parameters and conditional random-effect modes, using R's RNG and
+`set.seed()`. It preserves missing observations and rounds effective composition
+sample sizes to integers. It does not sample random effects or priors.
+`clear()` releases shared bridge input but does not invalidate existing fits.
+Parallel diagnostics use separate R worker sessions rather than forks.
+They prepare dependencies before launching workers and retain the runtime
+selected with `setup_julia(julia = ...)`.
 
 If you encounter a :bug:, please file an [Issue](https://github.com/NOAA-FIMS/FIMS/issues) with a minimal reproducible example on GitHub.
 

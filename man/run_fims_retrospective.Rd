@@ -5,8 +5,12 @@
 \title{Run Retrospective Analysis}
 \usage{
 run_fims_retrospective(
-  years_to_remove, data, parameters, n_cores = NULL,
-  backend = c("tmb", "julia"), priors = NULL
+  years_to_remove,
+  data,
+  parameters,
+  n_cores = NULL,
+  backend = "julia",
+  priors = NULL
 )
 }
 \arguments{
@@ -55,8 +59,6 @@ This diagnostic tool is used to detect retrospective patterns or bias in
 model estimates.
 }
 \details{
-Julia refits use separate R sessions rather than forked workers.
-
 Run Retrospective Analysis for a FIMS Model
 
 Retrospective analysis involves refitting a model after sequentially removing
@@ -64,6 +66,7 @@ one or more years of data from the end of the time series. This helps assess
 whether the model estimates are stable and whether there is a consistent
 pattern of revision as new data are added. The function runs models in
 parallel for computational efficiency.
+Julia refits use separate R sessions rather than forked workers.
 
 The first element of \code{years_to_remove} should typically be 0 to represent
 the reference model with no data removed. This allows for direct comparison

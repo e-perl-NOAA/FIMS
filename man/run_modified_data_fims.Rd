@@ -5,8 +5,11 @@
 \title{Modify data for a FIMS Model}
 \usage{
 run_modified_data_fims(
-  years_to_remove = 0, data, parameters,
-  backend = c("tmb", "julia"), priors = NULL
+  years_to_remove = 0,
+  data,
+  parameters,
+  backend = "julia",
+  priors = NULL
 )
 }
 \arguments{

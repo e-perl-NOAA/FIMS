@@ -90,7 +90,8 @@ print(fig_likelihood_custom_theme)
 
 ### Clean up
 
-Once you are finished running a FIMS model, it is always good practice to clear the C++ memory from one FIMS model run to the next.
+`clear()` releases shared Julia bridge input between runs. Existing fitted
+objects retain their own input and remain usable.
 ```{r}
 clear()
 ```
@@ -165,7 +166,8 @@ retro_fit[["estimates"]] |>
 
 ### Clean up
 
-Once you are finished running a FIMS model, it is always good practice to clear the C++ memory from one FIMS model run to the next.
+Call `clear()` to release shared Julia bridge input between model runs.
+Previously returned fitted objects remain usable.
 ```{r}
 clear()
 ```

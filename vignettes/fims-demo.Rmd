@@ -26,7 +26,8 @@ The NOAA Fisheries Integrated Modeling System (FIMS) is a new modeling framework
 
 ### Loading the package
 
-Calling `library(FIMS)` loads the R package, Rcpp functions, and Rcpp modules into the R environment.
+Calling `library(FIMS)` loads the high-level R interface. Julia starts lazily
+when the first model is fitted; `setup_julia()` prepares its dependencies.
 ```{r library, warning=FALSE, message=FALSE}
 library(FIMS)
 library(ggplot2)
@@ -35,19 +36,16 @@ library(stockplotr)
 
 ### Getting help
 
-In addition to using the traditional method of getting help within R for functions, i.e., `?FIMS::fit_fims`, you can use `methods::show()` to access help information for the C++ functions that are exported via {Rcpp}. You will either be provided with a short description of the function or a link to the doxygen documentation for the C++ code that will provide information about the function.
-
-For example, `CreateTMBModel` is a C++ function that returns a boolean.
-```r
-methods::show(FIMS::CreateTMBModel)
-internal C++ function <0000014f7bd8ff00>
-    docstring : See the documentation for the Rcpp interface, https://noaa-fims.github.io/FIMS/doxygen/rcpp__interface_8hpp.html.
-    signature : bool CreateTMBModel()
-```
+Use R's help interface, for example `?FIMS::fit_fims` or
+`?FIMS::initialize_fims`. Native module constructors and native logging have
+been retired; configure models through the parameter tibble instead.
 
 ### Memory
 
-The C++ code is compiled upon installation, rather than loading, so the call to `library()` should be pretty fast. Users should always run `clear()` prior to modeling to ensure that the C++ memory from any previous FIMS model run is cleared out.
+FIMS does not compile native code at installation. Each input and fitted
+object owns its model configuration, so fitting another model does not
+invalidate existing objectives. `clear()` optionally releases shared bridge
+scratch input without starting Julia or invalidating fitted objects.
 ```{r clear-memory, warning=FALSE, message=FALSE}
 # clear memory
 clear()
@@ -114,7 +112,10 @@ The parameters that are in the model will depend on which modules are used from 
 
 ### `setup_default_parameters()`
 
-Modules that are available in FIMS are known as reference classes in the C++ code. Each reference class acts as an interface between R and the underlining C++ code that defines FIMS. Several reference classes exist and several more will be created in the future. The beauty of having modules rather than a control file really comes out when more reference classes are created because each reference class can be accessed through R by itself to build up a model rather than needing to modify a control file for future features.
+FIMS represents growth, maturity, selectivity, recruitment, and population
+dynamics as Julia modules. Configure these through the R parameter tibble
+returned by `setup_default_parameters()` rather than constructing mutable
+low-level module objects.
 
 By just passing the data to `setup_default_parameters()`, the default values for parameters that relate to fleet(s), recruitment, growth, and maturity modules can be created. For example,
 
@@ -261,11 +262,19 @@ With data and parameters in place, we can now initialize modules using `initiali
 
 ### `initialize_fims()`
 
-The tibble returned by `setup_default_parameters()` is just a data frame containing specifications. Nothing has been created in memory as of yet. To actually initialize the modules, `initialize_fims()` needs to be called. This function takes all of the specifications and matches them with the appropriate data to initialize a module and create the pointers to the memory.
+The tibble returned by `setup_default_parameters()` contains model specifications.
+`initialize_fims()` validates those specifications and matches them with the
+data, creating an independent R model input. Julia starts lazily when the model
+is evaluated or fitted; no native module pointers are created.
 
 ### `fit_fims()`
 
-The list returned from `initialize_fims()` can be passed to the parameter of `fit_fims()` called `input` to run a FIMS model. If `optimize = FALSE`, the model will not actually be optimized but instead just checked to ensure it is a viable model. When `optimize = TRUE`, the model will be fit using `stats::nlminb()` and an object of the class `FIMSFit` will be returned.
+Pass the result of `initialize_fims()` to `fit_fims()`. With `optimize = FALSE`,
+the model is evaluated at the supplied values without optimization. With
+`optimize = TRUE`, Julia's LBFGS optimizer estimates the parameters and returns
+a `FIMSFit` object. For random effects, the optimizer minimizes the
+Laplace-adjusted marginal objective; `get_report(fit)[["jnll"]]` contains the
+joint objective.
 
 ### Example
 
@@ -298,22 +307,21 @@ One of the things you can do is to inspect the fit output. You can start with th
 
 You can then do `names(get_report(fit))` to see the names of all the information you can look into specifically and then look at that. You can also look in `View(get_estimates(fit))` to look through the tibble and identify problem data. Also, see the [Viewing results](#viewing-results) section for more information on how to view and filter the results.
 
-#### Logging system
+#### Optimization and uncertainty diagnostics
 
-Another thing is that you can look at the log file in R or write it to the disk but you must run `get_log()` before you run clear to obtain information about the model because clear removes everything from memory, including the log. `get_log()` returns the log information as a string. This string can be manipulated into a data frame using `jsonlite::fromJSON()`. There are three logging levels, "info", "warning", and "error". The log below will not have any error messages but if you were to have error messages and you want to know immediately upon the first error that there are problems, you can run `set_log_throw_on_error(TRUE)` prior to running your model. See the vignette on [FIMS logging](fims-logging.html) or the [doxygen documentation](https://noaa-fims.github.io/FIMS/doxygen/classfims_1_1FIMSLog.html) for more information.
+The retired native logging functions are not available with the Julia backend.
+Errors are raised in R, and convergence or uncertainty failures are reported
+explicitly. Inspect the optimizer summary, gradient, and uncertainty status:
 
-```{r example-log, eval = FALSE}
-log_json_string <- get_log()
-log_data_frame <- jsonlite::fromJSON(log_json_string)
-log_data_frame[1, ]
-dim(log_data_frame)
-# Print how many log entries there are of each type
-dplyr::count(log_data_frame, level)
-# Subset for just the warnings
-log_data_frame |> dplyr::filter(level == "warning")
-
-clear()
+```{r fit-diagnostics, eval = FALSE}
+get_opt(fit)
+get_max_gradient(fit)
+get_sdreport(fit)[["uncertainty_status"]]
+summary(get_sdreport(fit), "fixed")
 ```
+
+`clear()` releases shared bridge input without invalidating existing fitted
+objects or their objective functions.
 
 ### Viewing results
 

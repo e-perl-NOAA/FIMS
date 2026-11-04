@@ -39,13 +39,12 @@
 #' \describe{
 #'   \item{\code{module_name}:}{The name of the FIMS module (e.g.,
 #'     "Data", "Selectivity", "Recruitment", "Growth", "Maturity"). These
-#'     entries are always written in PascalCase to match the names used in the
-#'     C++ code.}
+#'     entries retain the established PascalCase R interface names.}
 #'   \item{\code{fleet}:}{The name of the fleet the module applies to. This
 #'     will be `NA` for non-fleet-specific modules like "Recruitment".}
 #'   \item{\code{module_type}:}{The specific type of the module (e.g.,
 #'     "Logistic" for a "Selectivity" module). This column will always be written
-#'     in PascalCase to match the names used in the C++ code.}
+#'     in PascalCase to retain the established R interface names.}
 #'   \item{\code{label}:}{The parameter name (e.g., "inflection_point").}
 #'   \item{\code{age}:}{The age the parameter applies to.}
 #'   \item{\code{length}:}{The length bin the parameter applies to.}
@@ -58,7 +57,7 @@
 #'     random effect but it does not fit to data, e.g., recruitment deviation.}
 #'   \item{\code{distribution}:}{The distribution name (e.g., "Dlnorm",
 #'     "Dmultinom"). This column will always be written
-#'     in PascalCase to match the names used in the C++ code.}
+#'     in PascalCase to retain the established R interface names.}
 #' }
 #' @export
 #' @keywords setup_default_parameters

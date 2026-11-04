@@ -10,7 +10,7 @@ run_modified_pars_fims(
   module_name = NULL,
   parameters,
   data,
-  backend = c("tmb", "julia"),
+  backend = "julia",
   priors = NULL
 )
 }

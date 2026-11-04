@@ -715,16 +715,19 @@ function lognormal_random_effect_nll(observed, expected, sigma)
 end
 
 function parameter_prior_nll_components(params, model_config)
-  components = get(model_config, :parameter_prior_components, String[])
-  indices = get(model_config, :parameter_prior_indices, Int[])
-  distributions = get(model_config, :parameter_prior_distributions, String[])
-  means = get(model_config, :parameter_prior_means, Float64[])
-  standard_deviations = get(model_config, :parameter_prior_sds, Float64[])
-  transforms = get(
+  # JuliaCall simplifies length-one R vectors, including strings, to scalars.
+  prior_values(value::AbstractArray) = vec(value)
+  prior_values(value) = [value]
+  components = prior_values(get(model_config, :parameter_prior_components, String[]))
+  indices = prior_values(get(model_config, :parameter_prior_indices, Int[]))
+  distributions = prior_values(get(model_config, :parameter_prior_distributions, String[]))
+  means = prior_values(get(model_config, :parameter_prior_means, Float64[]))
+  standard_deviations = prior_values(get(model_config, :parameter_prior_sds, Float64[]))
+  transforms = prior_values(get(
     model_config,
     :parameter_prior_transforms,
     fill("identity", length(components)),
-  )
+  ))
   n_priors = length(components)
   all(length(values) == n_priors for values in (
     indices,
@@ -1130,8 +1133,12 @@ function evaluate_model(parameters_vector, data_dict, model_config)
   prior_nll_components = parameter_prior_nll_components(params, model_config)
   prior_nll_value = sum(prior_nll_components; init = zero(parameter_type))
   nll_components = copy(prior_nll_components)
+  nll_component_labels = fill("parameter_prior", length(prior_nll_components))
+  nll_component_fleets = fill("", length(prior_nll_components))
   if get(model_config, :recruitment_process_active, false) && has_recruitment_process_values
     push!(nll_components, process_nll_value)
+    push!(nll_component_labels, "recruitment_process")
+    push!(nll_component_fleets, "")
   end
   fleet_has_catch = get(
     data_dict,
@@ -1166,17 +1173,26 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     ],
   )
   for fleet_index in 1:n_fleets
+    fleet_name = string(data_dict[:fleets][fleet_index])
     if haskey(data_dict, :observed_catch) && fleet_has_catch[fleet_index]
       push!(nll_components, catch_nll_by_fleet[fleet_index])
+      push!(nll_component_labels, "catch_expected")
+      push!(nll_component_fleets, fleet_name)
     end
     if haskey(data_dict, :observed_index) && fleet_has_index[fleet_index]
       push!(nll_components, index_nll_by_fleet[fleet_index])
+      push!(nll_component_labels, "index_expected")
+      push!(nll_component_fleets, fleet_name)
     end
     if fleet_has_age_comp[fleet_index]
       push!(nll_components, age_comp_nll_by_fleet[fleet_index])
+      push!(nll_component_labels, "agecomp_expected")
+      push!(nll_component_fleets, fleet_name)
     end
     if fleet_has_length_comp[fleet_index]
       push!(nll_components, length_comp_nll_by_fleet[fleet_index])
+      push!(nll_component_labels, "lengthcomp_expected")
+      push!(nll_component_fleets, fleet_name)
     end
   end
   total_nll = sum(nll_components; init = zero(parameter_type))
@@ -1186,6 +1202,8 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     "report" => Dict(
       "parameter_prior_nll" => prior_nll_value,
       "nll_components" => nll_components,
+      "nll_component_labels" => nll_component_labels,
+      "nll_component_fleets" => nll_component_fleets,
       "numbers_at_age" => population.numbers_at_age,
       "catch_numbers_at_age" => population.catch_numbers_at_age,
       "biomass" => population.biomass,

@@ -28,9 +28,9 @@ label_values <- function(values, value_labels = NULL, fallback = "p") {
   ifelse(repeated, sprintf("%s[%d]", value_labels, position), value_labels)
 }
 
-#' Check convergence of nlminb optimization
+#' Check optimizer convergence
 #'
-#' Checks the convergence of the nlminb optimization by evaluating the
+#' Checks optimizer convergence by evaluating the
 #' convergence code and maximum gradient. If convergence issues are detected,
 #' appropriate warnings are issued and the fit is returned for diagnostic
 #' purposes. If the optimizer converged but the maximum gradient is above
@@ -38,17 +38,17 @@ label_values <- function(values, value_labels = NULL, fallback = "p") {
 #'
 #' @param input The FIMS input object used for fitting, containing model
 #' configuration and data.
-#' @param obj The TMB object used for fitting, containing the model environment
+#' @param obj The objective used for fitting, containing the model environment
 #' and random effects.
-#' @param opt The optimization output from nlminb, containing convergence
+#' @param opt The optimization summary, containing convergence
 #' information.
 #' @param maxgrad The maximum absolute gradient from the optimization, used to
 #' assess convergence quality.
 #' @param gradient The gradient vector of the fixed effects at the optimum, used
 #' to name the parameter with the largest absolute gradient. The default of
 #' `NULL` leaves the name out of the messages.
-#' @param parameter_names A character vector of fixed-effect names, e.g., from
-#' [get_parameter_names()], in the same order as `gradient`. If `NULL`, labels
+#' @param parameter_names A character vector of fixed-effect names in the
+#' same order as `gradient`. If `NULL`, labels
 #' such as `"p[2]"` are used.
 #' @return
 #' If convergence issues are detected, a FIMSFit object is returned for
@@ -78,7 +78,7 @@ check_mle_convergence <- function(
     )
   }
 
-  # Check 1: nlminb convergence flag
+  # Check 1: optimizer convergence flag
   if (opt[["convergence"]] != 0) {
     convergence_message <- if (!is.null(opt[["message"]])) {
       c(
@@ -120,13 +120,13 @@ check_mle_convergence <- function(
     }
   }
 
-  # If optimizer did not converge, skip sdreport, warn, and return fit for
-  # diagnostics
+  # Retain the fit for diagnostics without implying valid inference.
   if (length(convergence_issues) > 0) {
     warning_bullets <- c(
       "x" = "Optimization failed convergence checks.",
       setNames(convergence_issues, rep("i", length(convergence_issues))),
-      "i" = "Skipping sdreport. Consider adjusting control parameters
+      "i" = "Do not interpret uncertainty until optimization converges.
+        Consider adjusting control parameters
         (eval.max, iter.max) or model structure.",
       "i" = "Model fit returned for diagnostic purposes only. Results are not
         reliable."
@@ -172,10 +172,10 @@ check_mle_convergence <- function(
 #' If the Hessian is near singular (high condition number), a warning is issued
 #' about potential unreliability of standard errors and MLEs.
 #' @inheritParams check_mle_convergence
-#' @param sdreport The sdreport output from TMB, containing standard errors and
+#' @param sdreport The backend uncertainty report, containing standard errors and
 #' Hessian information.
-#' @param random_effects_names A character vector of random-effect names, e.g.,
-#' from [get_random_names()], in the same order as the random effects in
+#' @param random_effects_names A character vector of random-effect names
+#' in the same order as the random effects in
 #' `sdreport`. If `NULL`, labels such as `"re[2]"` are used.
 #' @return
 #' If convergence issues are detected, a FIMSFit object is returned for
@@ -192,8 +192,7 @@ check_sdreport_convergence <- function(
 ) {
   condition_number_threshold <- 1e5
   has_random_effects <- length(obj[["env"]][["random"]]) > 0
-  # TMB labels every fixed effect "p" and every random effect "re", so prefer
-  # the FIMS names and only fall back to the summary row names without them.
+  # Prefer FIMS names over generic backend summary labels.
   summary_labels <- function(summary_matrix, preferred_labels, fallback) {
     row_labels <- if (is.null(preferred_labels)) {
       rownames(summary_matrix)

@@ -126,18 +126,30 @@ plot_likelihood <- function(like_fit, group = "label") {
   # could use paste() to combine multiple grouping variables into one column
   # then use that column for grouping below
 
-  # summing total likelihood by parameter value and data type, use later for plotting
-  by_type <- like_fit$estimates |>
+  estimates <- like_fit[["estimates"]]
+  component_rows <- "type" %in% names(estimates) &&
+    any(estimates[["type"]] == "likelihood", na.rm = TRUE)
+  if (component_rows) {
+    estimates <- estimates |>
+      dplyr::filter(.data$type == "likelihood")
+  }
+  # Julia supplies one row per component, including equal-valued components.
+  likelihood_rows <- estimates |>
     dplyr::filter(!is.na(.data$lpdf)) |>
-    dplyr::group_by(.data[[column_name]], .data[[group]]) |> # grouping by parameter and data type
-    dplyr::distinct(.data$lpdf) |>
+    dplyr::group_by(.data[[column_name]], .data[[group]])
+  if (!component_rows) {
+    likelihood_rows <- likelihood_rows |> dplyr::distinct(.data$lpdf)
+  }
+  by_type <- likelihood_rows |>
     dplyr::summarize(total_like = sum(.data$lpdf, na.rm = TRUE), .groups = "drop")
 
   ### add total likelihood across all groups
-  total <- like_fit$estimates |>
-    dplyr::filter(!is.na(.data$lpdf)) |>
-    dplyr::group_by(.data[[column_name]]) |>
-    dplyr::distinct(.data$lpdf) |>
+  total <- likelihood_rows |>
+    dplyr::group_by(.data[[column_name]])
+  if (!component_rows) {
+    total <- total |> dplyr::distinct(.data$lpdf)
+  }
+  total <- total |>
     dplyr::summarize(total_like = sum(.data$lpdf, na.rm = TRUE), .groups = "drop") |>
     dplyr::mutate(label = "Total") |>
     dplyr::select(.data[[column_name]], .data$label, .data$total_like)

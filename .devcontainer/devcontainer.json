@@ -1,65 +1,23 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
-// https://github.com/microsoft/vscode-dev-containers/tree/v0.234.0/containers/r
 {
-  "name": "Default: FIMS Developer",
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-  "image": "ghcr.io/rocker-org/devcontainer/r-ver:4.3", //commma needed if other sections are used.
-  // Add capAdd and securityOpt to allow debugging with lldb
-  "capAdd": [
-    "SYS_PTRACE"
-  ],
-  "securityOpt": [
-    "seccomp=unconfined"
-  ],
-  // Features to add to the dev container. More info: https://containers.dev/features.
+  "name": "FIMS R and Julia development",
+  "image": "ghcr.io/rocker-org/devcontainer/r-ver:4.5",
   "features": {
-    // if we want to install r packages using pak
-    // more info: https://github.com/rocker-org/devcontainer-features/blob/main/src/r-packages/README.md
-    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
-      "packages": "clang,clang-format,clang-tidy,cmake,doxygen,g++,gcc,libxt6,libxtst6,lldb,make,ninja-build,gdb,valgrind",
-      "updatePackages": true
+    "ghcr.io/julialang/devcontainer-features/julia:1": {
+      "version": "1.10"
     },
     "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
-      "packages": "covr,dplyr,devtools,furrr,ggplot2,graphics,jsonlite,methods,Rcpp,RcppEigen,scales,snowfall,TMB,tibble,tidyr,usethis,yardstick",
+      "packages": "pak,devtools,JuliaCall,testthat,styler,roxygen2",
       "installSystemRequirements": true
-    },
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "24"
     }
   },
-  // // if we want quarto cli
-  // more info: https://github.com/rocker-org/devcontainer-features/blob/main/src/quarto-cli/README.md
-  //    "ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {}
-  // },
-  // Use 'forwardPorts' to make a list of ports inside the container available locally.
-  // "forwardPorts": [],
-  "updateContentCommand": "Rscript -e 'options(repos = c(NOAA = \"https://noaa-fisheries-integrated-toolbox.r-universe.dev\", CRAN = \"https://cloud.r-project.org\")); pak::pak(c(\"github::noaa-afsc/SparseNUTS\", \"nmfs-ost/stockplotr\"))' || (echo '' && echo '>>> WARNING: Package installation failed! <<<' && echo 'Please install manually after opening the container.' && echo '')",
-  // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "echo 'options(repos = c(CRAN = \"https://cloud.r-project.org\"))' | sudo sh -c 'cat - >>\"${R_HOME}/etc/Rprofile.site\"' && npm install --global cspell@8.19.4",
-  // Configure tool-specific properties.
+  "postCreateCommand": "Rscript -e 'pak::pak(\"local::.\"); FIMS::setup_julia()'",
   "customizations": {
     "vscode": {
-      // Set *default* container specific settings.json values on container create.
-      // Add the IDs of extensions you want installed when the container is created.
       "extensions": [
-        // if we want liveshare.
-        "ms-vsliveshare.vsliveshare",
-        "streetsidesoftware.code-spell-checker",
-        "ms-vscode.cpptools",
-        "ms-vscode.cmake-tools",
-        "GitHub.codespaces",
-        "bbenoist.Doxygen",
-        "matepek.vscode-catch2-text-adapter",
-        "hbenl.vscode-test-explorer",
         "reditorsupport.r",
-        "rdebugger.r-debugger",
+        "julialang.language-julia",
         "github.vscode-pull-request-github"
-      ],
-      "settings": {
-        "r.session.emulateRStudioAPI": false
-      }
+      ]
     }
-    // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-    // "remoteUser": "root"
   }
 }

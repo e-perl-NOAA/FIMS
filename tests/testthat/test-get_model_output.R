@@ -14,18 +14,15 @@ fit_big_unoptimized <- FIMS:::fit_big_unoptimized
 
 ## IO correctness ----
 test_that("`get_model_output()` works with correct inputs", {
-  expected_names <- c(
-    "name", "type", "estimation_framework", "id", "objective_function_value",
-    "growth", "recruitment", "maturity",
-    "selectivity", "population_ids", "fleet_ids", "populations", "fleets",
-    "density_components", "data"
-  )
+  expected_names <- c("backend", "estimates", "report")
 
   for (fit in list(fit_big_optimized, fit_big_unoptimized)) {
     model_output <- get_model_output(fit)
     json_list <- jsonlite::fromJSON(model_output, simplifyVector = FALSE)
     #' @description Test that `get_model_output()` returns the expected model output fields.
     expect_equal(names(json_list), expected_names)
+    expect_identical(json_list[["backend"]], "julia")
+    expect_equal(json_list[["report"]][["jnll"]], get_report(fit)[["jnll"]])
   }
 })
 
