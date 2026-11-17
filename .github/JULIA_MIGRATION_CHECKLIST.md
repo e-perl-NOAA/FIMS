@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **P1**.
+   Name that item before starting. The default next item is **P2**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -85,7 +85,7 @@ The release requirement is **complete Julia fits, including uncertainty, no
 slower than native C++/TMB, preferably faster**. A faster gradient or a saved
 fit is not acceptance evidence.
 
-- [ ] **P1 - Build one reproducible matched full-fit benchmark harness.**
+- [x] **P1 - Build one reproducible matched full-fit benchmark harness.**
   **Depends on:** none.
   **Done when:** one documented command launches native and Julia in separate
   R processes using identical full-model data, full-precision starts, fixed/
@@ -96,6 +96,37 @@ fit is not acceptance evidence.
   do not hide Julia startup costs. Run a bounded smoke case to prove both
   harness branches and failure propagation work. This item delivers the
   executable harness, not a claim of performance parity.
+
+  **Completed:** 2026-11-17; implementation commit `1ef4e451`.
+  The [benchmark instructions](../data-raw/BACKEND_BENCHMARK.md) provide
+  the single full-model command, separate P2/P3 commands, timing boundaries,
+  live diagnostics, and failure semantics.
+
+  **Verification:** ran the documented real smoke protocol with one warm
+  repetition, iteration/evaluation limits 400/1000, three restarts, and
+  30-second safe-point snapshots on Windows x64, R 4.6.2, Julia 1.10.10,
+  and one BLAS/Julia thread. Both cold and warm comparisons passed:
+  ten active estimates/SEs, complete 10-by-10 covariance, joint/marginal
+  objectives, and all 32 common derived-SE families (2,216 rows).
+  Actual serialized starts matched the shared input. Full-case input
+  construction separately verified 49 fixed/29 random parameters and
+  the 32-family requirement; no full benchmark fit was run for P1.
+
+  **Failure/live-profile checks:** a deliberately nonconverged native fit
+  returned worker/controller exit 1; a one-second native preparation timeout
+  returned worker exit 124/controller exit 1. Both retained `failure.json`
+  without a success summary. Corrupted reference checksums/covariance and
+  existing-output overwrite attempts were rejected. Five cold and two warm
+  Julia snapshots were retained, including useful snapshots observed before
+  process exit. Twenty focused Julia assertions passed, covering same-task
+  observer execution/error propagation and coupled Laplace derivatives;
+  profiler initialization-failure cleanup and final flushing also passed.
+
+  **Evidence:** [portable smoke record](../data-raw/backend-benchmark-smoke.json);
+  raw local session artifacts `p1-smoke-03`, `p1-expected-nonconvergence`,
+  and `p1-expected-timeout` retain full-precision results, metadata, logs,
+  and profiles. Smoke timings include profiling/JIT overhead and overlapping
+  failure-check work; they are not P2/P3/P6 performance evidence.
 
 - [ ] **P2 - Capture the matched native full-fit timing baseline.**
   **Depends on:** P1.

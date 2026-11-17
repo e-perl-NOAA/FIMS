@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "checklist_item": "P1",
+  "status": "passed",
+  "date": "2026-11-17",
+  "scope": "Real bounded harness smoke; not a controlled full-model performance benchmark.",
+  "environment": {
+    "platform": "Windows x64",
+    "R": "4.6.2",
+    "Julia": "1.10.10",
+    "FIMS": "0.11.0.9000",
+    "thread_environment": 1,
+    "actual_julia_blas_threads": 1,
+    "dependency_cache": "Existing caches reused; not a clean-depot installation."
+  },
+  "native_provenance": {
+    "declared_historical_revision": "1e5a64a8",
+    "loaded_dll_md5": "7791104ab1295dcec1725062eb5f1f0a",
+    "source": "Preserved independent native oracle export; not the production candidate."
+  },
+  "harness_md5": {
+    "benchmark_backends.R": "021f47b8af1b422a2110867e2372bdba",
+    "benchmark_profile.jl": "e68b2f8eb170238e4e15dbf66e93ed7a"
+  },
+  "full_input_construction": {
+    "fixture": "native-full-model-oracle.rds",
+    "fixed_parameters": 49,
+    "random_parameters": 29,
+    "required_derived_families": 32,
+    "full_fit_executed_for_P1": false
+  },
+  "smoke_protocol": {
+    "fixture": "native-configuration-oracle.rds",
+    "case": "EWAA-joint",
+    "fixed_parameters": 6,
+    "random_parameters": 4,
+    "priors": null,
+    "iter_max": 400,
+    "eval_max": 1000,
+    "restarts": 3,
+    "warm_runs": 1,
+    "snapshot_seconds": 30,
+    "input_md5": "bac531aa5391afbf4c53e93f9fc17e13",
+    "objective_tolerance": 0.000001,
+    "estimate_covariance_SE_tolerance": 0.0001,
+    "maximum_absolute_fixed_gradient_threshold": 0.001
+  },
+  "comparisons": {
+    "cold": {
+      "status": "passed",
+      "parameters": 10,
+      "complete_covariance_shape": [10, 10],
+      "derived_families": 32,
+      "derived_rows": 2216
+    },
+    "warm_1": {
+      "status": "passed",
+      "parameters": 10,
+      "complete_covariance_shape": [10, 10],
+      "derived_families": 32,
+      "derived_rows": 2216
+    },
+    "actual_serialized_starts_match_shared_input": true,
+    "all_trials_converged_with_valid_gradients_and_uncertainty": true,
+    "additional_julia_derived_family_retained_separately": "spawning_biomass_ratio"
+  },
+  "instrumented_smoke_timings_seconds": {
+    "native": {
+      "cold_process_to_result": 20.5257499217987,
+      "cold_trial_wall": 9.5,
+      "warm_1_trial_wall": 11.56
+    },
+    "julia": {
+      "cold_process_to_result": 152.519139051437,
+      "cold_trial_wall": 138.49,
+      "warm_1_trial_wall": 9.73999999999998,
+      "cold_snapshot_writing": 38.5450000762939,
+      "warm_1_snapshot_writing": 0.899999856948853
+    },
+    "limitations": "Smoke-only instrumented timings, including substantial cold profile formatting/JIT cost. A bounded native failure check overlapped the Julia cold trial. Do not interpret these as P2/P3/P6 performance evidence."
+  },
+  "live_profiles": {
+    "cold_snapshots": 5,
+    "warm_1_snapshots": 2,
+    "snapshots_observed_before_worker_exit": true,
+    "cold_midfit_stages": [
+      "conditional_mode:complete",
+      "uncertainty_joint_hessian:start",
+      "report_standard_errors:complete"
+    ],
+    "safe_point_latency_and_profiling_overhead_documented": true
+  },
+  "failure_checks": {
+    "native_one_iteration_one_evaluation": {
+      "worker_exit": 1,
+      "controller_exit": 1,
+      "failure_json_written": true,
+      "success_summary_absent": true
+    },
+    "native_prepare_one_second_timeout": {
+      "worker_exit": 124,
+      "controller_exit": 1,
+      "failure_json_written": true,
+      "success_summary_absent": true,
+      "timed_out_child_no_longer_running": true
+    },
+    "changed_reference_checksum_rejected": true,
+    "corrupted_reference_covariance_rejected": true,
+    "profiler_initialization_failure_resets_observer": true,
+    "profiler_duplicate_start_rejected": true,
+    "profiler_final_snapshot_and_observer_cleanup_verified": true
+  },
+  "focused_julia_regressions": {
+    "synchronous_same_task_checkpoint_observer": 5,
+    "coupled_implicit_Laplace_derivatives": 15,
+    "failures": 0
+  },
+  "raw_local_session_artifacts": [
+    "p1-smoke-03",
+    "p1-expected-nonconvergence",
+    "p1-expected-timeout"
+  ],
+  "performance_parity_established": false
+}
