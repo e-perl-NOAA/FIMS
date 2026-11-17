@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **P2**.
+   Name that item before starting. The default next item is **P3**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -128,13 +128,47 @@ fit is not acceptance evidence.
   and profiles. Smoke timings include profiling/JIT overhead and overlapping
   failure-check work; they are not P2/P3/P6 performance evidence.
 
-- [ ] **P2 - Capture the matched native full-fit timing baseline.**
+- [x] **P2 - Capture the matched native full-fit timing baseline.**
   **Depends on:** P1.
   **Done when:** the harness records at least one cold-process run and three
   warm full fits in a consistent environment, with convergence, acceptable
   gradients, valid uncertainty, saved numerical outputs, and phase timings.
   Retain full-precision output and native provenance. An old 5.7-minute run
   with unmatched settings is not a substitute.
+
+  **Completed:** 2026-11-17; evidence commit `8f3b383d`, captured against
+  candidate `b83f908f`. Ran the documented native-only full-model command
+  with one cold and three warm fits, controls 10000/10000, three restarts,
+  unchanged full-precision starts, and no added priors. Environment:
+  Windows 11 x64, R 4.6.2, TMB 1.9.21, Intel i7-1365U, Balanced power plan,
+  and single-thread settings. The independently preserved native DLL
+  fingerprint matched the `1e5a64a8` oracle provenance.
+
+  **Result:** all four 49-fixed/29-random fits converged with maximum absolute
+  fixed gradient `0.000359420286652812` (below `1e-3`), valid uncertainty,
+  complete positive-definite 78-by-78 covariance, and all 32 required
+  derived-SE families (13,091 rows). Warm numerical outputs matched cold
+  at existing tolerances. Each trial had four optimization passes and one
+  uncertainty pass; all profiles and phase markers were retained.
+
+  **Timings:** cold process launch to result 209.17 seconds; cold trial wall
+  198.98 seconds. Warm trial wall times were 199.86, 187.67, and 184.42
+  seconds (median 187.67; mean 190.65), including initialization, fitting/
+  uncertainty, extraction/validation, and profiling. The host was an
+  interactive workstation, not an exclusive timing host; preflight CPU load
+  ranged from 19% to 43%. No other FIMS jobs or concurrent agent builds,
+  tests, or model fits were launched during collection.
+
+  **Evidence:** [portable baseline record](../data-raw/benchmarks/native-full-2026-11-17/baseline.json)
+  and [command/phase breakdown](../data-raw/BACKEND_BENCHMARK.md#p2-native-full-model-baseline-2026-11-17).
+  The committed adjacent `input.rds`, four full-precision `result.rds` files,
+  and native phase timestamps have verified checksums and no user-specific
+  paths. P3 can use this directory directly as `--reference`; reconstructing
+  its input reproduces checksum `ad075166d27afabb8dbe224aa73b84c6`.
+  Raw local artifact `p2-native-full-01` additionally retains complete logs
+  and profiles, including native sampling data observed during uncertainty.
+  No fresh Julia full-fit comparison or performance-parity decision has
+  been made.
 
 - [ ] **P3 - Capture fresh matched Julia full fits and compare all outputs.**
   **Depends on:** P1, P2.
