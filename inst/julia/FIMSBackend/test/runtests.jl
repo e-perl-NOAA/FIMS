@@ -75,6 +75,31 @@ end
   @test size(FIMSBackend._hessian_covariance(zeros(0, 0))) == (0, 0)
 end
 
+@testset "optimizer checkpoint observers run synchronously and surface errors" begin
+  previous = FIMSBackend._optimizer_checkpoint_observer[]
+  stages = String[]
+  tasks = Task[]
+  try
+    FIMSBackend._optimizer_checkpoint_observer[] = stage -> begin
+      push!(stages, stage)
+      push!(tasks, current_task())
+    end
+    mktempdir() do directory
+      path = joinpath(directory, "progress.log")
+      FIMSBackend._optimizer_checkpoint(path, "test:start")
+      @test stages == ["test:start"]
+      @test tasks == [current_task()]
+      @test endswith(only(readlines(path)), " test:start")
+      FIMSBackend._optimizer_checkpoint(nothing, "disabled")
+      @test stages == ["test:start"]
+      FIMSBackend._optimizer_checkpoint_observer[] = stage -> error("snapshot failed")
+      @test_throws ErrorException FIMSBackend._optimizer_checkpoint(path, "test:error")
+    end
+  finally
+    FIMSBackend._optimizer_checkpoint_observer[] = previous
+  end
+end
+
 @testset "implicit Laplace derivatives with coupled random effects" begin
   fixed_indices = [3, 2]
   random_indices = [4, 1]

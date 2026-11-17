@@ -15,6 +15,8 @@
 
 The [Julia migration checklist](.github/JULIA_MIGRATION_CHECKLIST.md) tracks
 the remaining work as bounded items with explicit completion criteria.
+The [matched backend benchmark](data-raw/BACKEND_BENCHMARK.md) documents the
+separate-process native/Julia harness and its cold/warm timing boundaries.
 
 FIMS is an R package for fitting integrated statistical population-dynamics models to fishery data. Julia implements the population model, likelihood, automatic differentiation, optimization, and uncertainty calculations. The high-level R data, parameter, fitting, and diagnostic interfaces remain available.
 

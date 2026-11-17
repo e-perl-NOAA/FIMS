@@ -17,11 +17,15 @@ function _bounded_jacobian(objective, values)
   ForwardDiff.jacobian(objective, values, config)
 end
 
+const _optimizer_checkpoint_observer = Ref{Union{Nothing, Function}}(nothing)
+
 function _optimizer_checkpoint(path, stage)
   isnothing(path) && return nothing
   open(path, "a") do io
     println(io, round(time(); digits = 3), " ", stage)
   end
+  observer = _optimizer_checkpoint_observer[]
+  isnothing(observer) || observer(stage)
   nothing
 end
 
