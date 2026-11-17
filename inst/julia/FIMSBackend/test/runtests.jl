@@ -5,6 +5,17 @@ using ForwardDiff: derivative
 using LinearAlgebra: diag
 using SpecialFunctions: erf
 
+@testset "Beverton-Holt recruitment" begin
+  logit_steep = 0.3
+  rzero = 1000.0
+  spawners = 200.0
+  phi_0 = 0.4
+  steep = 0.2 + 0.8 / (1 + exp(-logit_steep))
+  expected = 0.8 * rzero * steep * spawners /
+    (0.2 * phi_0 * rzero * (1 - steep) + spawners * (steep - 0.2))
+  @test BevertonHolt(logit_steep, log(rzero))(spawners, phi_0) ≈ expected rtol = 1e-13
+end
+
 @testset "parameter prior transforms" begin
   parameters = ComponentArray((
     maturity_slope = 2.0,
@@ -107,6 +118,30 @@ end
   @test conditional.converged
   @test conditional.parameters ≈ parameters atol = 1e-8
   @test conditional.marginal_nll ≈ marginal(fixed) atol = 1e-8
+
+  # Exceed the differentiation chunk width and retain mode sensitivity.
+  wide_fixed = collect(range(-0.2, 0.3; length = 6))
+  wide_parameters = vcat(wide_fixed, wide_fixed .^ 2)
+  wide_objective = values -> sum(
+    0.5 * values[index]^2 +
+    exp(values[index]) * (
+      exp(values[index + 6] - values[index]^2) -
+      (values[index + 6] - values[index]^2)
+    )
+    for index in 1:6
+  )
+  mktempdir() do directory
+    diagnostic_file = joinpath(directory, "progress.log")
+    actual = FIMSBackend._laplace_gradient(
+      wide_objective, wide_parameters, collect(1:6), collect(7:12);
+      diagnostic_file = diagnostic_file,
+    )
+    @test actual ≈ wide_fixed .+ exp.(wide_fixed) .+ 0.5 atol = 1e-10
+    @test map(line -> split(line)[2], readlines(diagnostic_file)) == [
+      "laplace_joint_hessian:start", "laplace_joint_hessian:complete",
+      "laplace_third_derivatives:start", "laplace_third_derivatives:complete",
+    ]
+  end
 end
 
 @testset "population proportion-female parameter layouts" begin
@@ -776,7 +811,7 @@ end
   mean_recruitment =
     0.8 * 1000.0 * steepness * spawning_biomass /
     (
-      0.2 * expected_phi_0 * 1000.0 * (1.0 - steepness + sqrt(eps(Float64))) +
+      0.2 * expected_phi_0 * 1000.0 * (1.0 - steepness) +
         spawning_biomass * (steepness - 0.2)
     )
   expected_process_nll =

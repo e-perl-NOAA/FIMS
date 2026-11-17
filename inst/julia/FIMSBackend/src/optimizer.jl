@@ -7,6 +7,24 @@ using Optim: LineSearches
 _primal_float(value::ForwardDiff.Dual) = _primal_float(ForwardDiff.value(value))
 _primal_float(value::Real) = Float64(value)
 
+function _bounded_gradient(objective, values)
+  config = ForwardDiff.GradientConfig(objective, values, ForwardDiff.Chunk(values, 4))
+  gradient(objective, values, config)
+end
+
+function _bounded_jacobian(objective, values)
+  config = ForwardDiff.JacobianConfig(objective, values, ForwardDiff.Chunk(values, 4))
+  ForwardDiff.jacobian(objective, values, config)
+end
+
+function _optimizer_checkpoint(path, stage)
+  isnothing(path) && return nothing
+  open(path, "a") do io
+    println(io, round(time(); digits = 3), " ", stage)
+  end
+  nothing
+end
+
 function _flatten_init_params(init_params, model_config = Dict())
   if init_params isa ComponentArray
     return Float64.(collect(init_params)), init_params
@@ -115,7 +133,9 @@ function _numerical_gradient_hessian(objective_gradient, x)
   Matrix(Symmetric((result + result') / 2))
 end
 
-function _laplace_gradient(joint_objective, parameters, fixed_indices, random_indices)
+function _laplace_gradient(
+  joint_objective, parameters, fixed_indices, random_indices; diagnostic_file = nothing,
+)
   isempty(fixed_indices) && return Float64[]
   fixed_count = length(fixed_indices)
   active_indices = vcat(fixed_indices, random_indices)
@@ -124,27 +144,48 @@ function _laplace_gradient(joint_objective, parameters, fixed_indices, random_in
     parameters, fixed_indices, values[1:fixed_count],
     random_indices, values[(fixed_count + 1):end],
   ))
-  laplace_integrand = values -> begin
-    fixed_values = values[1:fixed_count]
-    random_values = values[(fixed_count + 1):end]
+  isempty(random_indices) && return _bounded_gradient(active_joint, active_parameters)
+  _optimizer_checkpoint(diagnostic_file, "laplace_joint_hessian:start")
+  random_gradient = values -> begin
     random_objective = random -> joint_objective(_compose_parameter_vector(
-      parameters, fixed_indices, fixed_values, random_indices, random,
+      parameters, fixed_indices, values[1:fixed_count], random_indices, random,
     ))
-    active_joint(values) + 0.5 * _positive_definite_logdet(
-      hessian(random_objective, random_values),
-    )
+    _bounded_gradient(random_objective, values[(fixed_count + 1):end])
   end
-  joint_curvature = hessian(active_joint, active_parameters)
+  random_curvature = _bounded_jacobian(random_gradient, active_parameters)
+  _optimizer_checkpoint(diagnostic_file, "laplace_joint_hessian:complete")
   random_positions = (fixed_count + 1):length(active_indices)
-  # Apply the implicit derivative of the conditional mode; holding that mode
-  # fixed would omit its contribution to the log-determinant derivative.
+  random_factor = cholesky(Symmetric(random_curvature[:, random_positions]))
   mode_sensitivity = -(
-    Symmetric(joint_curvature[random_positions, random_positions]) \
-    joint_curvature[random_positions, 1:fixed_count]
+    random_factor \
+    random_curvature[:, 1:fixed_count]
   )
-  integrand_gradient = gradient(laplace_integrand, active_parameters)
-  integrand_gradient[1:fixed_count] +
-    mode_sensitivity' * integrand_gradient[random_positions]
+  random_directions = inv(random_factor.U)
+  fixed_start = parameters[fixed_indices]
+  random_start = parameters[random_indices]
+  # d logdet(H) = tr(inv(H) dH). Freeze B with B*B' = inv(H), and
+  # differentiate sum(b' * H * b) instead of a full dual-valued Hessian.
+  linearized_marginal = fixed_values -> begin
+    random_values = random_start + mode_sensitivity * (fixed_values - fixed_start)
+    result = joint_objective(_compose_parameter_vector(
+      parameters, fixed_indices, fixed_values, random_indices, random_values,
+    ))
+    for direction in eachcol(random_directions)
+      directional_objective = offset -> joint_objective(_compose_parameter_vector(
+        parameters, fixed_indices, fixed_values, random_indices,
+        random_values + offset * direction,
+      ))
+      result += 0.5 * ForwardDiff.derivative(
+        offset -> ForwardDiff.derivative(directional_objective, offset),
+        zero(eltype(fixed_values)),
+      )
+    end
+    result
+  end
+  _optimizer_checkpoint(diagnostic_file, "laplace_third_derivatives:start")
+  marginal_gradient = _bounded_gradient(linearized_marginal, fixed_start)
+  _optimizer_checkpoint(diagnostic_file, "laplace_third_derivatives:complete")
+  marginal_gradient
 end
 
 function _positive_definite_logdet(hessian_matrix)
@@ -251,12 +292,18 @@ function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, 
     result.marginal_nll
   end
   objective_gradient = fixed -> begin
+    diagnostic_file = get(objective_config, :diagnostic_file, nothing)
+    _optimizer_checkpoint(diagnostic_file, "conditional_mode:start")
     result = _conditional_mode(
       x0, fixed_indices, fixed, random_indices, joint_objective, options,
     )
     result.converged ||
       throw(ArgumentError("Random-effect optimization did not converge while evaluating the gradient."))
-    _laplace_gradient(joint_objective, result.parameters, fixed_indices, random_indices)
+    _optimizer_checkpoint(diagnostic_file, "conditional_mode:complete")
+    _laplace_gradient(
+      joint_objective, result.parameters, fixed_indices, random_indices;
+      diagnostic_file = diagnostic_file,
+    )
   end
   if derivative_order == 3
     result = _conditional_mode(
@@ -397,6 +444,8 @@ function fit_model(init_params, data_dict, config = Dict())
     String.(Symbol.(propertynames(parameter_layout))) :
     String.(parameter_layout)
   objective_config = merge(Dict(:parameter_names => parameter_names), objective_config)
+  diagnostic_file = get(objective_config, :diagnostic_file, nothing)
+  _optimizer_checkpoint(diagnostic_file, "fit:start")
   optimizer_options = _optimizer_options(objective_config)
   optimizer_restarts = Int(get(objective_config, :optimizer_restarts, 0))
   optimizer_restarts >= 0 ||
@@ -419,15 +468,25 @@ function fit_model(init_params, data_dict, config = Dict())
     evaluate_nll(_named_component_array(parameters, parameter_layout), data_dict, objective_config)
 
   function conditional_mode(fixed_values)
-    _conditional_mode(
+    _optimizer_checkpoint(diagnostic_file, "conditional_mode:start")
+    result = _conditional_mode(
       x0, fixed_indices, fixed_values, random_indices, joint_objective, optimizer_options,
     )
+    _optimizer_checkpoint(diagnostic_file, "conditional_mode:complete")
+    result
   end
 
-  marginal_objective = fixed_values -> conditional_mode(fixed_values).marginal_nll
+  marginal_objective = fixed_values -> begin
+    value = conditional_mode(fixed_values).marginal_nll
+    _optimizer_checkpoint(diagnostic_file, "outer_objective:value=$value")
+    value
+  end
   marginal_gradient = fixed_values -> begin
     result = conditional_mode(fixed_values)
-    _laplace_gradient(joint_objective, result.parameters, fixed_indices, random_indices)
+    _laplace_gradient(
+      joint_objective, result.parameters, fixed_indices, random_indices;
+      diagnostic_file = diagnostic_file,
+    )
   end
   outer_gradient! = (storage, fixed_values) -> begin
     values = if isempty(random_indices)
@@ -435,6 +494,9 @@ function fit_model(init_params, data_dict, config = Dict())
     else
       marginal_gradient(fixed_values)
     end
+    _optimizer_checkpoint(
+      diagnostic_file, "outer_gradient:max_abs=$(maximum(abs, values))",
+    )
     copyto!(storage, values)
   end
 
@@ -458,6 +520,7 @@ function fit_model(init_params, data_dict, config = Dict())
     result
   end
   fixed_hat = _primal_float.(isnothing(outer_result) ? fixed_start : minimizer(outer_result))
+  _optimizer_checkpoint(diagnostic_file, "outer_optimization:complete")
   conditional_result = conditional_mode(fixed_hat)
   xhat = _primal_float.(conditional_result.parameters)
   estimate_components = _named_component_array(xhat, parameter_layout)
@@ -466,6 +529,7 @@ function fit_model(init_params, data_dict, config = Dict())
   # Constants have no sampling uncertainty. Leave their unevaluated curvature
   # explicitly unavailable instead of differentiating the entire input.
   joint_hessian = fill(NaN, length(xhat), length(xhat))
+  _optimizer_checkpoint(diagnostic_file, "uncertainty_joint_hessian:start")
   if !isempty(active_indices)
     active_objective = values -> joint_objective(_compose_parameter_vector(
       xhat, active_indices, values, Int[], Float64[],
@@ -473,7 +537,9 @@ function fit_model(init_params, data_dict, config = Dict())
     joint_hessian[active_indices, active_indices] .=
       hessian(active_objective, xhat[active_indices])
   end
+  _optimizer_checkpoint(diagnostic_file, "uncertainty_joint_hessian:complete")
   compute_standard_errors = Bool(get(objective_config, :compute_standard_errors, true))
+  _optimizer_checkpoint(diagnostic_file, "uncertainty_marginal_hessian:start")
   fixed_hessian = if isempty(fixed_indices)
     zeros(Float64, 0, 0)
   elseif isempty(random_indices)
@@ -483,6 +549,7 @@ function fit_model(init_params, data_dict, config = Dict())
   else
     Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   end
+  _optimizer_checkpoint(diagnostic_file, "uncertainty_marginal_hessian:complete")
   fixed_covariance = if compute_standard_errors
     _hessian_covariance(fixed_hessian)
   else
@@ -523,6 +590,7 @@ function fit_model(init_params, data_dict, config = Dict())
     fill!(standard_errors, NaN)
   end
   se_components = _named_component_array(standard_errors, parameter_layout)
+  _optimizer_checkpoint(diagnostic_file, "report_standard_errors:start")
   report_uncertainty =
     compute_standard_errors ?
     _report_standard_errors(
@@ -535,6 +603,7 @@ function fit_model(init_params, data_dict, config = Dict())
       value_names = String[],
       covariance = nothing,
     )
+  _optimizer_checkpoint(diagnostic_file, "report_standard_errors:complete")
 
   fit_gradient = zeros(Float64, length(x0))
   if !isempty(fixed_indices)
@@ -548,6 +617,7 @@ function fit_model(init_params, data_dict, config = Dict())
 
   fixed_converged = isnothing(outer_result) || converged(outer_result)
   random_converged = conditional_result.converged
+  _optimizer_checkpoint(diagnostic_file, "fit:complete")
   fit_converged = fixed_converged && random_converged
   convergence_code = if fixed_converged && random_converged
     isempty(active_indices) ? "no_estimable_parameters" :

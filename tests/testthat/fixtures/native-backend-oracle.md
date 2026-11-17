@@ -26,3 +26,11 @@ for deterministic objectives/reports, `1e-6` for optimized objectives, and
 `1e-4` for optimized estimates and standard errors. These narrow cases do not
 prove parity for every model, prior, or estimation configuration. The former
 native comparison job remains reproducible from the historical revision.
+
+`native-full-model-oracle.rds` captures the full 49-fixed/29-random example
+fit at that same revision. Parameter estimates are taken from the native
+uncertainty report at full precision rather than the rounded native JSON. The
+joint objective and reports were re-evaluated in the native backend at those
+exact values, treating recruitment deviations as fixed. The Julia regression
+evaluates the same point; it does not establish optimized-fit or uncertainty
+parity.

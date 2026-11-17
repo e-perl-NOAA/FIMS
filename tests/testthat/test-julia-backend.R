@@ -1151,6 +1151,40 @@ test_that("Julia backend serializes VonBertalanffy delta-method variability", {
   expect_equal(flat_parameter[["uncertainty"]], 0.2)
 })
 
+test_that("Julia parameter estimates separate maturity and selectivity labels", {
+  parameters <- tibble::tibble(
+    module_name = c("Maturity", "Selectivity", "Selectivity",
+      "Maturity", "Selectivity", "Selectivity", "Fleet"),
+    fleet = c(NA_character_, "fleet1", "survey1", NA_character_,
+      "fleet1", "survey1", "fleet1"),
+    label = c("inflection_point", "inflection_point", "inflection_point",
+      "slope", "slope", "slope", "log_Fmort"),
+    timing = c(rep(NA_integer_, 6), 2L),
+    value = seq_len(7),
+    estimation_type = "fixed_effects"
+  )
+  flattened <- FIMS:::flatten_julia_parameter_rows(
+    parameters,
+    estimates = list(
+      inflection_point = c(2.1, 3.2), slope = c(5.3, 6.4),
+      maturity_inflection_point = 1.2, maturity_slope = 4.3,
+      log_Fmort = 7.5
+    ),
+    standard_errors = list(
+      inflection_point = c(0.21, 0.32), slope = c(0.53, 0.64),
+      maturity_inflection_point = 0.12, maturity_slope = 0.43,
+      log_Fmort = 0.75
+    )
+  )
+  matched <- parameters |>
+    dplyr::select("module_name", "fleet", "label") |>
+    dplyr::left_join(flattened, by = c("module_name", "fleet", "label"))
+  expect_equal(nrow(flattened), nrow(parameters))
+  expect_equal(matched[["estimated"]], c(1.2, 2.1, 3.2, 4.3, 5.3, 6.4, 7.5))
+  expect_equal(matched[["uncertainty"]], c(0.12, 0.21, 0.32, 0.43, 0.53, 0.64, 0.75))
+  expect_equal(matched[["year_i"]], parameters[["timing"]])
+})
+
 test_that("Julia backend config preserves normal catch and lognormal index likelihoods", {
   data <- data_big |>
     dplyr::mutate(
@@ -1966,6 +2000,42 @@ test_that("real Julia evaluation retains the saved native deterministic oracle",
   json <- jsonlite::fromJSON(get_model_output(fit))
   expect_identical(json[["backend"]], "julia")
   expect_true(all(c("estimates", "report") %in% names(json)))
+})
+
+test_that("real Julia full model matches the native optimum at fixed parameters", {
+  skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
+    "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise the real Julia bridge.")
+  oracle <- readRDS(testthat::test_path("fixtures", "native-full-model-oracle.rds"))
+  values <- oracle[["estimates"]] |>
+    dplyr::transmute(
+      module_name = .data$module_name, fleet = .data$fleet, label = .data$label,
+      timing = .data$year_i, age = .data$age, length = .data$length,
+      value = .data$estimated
+    )
+  parameters <- oracle[["parameters"]] |>
+    dplyr::rows_update(
+      values, by = c("module_name", "fleet", "label", "timing", "age", "length")
+    ) |>
+    dplyr::mutate(estimation_type = "constant")
+  fit <- initialize_fims(parameters, FIMSFrame(oracle[["data"]])) |>
+    fit_fims(optimize = FALSE, get_sd = FALSE)
+  report <- get_report(fit)
+  expect_equal(report[["jnll"]], oracle[["joint"]], tolerance = 1e-8)
+  fields <- c(
+    "numbers_at_age", "biomass", "spawning_biomass", "expected_recruitment",
+    "mortality_F", "mortality_M", "mortality_Z", "proportion_mature_at_age",
+    "catch_expected", "index_expected", "unfished_biomass",
+    "unfished_numbers_at_age", "unfished_spawning_biomass",
+    "spawning_biomass_ratio", "agecomp_expected", "lengthcomp_expected",
+    "total_catch_numbers", "total_catch_weight"
+  )
+  for (field in fields) {
+    actual <- unname(unlist(report[[field]]))
+    expected <- unname(unlist(oracle[["report"]][[field]]))
+    expect_true(length(expected) > 0L)
+    expect_true(all(is.finite(actual)))
+    expect_equal(actual, expected, tolerance = 1e-8, info = field)
+  }
 })
 
 test_that("real Julia fits retain the saved optimized native comparisons", {

@@ -595,8 +595,13 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
     ),
     growth_component_map
   )
+  parameter_labels <- dplyr::if_else(
+    parameter_info[["module_name"]] == "Maturity",
+    paste0("maturity_", parameter_info[["label"]]),
+    parameter_info[["label"]]
+  )
   component_labels <- component_labels[
-    component_labels %in% unique(parameter_info[["label"]])
+    component_labels %in% unique(parameter_labels)
   ]
   mapped_labels <- unique(unname(component_labels))
   if (length(mapped_labels) == 0L) {
@@ -605,7 +610,7 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
 
   purrr::map_dfr(mapped_labels, function(label_name) {
     rows <- parameter_info |>
-      dplyr::filter(.data$label == .env$label_name)
+      dplyr::filter(.env$parameter_labels == .env$label_name)
     if (identical(label_name, "length_at_age_sd_at_reference_ages")) {
       rows <- rows |>
         dplyr::arrange(.data$age)
@@ -680,6 +685,7 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
         type = "parameter",
         type_id = dplyr::row_number(),
         input = .data$value,
+        year_i = .data$timing,
         estimated = estimate_values,
         expected = NA_real_,
         observed = NA_real_,

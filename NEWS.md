@@ -1,10 +1,10 @@
 # FIMS (development version)
 
 * The Julia-only cutover below is work in progress, not release-ready.
-  Shipped optimized and internal example fits still require genuine Julia
-  regeneration. Full-model optimized parity and a complete compiler-disabled
-  R CMD check remain unverified. Final validation of the latest singleton-prior,
-  likelihood-component, and parallel-runtime changes is incomplete.
+  Shipped optimized and internal example fits have been regenerated with
+  Julia, including the complete 49-fixed/29-random example with convergence
+  and positive-definite uncertainty. Broader covariance/report-standard-error
+  parity and a complete compiler-disabled R CMD check remain unverified.
 * Julia is now the sole backend. The high-level R workflow remains available;
   low-level native modules, mutable parameter vectors, native logging, and
   native module-ID JSON have been retired. Saved native fits must be refitted.
@@ -12,6 +12,16 @@
   or direct Rcpp/TMB dependencies. JuliaCall has its own compiled dependencies.
 * `setup_julia()` prepares dependencies outside the embedded runtime in a
   writable user cache and configures RCall for the selected R installation.
+* Beverton-Holt recruitment uses the native denominator without an added
+  numerical offset.
+* Laplace derivatives use exact directional trace contractions and capped
+  automatic-differentiation batch sizes instead of differentiating a full
+  random-effect Hessian. This reduces compilation and allocation costs without
+  approximating the derivatives.
+  Example-fit regeneration records live phase timings separately from the
+  sampling profile saved on exit.
+* Julia estimate extraction keeps maturity and selectivity parameters separate
+  when their labels overlap, and retains parameter year indices for refits.
 * Objective simulation uses R's RNG to draw observations conditional on
   parameters and random-effect modes. Uncertainty summaries no longer use TMB.
 
