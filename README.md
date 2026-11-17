@@ -13,6 +13,9 @@
 > configuration and full-scale workflow coverage, and verification across
 > supported platforms remain release gates. See `NEWS.md`.
 
+The [Julia migration checklist](.github/JULIA_MIGRATION_CHECKLIST.md) tracks
+the remaining work as bounded items with explicit completion criteria.
+
 FIMS is an R package for fitting integrated statistical population-dynamics models to fishery data. Julia implements the population model, likelihood, automatic differentiation, optimization, and uncertainty calculations. The high-level R data, parameter, fitting, and diagnostic interfaces remain available.
 
 If you are new to FIMS, the best place to start is the <a href="https://noaa-fims.github.io/FIMS/articles/fims-demo.html" target="_blank">"Introducing FIMS"</a> vignette.
