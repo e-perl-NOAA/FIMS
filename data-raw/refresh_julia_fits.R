@@ -76,6 +76,8 @@ stopifnot(
   FIMS::get_max_gradient(fit_big_optimized) < 1e-3,
   isTRUE(FIMS::get_sdreport(fit_big_optimized)[["pdHess"]])
 )
+attr(fit_big_optimized@input, "julia_model_config")[["diagnostic_file"]] <- NULL
+environment(FIMS::get_obj(fit_big_optimized)[["fn"]])[["model_config"]][["diagnostic_file"]] <- NULL
 estimates_big_optimized <- FIMS::get_estimates(fit_big_optimized)
 save(fit_big_optimized, file = "data/fit_big_optimized.rda", compress = "xz")
 save(estimates_big_optimized, file = "data/estimates_big_optimized.rda", compress = "xz")

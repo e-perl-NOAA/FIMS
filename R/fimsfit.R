@@ -446,7 +446,14 @@ build_julia_backend_report <- function(julia_input, fit_result) {
     if (is.null(conversion)) {
       return(rep(list(numeric()), length(data[["fleets"]])))
     }
-    report_fleet_conversions("age_to_length_conversion_derived")
+    conversions <- report_fleet_conversions("age_to_length_conversion_derived")
+    used <- as.logical(report[["age_to_length_conversion_derived_used"]])
+    lapply(seq_along(conversions), \(fleet_index) {
+      if (!used[[fleet_index]]) {
+        return(numeric())
+      }
+      rep(conversions[[fleet_index]], times = data[["n_years"]])
+    })
   }
   report_fleet_conversions <- function(name) {
     value <- report[[name]]
@@ -463,7 +470,16 @@ build_julia_backend_report <- function(julia_input, fit_result) {
       cli::cli_abort("Julia report field {.val {name}} must have two or three dimensions.")
     }
     lapply(seq_len(dimensions[[3]]), \(fleet_index) {
-      as.numeric(t(as.matrix(value[, , fleet_index])))
+      fleet_conversion <- matrix(value[, , fleet_index], nrow = dimensions[[1]])
+      if (!is.null(data[["lengths_by_fleet"]])) {
+        fleet_lengths <- data[["lengths_by_fleet"]][
+          seq_len(data[["n_lengths_by_fleet"]][[fleet_index]]), fleet_index
+        ]
+        fleet_conversion <- fleet_conversion[
+          , match(fleet_lengths, data[["lengths"]]), drop = FALSE
+        ]
+      }
+      as.numeric(t(fleet_conversion))
     })
   }
 
@@ -554,6 +570,11 @@ build_julia_backend_report <- function(julia_input, fit_result) {
   )
 }
 
+julia_estimate_distribution <- function(distribution) {
+  labels <- c(dnorm = "normal", dlnorm = "lognormal", dmultinom = "multinomial")
+  dplyr::coalesce(unname(labels[tolower(distribution)]), distribution)
+}
+
 flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_errors) {
   if (is.null(parameter_info) || !tibble::is_tibble(parameter_info)) {
     return(tibble::tibble())
@@ -607,6 +628,7 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
   if (length(mapped_labels) == 0L) {
     return(tibble::tibble())
   }
+  parameter_offsets <- cumsum(lengths(estimates)) - lengths(estimates)
 
   purrr::map_dfr(mapped_labels, function(label_name) {
     rows <- parameter_info |>
@@ -637,6 +659,9 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
         "growth_log_length_sd_at_old"
       )
     }
+    parameter_indices <- unlist(lapply(component_names, function(component_name) {
+      parameter_offsets[[component_name]] + seq_along(estimates[[component_name]])
+    }), use.names = FALSE)
     estimate_values <- unlist(lapply(component_names, function(component_name) {
       values <- if (component_name %in% names(estimates)) {
         as_julia_backend_numeric(estimates[[component_name]])
@@ -658,6 +683,9 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
     if (identical(label_name, "log_M") && length(component_names) == 1L &&
       is.matrix(estimates[[component_names[[1]]]])) {
       estimate_values <- as.numeric(t(estimates[[component_names[[1]]]]))
+      parameter_indices <- as.numeric(t(matrix(
+        parameter_indices, nrow = nrow(estimates[[component_names[[1]]]])
+      )))
       se_values <- if (!is.null(standard_errors[[component_names[[1]]]])) {
         as.numeric(t(standard_errors[[component_names[[1]]]]))
       } else {
@@ -677,11 +705,16 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
     } else {
       rep(1L, nrow(rows))
     }
+    distributions <- if ("distribution" %in% names(rows)) {
+      rows[["distribution"]]
+    } else {
+      rep(NA_character_, nrow(rows))
+    }
 
     rows |>
       dplyr::mutate(
         module_id = module_ids,
-        parameter_id = dplyr::row_number(),
+        parameter_id = as.integer(parameter_indices),
         type = "parameter",
         type_id = dplyr::row_number(),
         input = .data$value,
@@ -689,7 +722,7 @@ flatten_julia_parameter_rows <- function(parameter_info, estimates, standard_err
         estimated = estimate_values,
         expected = NA_real_,
         observed = NA_real_,
-        distribution = NA_character_,
+        distribution = julia_estimate_distribution(distributions),
         input_type = .data$estimation_type,
         lpdf = NA_real_,
         likelihood = NA_real_,
@@ -708,7 +741,8 @@ make_julia_matrix_estimate_rows <- function(label,
                                             fleet = NA_character_,
                                             distribution = NA_character_,
                                             observed_matrix = NULL,
-                                            uncertainty = NA_real_) {
+                                            uncertainty = NA_real_,
+                                            row_log_likelihood = NULL) {
   matrix_values <- as.matrix(matrix_values)
   observed_values <- if (is.null(observed_matrix)) {
     rep(NA_real_, length(matrix_values))
@@ -734,8 +768,12 @@ make_julia_matrix_estimate_rows <- function(label,
     estimation_type = estimation_type,
     distribution = distribution,
     input_type = estimation_type,
-    lpdf = NA_real_,
-    likelihood = NA_real_,
+    lpdf = if (is.null(row_log_likelihood)) NA_real_ else sum(row_log_likelihood),
+    likelihood = if (is.null(row_log_likelihood)) {
+      NA_real_
+    } else {
+      rep(row_log_likelihood, each = ncol(matrix_values))
+    },
     log_sd = NA_real_,
     uncertainty = uncertainty,
     gradient = NA_real_
@@ -789,6 +827,14 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
   estimates <- fit_result[["estimates"]]
   standard_errors <- fit_result[["standard_errors"]]
   report_standard_errors <- fit_result[["report_standard_errors"]]
+  composition_log_likelihood <- function(label, fleet_index) {
+    values <- fit_result[["report"]][[paste0(label, "_log_likelihood_by_fleet")]]
+    if (is.null(values)) {
+      return(NULL)
+    }
+    as_julia_backend_matrix(values, nrow = julia_input[["data"]][["n_years"]])[, fleet_index]
+  }
+  model_config <- attr(input, "julia_model_config")
   data <- julia_input[["data"]]
   raw_data <- data[["data"]]
   n_years <- data[["n_years"]]
@@ -797,6 +843,15 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
   n_lengths <- data[["n_lengths"]]
   fleet_names <- data[["fleets"]]
   n_fleets <- length(fleet_names)
+  fleet_distribution <- function(name, fleet_index) {
+    family <- model_config[[paste0(name, "_distribution")]]
+    family <- if (is.matrix(family)) {
+      family[, fleet_index]
+    } else {
+      rep_len(family, n_fleets)[[fleet_index]]
+    }
+    julia_estimate_distribution(family)
+  }
 
   report_se_vector <- function(name, n_values) {
     if (is.null(report_standard_errors) || is.null(report_standard_errors[[name]])) {
@@ -829,9 +884,13 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
 
   parameter_rows <- flatten_julia_parameter_rows(
     parameter_info = parameter_info,
-    estimates = estimates,
+    estimates = estimates[names(julia_input[["parameters"]])],
     standard_errors = standard_errors
   )
+  if (!isTRUE(model_config[["recruitment_process_active"]])) {
+    parameter_rows <- parameter_rows |>
+      dplyr::filter(!(.data$module_name == "Recruitment" & .data$label == "log_sd"))
+  }
 
   output <- list(
     parameter_rows,
@@ -926,7 +985,13 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
         report[["weight_at_age"]][[1]],
         nrow = n_report_years,
         byrow = TRUE
-      )
+      ),
+      module_name = "Growth",
+      estimation_type = if (identical(model_config[["growth_model_type"]], "EWAA")) {
+        "constant"
+      } else {
+        "derived_quantity"
+      }
     ),
     make_julia_matrix_estimate_rows(
       label = "sum_selectivity",
@@ -997,8 +1062,7 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
 
   for (fleet_index in seq_along(fleet_names)) {
     fleet_name <- fleet_names[[fleet_index]]
-    if (!is.null(data[["observed_catch"]]) &&
-      any(raw_data$type == "catch" & raw_data$fleet == fleet_name)) {
+    if (!is.null(data[["observed_catch"]])) {
       output[[length(output) + 1]] <- make_julia_matrix_estimate_rows(
         label = "catch_numbers_at_age",
         matrix_values = report[["catch_numbers_at_age_by_fleet"]][[1]][, , fleet_index],
@@ -1017,8 +1081,12 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
         module_name = "Fleet",
         module_id = as.integer(fleet_index),
         fleet = fleet_name,
-        distribution = "dlnorm",
-        observed_values = data[["observed_catch"]][, fleet_index],
+        distribution = fleet_distribution("catch", fleet_index),
+        observed_values = if (any(raw_data$type == "catch" & raw_data$fleet == fleet_name)) {
+          data[["observed_catch"]][, fleet_index]
+        } else {
+          NULL
+        },
         uncertainty = report_se_matrix(
           "catch_expected_by_fleet",
           n_years,
@@ -1027,21 +1095,81 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
       )
     }
 
-    if (!is.null(data[["observed_index"]]) &&
-      any(raw_data$type == "index" & raw_data$fleet == fleet_name)) {
+    if (!is.null(data[["observed_index"]])) {
       output[[length(output) + 1]] <- make_julia_vector_estimate_rows(
         label = "index_expected",
         vector_values = report[["index_expected_by_fleet"]][[1]][, fleet_index],
         module_name = "Fleet",
         module_id = as.integer(fleet_index),
         fleet = fleet_name,
-        distribution = "dlnorm",
-        observed_values = data[["observed_index"]][, fleet_index],
+        distribution = fleet_distribution("index", fleet_index),
+        observed_values = if (any(raw_data$type == "index" & raw_data$fleet == fleet_name)) {
+          data[["observed_index"]][, fleet_index]
+        } else {
+          NULL
+        },
         uncertainty = report_se_matrix(
           "index_expected_by_fleet",
           n_years,
           n_fleets
         )[, fleet_index]
+      )
+    }
+
+    for (data_type in c("catch", "index")) {
+      label <- paste0("log_", data_type, "_expected")
+      if (!is.null(report[[label]])) {
+        values <- report[[label]][[fleet_index]]
+        output[[length(output) + 1L]] <- make_julia_vector_estimate_rows(
+          label = label,
+          vector_values = dplyr::if_else(is.finite(values), values, -999),
+          module_name = "Fleet",
+          module_id = as.integer(fleet_index),
+          fleet = fleet_name,
+          uncertainty = report_se_matrix(
+            paste0(label, "_by_fleet"), n_years, n_fleets
+          )[, fleet_index]
+        )
+      }
+    }
+
+    for (label in c("catch_numbers", "index_numbers", "catch_weight", "index_weight")) {
+      if (!is.null(report[[label]])) {
+        output[[length(output) + 1L]] <- make_julia_vector_estimate_rows(
+          label = label,
+          vector_values = report[[label]][[fleet_index]],
+          module_name = "Fleet",
+          module_id = as.integer(fleet_index),
+          fleet = fleet_name,
+          uncertainty = report_se_matrix(
+            paste0(label, "_by_fleet"), n_years, n_fleets
+          )[, fleet_index]
+        )
+      }
+    }
+    for (label in c(
+      "index_numbers_at_age", "catch_weight_at_age", "index_weight_at_age",
+      "catch_numbers_at_length", "index_numbers_at_length",
+      "agecomp_proportion", "lengthcomp_proportion"
+    )) {
+      if (is.null(report[[label]]) || length(report[[label]][[fleet_index]]) == 0L) {
+        next
+      }
+      values <- matrix(report[[label]][[fleet_index]], nrow = n_years, byrow = TRUE)
+      se_label <- if (label %in% c("agecomp_proportion", "lengthcomp_proportion")) {
+        label
+      } else {
+        paste0(label, "_by_fleet")
+      }
+      output[[length(output) + 1L]] <- make_julia_matrix_estimate_rows(
+        label = label,
+        matrix_values = values,
+        module_name = "Fleet",
+        module_id = as.integer(fleet_index),
+        fleet = fleet_name,
+        uncertainty = report_se_fleet_matrix(
+          se_label, c(n_years, ncol(values), n_fleets), fleet_index
+        )
       )
     }
 
@@ -1053,8 +1181,9 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
         module_name = "Fleet",
         module_id = as.integer(fleet_index),
         fleet = fleet_name,
-        distribution = "dmultinom",
+        distribution = "multinomial",
         observed_matrix = data[["observed_age_comp"]][, , fleet_index],
+        row_log_likelihood = composition_log_likelihood("agecomp", fleet_index),
         uncertainty = report_se_fleet_matrix(
           "agecomp_expected",
           c(n_years, n_ages, n_fleets),
@@ -1071,8 +1200,9 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
         module_name = "Fleet",
         module_id = as.integer(fleet_index),
         fleet = fleet_name,
-        distribution = "dmultinom",
+        distribution = "multinomial",
         observed_matrix = data[["observed_length_comp"]][, , fleet_index],
+        row_log_likelihood = composition_log_likelihood("lengthcomp", fleet_index),
         uncertainty = report_se_fleet_matrix(
           "lengthcomp_expected",
           c(n_years, n_lengths, n_fleets),
@@ -1103,7 +1233,32 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
       likelihood = exp(-component_values)
     )
   }
-  dplyr::bind_rows(output)
+  dplyr::bind_rows(output) |>
+    dplyr::mutate(
+      module_id = dplyr::if_else(
+        .data$module_name %in% c("Fleet", "Selectivity"),
+        match(.data$fleet, fleet_names),
+        .data$module_id
+      ),
+      age = dplyr::if_else(
+        !is.na(.data$age_i) & !grepl("_at_length$|^lengthcomp_", .data$label),
+        data[["ages"]][.data$age_i],
+        .data$age
+      ),
+      length = dplyr::if_else(
+        !is.na(.data$age_i) & grepl("_at_length$|^lengthcomp_", .data$label),
+        data[["lengths"]][.data$age_i],
+        .data$length
+      ),
+      log_like_cv = NA_real_
+    ) |>
+    dplyr::select(
+      "module_name", "module_id", "module_type", "label", "type", "type_id",
+      "parameter_id", "fleet", "year_i", "age", "length",
+      "input", "estimated", "expected", "observed",
+      "estimation_type", "uncertainty", "distribution", "input_type",
+      "lpdf", "likelihood", "log_sd", "log_like_cv", "gradient"
+    )
 }
 
 build_julia_backend_sdreport <- function(input, fit_result) {

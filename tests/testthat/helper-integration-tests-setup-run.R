@@ -8,13 +8,14 @@
 #' data with missing values. The integration_test_data_components.RData is
 #' generated after running the script data-raw/data_big.R.
 #'
+#' @param fit Whether to also generate the expensive fitted-model fixtures.
 #' @return None. The function saves the generated datasets as RDS files in the
 #' specified directory.
 #' @examples
 #' \dontrun{
 #' prepare_test_data()
 #' }
-prepare_test_data <- function() {
+prepare_test_data <- function(fit = TRUE) {
   # Set up FIMS data ----
   # The section generates datasets containing only age composition, only length
   # composition data, or data with missing values.
@@ -105,6 +106,9 @@ prepare_test_data <- function() {
     file = testthat::test_path("fixtures", "data_age_length_comp_na.RDS"),
     compress = FALSE
   )
+  if (!fit) {
+    return(invisible(NULL))
+  }
 
   # Set up FIMS deterministic and estimation runs results ----
   # This section generates multiple fit results for use in tests located in

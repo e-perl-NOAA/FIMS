@@ -11,6 +11,7 @@ summary: "How to run a simple FIMS model."
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+run_slow_vignettes <- identical(Sys.getenv("FIMS_RUN_SLOW_VIGNETTES"), "true")
 # Set local options so vignette output is clean and consistent
 # (avoids color codes and subtle formatting in rendered docs)
 withr::local_options(list(
@@ -419,11 +420,15 @@ stockplotr::plot_timeseries(
 
 Multiple fits, i.e., sensitivity runs, can be set up by modifying the parameter list using `dplyr::mutate()` or changing the data that is used to fit the model.
 
+The following full-model refits are opt-in during vignette builds. Set
+`FIMS_RUN_SLOW_VIGNETTES=true` to execute them. Routine builds use the saved
+Julia fits above; real Julia integration tests exercise smaller models.
+
 #### Initial values
 
 For example, one could change the initial value used for the slope of the logistic curve for the survey to see if the terminal estimate changes due to changes to the initial value.
 
-```{r initial-values}
+```{r initial-values, eval=run_slow_vignettes}
 parameters_high_slope <- parameters_4_model |>
   # Update the slope value of the logistic selectivity for the survey
   dplyr::mutate(
@@ -464,7 +469,7 @@ clear()
 
 One could also change the default selectivity configuration for the survey, update default parameterization, and evaluate the ability to estimate a small number of age-specific parameter values.
 
-```{r age-specific-selectivity}
+```{r age-specific-selectivity, eval=run_slow_vignettes}
 # Update "survey1" selectivity from "Logistic" to "AgeSpecificSelectivity"
 # This function is also used by setup_default_parameters()
 age_specific_selectivity_default <- setup_default_Selectivity(
@@ -518,11 +523,12 @@ clear()
 
 The same model can be fit to just the age data, removing the length-composition configurations.
 
-```{r age}
+```{r age, eval=run_slow_vignettes}
 # and fit the model
 age_only_fit <- parameters_4_model |>
   initialize_fims(data = get_data(data_4_model) |>
-    dplyr::filter(!type %in% c("length_comp", "age_to_length_conversion"))) |>
+    dplyr::filter(!type %in% c("length_comp", "age_to_length_conversion")) |>
+    FIMSFrame()) |>
   fit_fims(optimize = TRUE)
 
 clear()
@@ -532,15 +538,16 @@ clear()
 
 The same model can be fit to just the length data, removing the age-composition configurations.
 
-```{r length}
+```{r length, eval=run_slow_vignettes}
 length_only_fit <- parameters_4_model |>
   initialize_fims(data = get_data(data_4_model) |>
-    dplyr::filter(!type %in% c("age_comp"))) |>
+    dplyr::filter(!type %in% c("age_comp")) |>
+    FIMSFrame()) |>
   fit_fims(optimize = TRUE)
 clear()
 ```
 
-```{r fit-plot-biomass}
+```{r fit-plot-biomass, eval=run_slow_vignettes}
 #| warning: false
 #| message: false
 #| fig.alt: >

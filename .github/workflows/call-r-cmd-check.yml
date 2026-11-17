@@ -24,6 +24,10 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       FIMS_RUN_JULIA_INTEGRATION: "true"
+      RUN_SLOW_TESTS: "false"
+      FIMS_RUN_SLOW_VIGNETTES: "false"
+      JULIA_NUM_THREADS: "1"
+      NOT_CRAN: "true"
       R_KEEP_PKG_SOURCE: "yes"
     steps:
       - uses: actions/checkout@v7
@@ -37,7 +41,7 @@ jobs:
       - uses: r-lib/actions/setup-pandoc@v2
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck, any::pkgload
+          extra-packages: any::pkgload
           needs: check
       - name: Prepare Julia without modifying the package directory
         shell: Rscript {0}
@@ -57,9 +61,39 @@ jobs:
           makevars <- file.path(Sys.getenv("RUNNER_TEMP"), "Makevars-no-native")
           writeLines(c("CC = fims-compiler-disabled", "CXX = fims-compiler-disabled",
                        "CXX11 = fims-compiler-disabled", "CXX14 = fims-compiler-disabled",
-                       "CXX17 = fims-compiler-disabled", "FC = fims-compiler-disabled"), makevars)
+                       "CXX17 = fims-compiler-disabled", "CXX20 = fims-compiler-disabled",
+                       "FC = fims-compiler-disabled"), makevars)
           cat("R_MAKEVARS_USER=", makevars, "\nMAKE=fims-make-disabled\n",
               file = Sys.getenv("GITHUB_ENV"), append = TRUE, sep = "")
-      - uses: r-lib/actions/check-r-package@v2
+      - name: Build and check with native compilers disabled
+        shell: Rscript {0}
+        run: |
+          # Build frontends may require a compiler even for pure R packages.
+          root <- getwd()
+          description <- read.dcf("DESCRIPTION")
+          windows <- .Platform[["OS.type"]] == "windows"
+          executable <- file.path(R.home("bin"), if (windows) "Rcmd.exe" else "R")
+          prefix <- if (windows) character() else "CMD"
+          run_r_command <- function(arguments) {
+            status <- system2(executable, c(prefix, arguments))
+            if (status != 0L) stop("R CMD failed with status ", status, call. = FALSE)
+          }
+          build_directory <- file.path(Sys.getenv("RUNNER_TEMP"), "fims-source-build")
+          dir.create(build_directory)
+          setwd(build_directory)
+          run_r_command(c("build", "--no-manual", shQuote(root)))
+          archive <- file.path(build_directory,
+            paste0(description[1, "Package"], "_", description[1, "Version"], ".tar.gz"))
+          check_directory <- file.path(root, "check")
+          dir.create(check_directory)
+          setwd(check_directory)
+          run_r_command(c("check", "--no-manual", "--as-cran", shQuote(archive)))
+          log <- readLines(file.path("FIMS.Rcheck", "00check.log"))
+          if (any(grepl("\\b(ERROR|WARNING)\\b", log))) {
+            stop("R CMD check reported errors or warnings.", call. = FALSE)
+          }
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          upload-snapshots: true
+          name: R-CMD-check-${{ matrix.os }}
+          path: check

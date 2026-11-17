@@ -65,6 +65,11 @@ test_that("`fit_fims()` retains requested Julia report covariance", {
     expected = rep(length(sdreport[["value"]]), 2)
   )
   expect_true(all(is.finite(diag(sdreport[["cov"]]))))
+  estimates <- get_estimates(fit_with_covariance)
+  expect_false(any(estimates[["estimation_type"]] == "random_effects"))
+  expect_true(all(is.finite(
+    estimates[["uncertainty"]][estimates[["estimation_type"]] == "fixed_effects"]
+  )))
   clear()
 })
 

@@ -817,10 +817,13 @@ function data_likelihood_nll(observed, expected, sigma, family)
   throw(ArgumentError("Unsupported data likelihood family: $family"))
 end
 
-function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
+function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix, row_log_likelihood = nothing)
   total = zero(promote_type(eltype(observed), eltype(expected)))
 
   for row in axes(observed, 1)
+    if !isnothing(row_log_likelihood)
+      row_log_likelihood[row] = zero(total)
+    end
     obs_row = observed[row, :]
     if any(x -> !isfinite(x) || x == -999, obs_row)
       continue
@@ -833,12 +836,16 @@ function multinomial_nll(observed::AbstractMatrix, expected::AbstractMatrix)
     end
 
     normalized_probabilities = probs ./ probability_sum
-    total -=
+    log_likelihood =
       loggamma(sum(obs_row) + 1) - sum(loggamma.(obs_row .+ 1)) +
       sum(
         iszero(count) ? zero(total) : count * log(probability) for
         (count, probability) in zip(obs_row, normalized_probabilities)
       )
+    total -= log_likelihood
+    if !isnothing(row_log_likelihood)
+      row_log_likelihood[row] = log_likelihood
+    end
   end
 
   total
@@ -855,7 +862,7 @@ function expected_age_comp(population)
   expected
 end
 
-function evaluate_model(parameters_vector, data_dict, model_config)
+function _evaluate_model(parameters_vector, data_dict, model_config, ::Val{compute_report}) where {compute_report}
   data_dict = normalize_keys(data_dict)
   params = component_array_from_input(parameters_vector, model_config)
   parameter_type = eltype(collect(params))
@@ -955,6 +962,10 @@ function evaluate_model(parameters_vector, data_dict, model_config)
   length_comp_proportion = zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
   age_comp_nll_by_fleet = fill(zero(parameter_type), n_fleets)
   length_comp_nll_by_fleet = fill(zero(parameter_type), n_fleets)
+  age_comp_log_likelihood = compute_report ?
+    zeros(parameter_type, data_dict[:n_years], n_fleets) : nothing
+  length_comp_log_likelihood = compute_report ?
+    zeros(parameter_type, data_dict[:n_years], n_fleets) : nothing
   fleet_has_catch = get(data_dict, :fleet_has_catch, trues(n_fleets))
   observed_age_comp = get(data_dict, :observed_age_comp, nothing)
   observed_length_comp = get(data_dict, :observed_length_comp, nothing)
@@ -1005,6 +1016,7 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       age_comp_nll_by_fleet[fleet_index] = multinomial_nll(
         Matrix(observed_age_comp[:, :, fleet_index]),
         Matrix(age_comp_expected[:, :, fleet_index]),
+        isnothing(age_comp_log_likelihood) ? nothing : view(age_comp_log_likelihood, :, fleet_index),
       )
     end
   end
@@ -1014,87 +1026,11 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       length_comp_nll_by_fleet[fleet_index] = multinomial_nll(
         Matrix(observed_length_comp[:, :, fleet_index]),
         Matrix(length_comp_expected[:, :, fleet_index]),
+        isnothing(length_comp_log_likelihood) ? nothing : view(length_comp_log_likelihood, :, fleet_index),
       )
     end
   end
 
-  catch_numbers_at_age_by_fleet = population.catch_numbers_at_age_by_fleet
-  index_numbers_at_age_by_fleet = population.index_numbers_at_age_by_fleet
-  modeled_weights_at_age =
-    view(population.weights_at_age, 1:data_dict[:n_years], :)
-  catch_weight_at_age_by_fleet =
-    catch_numbers_at_age_by_fleet .* reshape(modeled_weights_at_age, data_dict[:n_years], data_dict[:n_ages], 1)
-  index_weight_at_age_by_fleet =
-    index_numbers_at_age_by_fleet .* reshape(modeled_weights_at_age, data_dict[:n_years], data_dict[:n_ages], 1)
-  catch_numbers_by_fleet = dropdims(sum(catch_numbers_at_age_by_fleet, dims = 2), dims = 2)
-  index_numbers_by_fleet = dropdims(sum(index_numbers_at_age_by_fleet, dims = 2), dims = 2)
-  catch_weight_by_fleet = dropdims(sum(catch_weight_at_age_by_fleet, dims = 2), dims = 2)
-  index_weight_by_fleet = dropdims(sum(index_weight_at_age_by_fleet, dims = 2), dims = 2)
-  catch_numbers_at_length_by_fleet =
-    zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
-  index_numbers_at_length_by_fleet =
-    zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
-  if !isnothing(growth_products.age_to_length_conversion)
-    conversion = growth_products.age_to_length_conversion
-    for fleet_index in 1:n_fleets, year in 1:data_dict[:n_years]
-      fleet_conversion = ndims(conversion) == 3 ?
-        view(conversion, :, :, fleet_index) : conversion
-      catch_numbers_at_length_by_fleet[year, :, fleet_index] .=
-        transpose(fleet_conversion) * view(catch_numbers_at_age_by_fleet, year, :, fleet_index)
-      index_numbers_at_length_by_fleet[year, :, fleet_index] .=
-        transpose(fleet_conversion) * view(index_numbers_at_age_by_fleet, year, :, fleet_index)
-    end
-  end
-  unfished_numbers_at_age =
-    zeros(parameter_type, data_dict[:n_years] + 1, data_dict[:n_ages])
-  log_unfished_recruitment =
-    params.log_rzero isa Number ? params.log_rzero : first(params.log_rzero)
-  unfished_recruitment = exp(log_unfished_recruitment)
-  unfished_numbers_at_age[1, 1] = unfished_recruitment
-  for age in 2:(data_dict[:n_ages] - 1)
-    unfished_numbers_at_age[1, age] =
-      unfished_numbers_at_age[1, age - 1] *
-      exp(-population.mortality_M[1, age - 1])
-  end
-  if data_dict[:n_ages] > 1
-    previous_age = data_dict[:n_ages] - 1
-    plus_age = data_dict[:n_ages]
-    survivors =
-      unfished_numbers_at_age[1, previous_age] *
-      exp(-population.mortality_M[1, previous_age])
-    unfished_numbers_at_age[1, plus_age] =
-      survivors / (one(parameter_type) - exp(-population.mortality_M[1, plus_age]))
-  end
-  for year in 2:(data_dict[:n_years] + 1)
-    mortality_year = year - 1
-    unfished_numbers_at_age[year, 1] = unfished_recruitment
-    for age in 2:(data_dict[:n_ages] - 1)
-      previous_age = age - 1
-      unfished_numbers_at_age[year, age] =
-        unfished_numbers_at_age[year - 1, previous_age] *
-        exp(-population.mortality_M[mortality_year, previous_age])
-    end
-    if data_dict[:n_ages] > 1
-      previous_age = data_dict[:n_ages] - 1
-      plus_age = data_dict[:n_ages]
-      survivors =
-        unfished_numbers_at_age[year - 1, previous_age] *
-        exp(-population.mortality_M[mortality_year, previous_age])
-      unfished_numbers_at_age[year, plus_age] =
-        survivors + unfished_numbers_at_age[year - 1, plus_age] *
-        exp(-population.mortality_M[mortality_year, plus_age])
-    end
-  end
-  unfished_biomass =
-    vec(sum(unfished_numbers_at_age .* population.weights_at_age, dims = 2))
-  unfished_spawning_biomass = vec(sum(
-    unfished_numbers_at_age .* population.weights_at_age .* population.maturity_at_age .*
-    reshape(population.proportion_female, 1, data_dict[:n_ages]),
-    dims = 2,
-  ))
-  spawning_biomass_ratio = population.spawning_biomass ./ first(unfished_spawning_biomass)
-  log_index_expected_by_fleet = log.(population.index_expected_by_fleet)
-  log_catch_expected_by_fleet = log.(population.catch_expected_by_fleet)
   has_recruitment_process_values =
     recruitment_mode == "log_r" ? has_component(params, :log_r) : has_component(params, :log_devs)
   process_nll_value = zero(parameter_type)
@@ -1196,6 +1132,85 @@ function evaluate_model(parameters_vector, data_dict, model_config)
     end
   end
   total_nll = sum(nll_components; init = zero(parameter_type))
+  !compute_report && return total_nll
+
+  catch_numbers_at_age_by_fleet = population.catch_numbers_at_age_by_fleet
+  index_numbers_at_age_by_fleet = population.index_numbers_at_age_by_fleet
+  modeled_weights_at_age =
+    view(population.weights_at_age, 1:data_dict[:n_years], :)
+  catch_weight_at_age_by_fleet =
+    catch_numbers_at_age_by_fleet .* reshape(modeled_weights_at_age, data_dict[:n_years], data_dict[:n_ages], 1)
+  index_weight_at_age_by_fleet =
+    index_numbers_at_age_by_fleet .* reshape(modeled_weights_at_age, data_dict[:n_years], data_dict[:n_ages], 1)
+  catch_numbers_by_fleet = dropdims(sum(catch_numbers_at_age_by_fleet, dims = 2), dims = 2)
+  index_numbers_by_fleet = dropdims(sum(index_numbers_at_age_by_fleet, dims = 2), dims = 2)
+  catch_weight_by_fleet = dropdims(sum(catch_weight_at_age_by_fleet, dims = 2), dims = 2)
+  index_weight_by_fleet = dropdims(sum(index_weight_at_age_by_fleet, dims = 2), dims = 2)
+  catch_numbers_at_length_by_fleet =
+    zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
+  index_numbers_at_length_by_fleet =
+    zeros(parameter_type, data_dict[:n_years], data_dict[:n_lengths], n_fleets)
+  if !isnothing(growth_products.age_to_length_conversion)
+    conversion = growth_products.age_to_length_conversion
+    for fleet_index in 1:n_fleets, year in 1:data_dict[:n_years]
+      fleet_conversion = ndims(conversion) == 3 ?
+        view(conversion, :, :, fleet_index) : conversion
+      catch_numbers_at_length_by_fleet[year, :, fleet_index] .=
+        transpose(fleet_conversion) * view(catch_numbers_at_age_by_fleet, year, :, fleet_index)
+      index_numbers_at_length_by_fleet[year, :, fleet_index] .=
+        transpose(fleet_conversion) * view(index_numbers_at_age_by_fleet, year, :, fleet_index)
+    end
+  end
+  unfished_numbers_at_age =
+    zeros(parameter_type, data_dict[:n_years] + 1, data_dict[:n_ages])
+  log_unfished_recruitment =
+    params.log_rzero isa Number ? params.log_rzero : first(params.log_rzero)
+  unfished_recruitment = exp(log_unfished_recruitment)
+  unfished_numbers_at_age[1, 1] = unfished_recruitment
+  for age in 2:(data_dict[:n_ages] - 1)
+    unfished_numbers_at_age[1, age] =
+      unfished_numbers_at_age[1, age - 1] *
+      exp(-population.mortality_M[1, age - 1])
+  end
+  if data_dict[:n_ages] > 1
+    previous_age = data_dict[:n_ages] - 1
+    plus_age = data_dict[:n_ages]
+    survivors =
+      unfished_numbers_at_age[1, previous_age] *
+      exp(-population.mortality_M[1, previous_age])
+    unfished_numbers_at_age[1, plus_age] =
+      survivors / (one(parameter_type) - exp(-population.mortality_M[1, plus_age]))
+  end
+  for year in 2:(data_dict[:n_years] + 1)
+    mortality_year = year - 1
+    unfished_numbers_at_age[year, 1] = unfished_recruitment
+    for age in 2:(data_dict[:n_ages] - 1)
+      previous_age = age - 1
+      unfished_numbers_at_age[year, age] =
+        unfished_numbers_at_age[year - 1, previous_age] *
+        exp(-population.mortality_M[mortality_year, previous_age])
+    end
+    if data_dict[:n_ages] > 1
+      previous_age = data_dict[:n_ages] - 1
+      plus_age = data_dict[:n_ages]
+      survivors =
+        unfished_numbers_at_age[year - 1, previous_age] *
+        exp(-population.mortality_M[mortality_year, previous_age])
+      unfished_numbers_at_age[year, plus_age] =
+        survivors + unfished_numbers_at_age[year - 1, plus_age] *
+        exp(-population.mortality_M[mortality_year, plus_age])
+    end
+  end
+  unfished_biomass =
+    vec(sum(unfished_numbers_at_age .* population.weights_at_age, dims = 2))
+  unfished_spawning_biomass = vec(sum(
+    unfished_numbers_at_age .* population.weights_at_age .* population.maturity_at_age .*
+    reshape(population.proportion_female, 1, data_dict[:n_ages]),
+    dims = 2,
+  ))
+  spawning_biomass_ratio = population.spawning_biomass ./ first(unfished_spawning_biomass)
+  log_index_expected_by_fleet = log.(population.index_expected_by_fleet)
+  log_catch_expected_by_fleet = log.(population.catch_expected_by_fleet)
 
   Dict(
     "nll" => total_nll,
@@ -1204,6 +1219,8 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       "nll_components" => nll_components,
       "nll_component_labels" => nll_component_labels,
       "nll_component_fleets" => nll_component_fleets,
+      "agecomp_log_likelihood_by_fleet" => age_comp_log_likelihood,
+      "lengthcomp_log_likelihood_by_fleet" => length_comp_log_likelihood,
       "numbers_at_age" => population.numbers_at_age,
       "catch_numbers_at_age" => population.catch_numbers_at_age,
       "biomass" => population.biomass,
@@ -1225,7 +1242,9 @@ function evaluate_model(parameters_vector, data_dict, model_config)
       "age_to_length_conversion_fixed" => get(data_dict, :age_to_length_conversion, nothing),
       "age_to_length_conversion_derived_used" =>
         growth_products.age_to_length_conversion_derived_used,
-      "age_to_length_conversion_derived" => nothing,
+      "age_to_length_conversion_derived" =>
+        string(get(model_config, :growth_model_type, "EWAA")) == "VonBertalanffySchnute" ?
+        growth_products.age_to_length_conversion : nothing,
       "sum_selectivity" => dropdims(sum(fleet_selectivity, dims = 3), dims = 3),
       "catch_expected" => population.catch_expected,
       "index_expected" => population.index_expected,
@@ -1255,5 +1274,9 @@ function evaluate_model(parameters_vector, data_dict, model_config)
 end
 
 function evaluate_nll(parameters_vector, data_dict, model_config)
-  evaluate_model(parameters_vector, data_dict, model_config)["nll"]
+  _evaluate_model(parameters_vector, data_dict, model_config, Val(false))
+end
+
+function evaluate_model(parameters_vector, data_dict, model_config)
+  _evaluate_model(parameters_vector, data_dict, model_config, Val(true))
 end

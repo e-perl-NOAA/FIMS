@@ -7,12 +7,18 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
+```{r, include = FALSE, eval = TRUE}
+run_slow_vignettes <- identical(Sys.getenv("FIMS_RUN_SLOW_VIGNETTES"), "true")
 knitr::opts_chunk$set(
+  eval = run_slow_vignettes,
   collapse = TRUE,
   comment = "#>"
 )
 ```
+
+This full growth-model fit is opt-in during vignette builds. Set
+`FIMS_RUN_SLOW_VIGNETTES=true` to execute it. Routine numerical and real-bridge
+regressions exercise smaller growth models.
 
 ```{css, echo=FALSE}
 .rchunk {
@@ -447,16 +453,12 @@ You can change the three starting values and rerun the fit to examine whether th
 
 ### Fit the Model
 
-Initialize and fit the model using the prepared parameter table. The report flag requests the complete realized Growth-derived age-to-length conversion tensor, which is used later to inspect the handoff from growth to fleet length bins.
+Initialize and fit the model using the prepared parameter table. Julia reports the complete realized Growth-derived age-to-length conversion tensor automatically, which is used later to inspect the handoff from growth to fleet length bins.
 
 ```{r fit}
 # Build the FIMS input from the prepared demo frame and parameters.
 input <- parameters |>
   FIMS::initialize_fims(data = demo$frame)
-
-# Ask FIMS to include the Growth-derived age-to-length conversion tensor in the report
-# so we can inspect it.
-input$model$ReportAgeToLengthConversionDerivedTensor(TRUE)
 
 # Fit the VonBertalanffySchnute demo
 fit <- FIMS::fit_fims(

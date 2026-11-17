@@ -18,8 +18,12 @@ test_that("`get_input()` works with correct inputs", {
     input <- get_input(fit)
     #' @description Test that `get_input()` returns the FIMSFit input slot.
     expect_equal(input, fit@input)
-    #' @description Test that `get_input()` returns parameter and model entries.
-    expect_named(input, c("parameters", "model"))
+    #' @description Test that `get_input()` retains the model input and Julia fit metadata.
+    expect_named(input, c(
+      "parameters", "model", "julia_estimates",
+      "julia_fixed_parameter_count", "julia_random_parameter_count"
+    ))
+    expect_identical(input[["julia_estimates"]], get_estimates(fit))
   }
 })
 

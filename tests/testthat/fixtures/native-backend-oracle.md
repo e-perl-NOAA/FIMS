@@ -34,3 +34,14 @@ joint objective and reports were re-evaluated in the native backend at those
 exact values, treating recruitment deviations as fixed. The Julia regression
 evaluates the same point; it does not establish optimized-fit or uncertainty
 parity.
+
+`native-full-uncertainty-oracle.rds` independently refits that full example
+in the historical native checkout, starting from its saved optimum. It retains
+full-precision fixed/random estimates, the complete 78-effect covariance
+obtained from TMB's joint precision, and native derived-report standard errors.
+Native parameter IDs were recovered from the original full-precision mapping;
+the independently refitted values agree with that mapping within `1.4e-7`.
+The fixture contains only R values, not native pointers. The bundled Julia fit
+is compared with this reference at the existing `1e-6` objective and `1e-4`
+optimized-estimate/uncertainty tolerances. This saved-fit gate does not replace
+the fresh real-bridge integration gates or prove all supported combinations.

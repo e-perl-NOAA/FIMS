@@ -83,3 +83,7 @@ script for FIMS itself.
 Run `devtools::test()` and Julia's package tests. To include real bridge
 regressions, set `FIMS_RUN_JULIA_INTEGRATION=true`. CI checks installation and
 R CMD check with FIMS compiler commands disabled on supported operating systems.
+Full-model vignette refits are opt-in: set `FIMS_RUN_SLOW_VIGNETTES=true`
+before building vignettes to execute them. Routine builds use bundled Julia
+fits, while real-bridge tests exercise smaller models, profiles,
+retrospectives and projections.

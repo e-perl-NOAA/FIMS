@@ -549,6 +549,9 @@ end
   )
 
   @test isfinite(result["nll"])
+  @test evaluate_nll(parameters, data, config) == result["nll"]
+  @test FIMSBackend.gradient(values -> evaluate_nll(values, data, config), parameters) ≈
+        FIMSBackend.gradient(values -> evaluate_model(values, data, config)["nll"], parameters)
   expected_maturity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
   @test maturity_result["report"]["proportion_mature_at_age"] ≈
     repeat(reshape(expected_maturity, 1, :), 3, 1)
@@ -608,6 +611,7 @@ end
   end
   @test vonb_result["report"]["age_to_length_conversion"] ≈ expected_conversion
   vonb_report = vonb_result["report"]
+  @test vonb_report["age_to_length_conversion_derived"] ≈ expected_conversion
   @test vonb_report["age_to_length_conversion_derived_used"] == trues(2)
   @test size(vonb_report["growth_derived_mean_WAA_by_fleet"]) == (2, 3, 2)
   expected_weight_at_length =
@@ -1138,6 +1142,10 @@ end
   @test isapprox(FIMSBackend.multinomial_nll(observed, expected), -log(2 * 0.25 * 0.75); atol = 1e-13)
   @test FIMSBackend.multinomial_nll([0.0 2.0], [0.0 1.0]) == 0.0
   @test FIMSBackend.multinomial_nll([1.0 1.0], [0.0 1.0]) == Inf
+  row_log_likelihood = fill(NaN, 2)
+  total = FIMSBackend.multinomial_nll(observed, expected, row_log_likelihood)
+  @test row_log_likelihood ≈ [log(2 * 0.25 * 0.75), 0.0]
+  @test -sum(row_log_likelihood) == total
 end
 
 @testset "normal data likelihood" begin

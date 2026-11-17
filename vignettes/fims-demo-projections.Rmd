@@ -12,6 +12,7 @@ summary: "Instructions for running a FIMS model with projections."
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+run_slow_vignettes <- identical(Sys.getenv("FIMS_RUN_SLOW_VIGNETTES"), "true")
 # Set local options so vignette output is clean and consistent
 # (avoids color codes and subtle formatting in rendered docs)
 withr::local_options(list(
@@ -253,7 +254,11 @@ The wrapper functions used in this vignette are not yet capable of setting up pr
 
 Regardless if there are projections or not, the model is fit using the `FIMS::fit_fims()`, which facilitates that the model output will be in the same format that users are used to.
 
-```{r projection-fit}
+The full projection refit and its plot are opt-in during vignette builds.
+Set `FIMS_RUN_SLOW_VIGNETTES=true` to execute them. Routine integration tests
+exercise real Julia projections on small models.
+
+```{r projection-fit, eval=run_slow_vignettes}
 projection_fit <- parameters_projection |>
   initialize_fims(data = data_4_projections) |>
   fit_fims(optimize = TRUE)
@@ -265,7 +270,7 @@ clear()
 
 We use {stockplotr} to plot the model results. In the code below, we pass a single model to `stockplotr::plot_biomass()` but the list can contain multiple models, where the start and end year of each model that is included need not align. Thus, if we had fit the model without projections we could have plotted that here as well for comparison.
 
-```{r fit-plot-projections}
+```{r fit-plot-projections, eval=run_slow_vignettes}
 #| fig.alt: >
 #|   Plot of spawning biomass for projection model.
 stockplotr::plot_biomass(

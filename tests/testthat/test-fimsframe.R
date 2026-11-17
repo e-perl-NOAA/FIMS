@@ -603,7 +603,7 @@ test_that("`model_*()` returns correct error messages", {
 # Load the test data from an RDS file containing model fits.
 # List all RDS files in the fixtures directory that match the pattern "fit*_.RDS"
 if (!file.exists(testthat::test_path("fixtures", "data_age_comp.RDS"))) {
-  prepare_test_data()
+  prepare_test_data(fit = FALSE)
 }
 
 data_files <- list.files(

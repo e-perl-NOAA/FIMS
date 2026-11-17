@@ -5,15 +5,17 @@
 \alias{inv_logit}
 \title{Transform probabilities to and from the logit scale}
 \usage{
-logit(x)
+logit(a, b, x)
 
-inv_logit(x)
+inv_logit(a, b, x)
 }
 \arguments{
-\item{x}{A numeric vector.}
+\item{a, b}{Numeric lower and upper bounds.}
+
+\item{x}{A single numeric value to transform.}
 }
 \value{
-A numeric vector on the transformed scale.
+A single numeric value on the transformed scale.
 }
 \description{
 Transform probabilities to and from the logit scale

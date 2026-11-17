@@ -17,12 +17,15 @@ test_that("`get_run_time()` works with correct inputs", {
   #' @description Test that `get_run_time()` returns the optimized fit slot.
   expect_equal(optimized_runtime, fit_big_optimized@run_time)
   expect_named(optimized_runtime, names(fit_big_optimized@run_time))
-  expect_true(all(optimized_runtime > 0))
+  expect_true(all(is.finite(optimized_runtime) & optimized_runtime >= 0))
+  expect_gt(as.numeric(optimized_runtime[["time_total"]]), 0)
+  expect_gte(optimized_runtime[["time_total"]], sum(optimized_runtime[-3]))
 
   deterministic_runtime <- get_run_time(fit_big_unoptimized)
-  #' @description Test that `get_run_time()` returns a zero runtime without optimization.
+  #' @description Test that `get_run_time()` records evaluation time without optimization.
   expect_equal(deterministic_runtime, fit_big_unoptimized@run_time)
-  expect_equal(as.numeric(deterministic_runtime), 0)
+  expect_true(all(is.finite(deterministic_runtime) & deterministic_runtime >= 0))
+  expect_gte(deterministic_runtime[["time_total"]], sum(deterministic_runtime[-3]))
 })
 
 ## Edge handling ----

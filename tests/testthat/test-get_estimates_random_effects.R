@@ -9,22 +9,15 @@
 
 # get_estimates_random_effects ----
 ## Setup ----
-# Load or prepare any necessary data for testing
-if (!file.exists(testthat::test_path("fixtures", "fit_age_length_comp.RDS"))) {
-  prepare_test_data()
-}
-
 ## IO correctness ----
 test_that("get_estimates() reports the uncertainty of random effects", {
-  # This fixture estimates the recruitment deviations as random effects
-  fit <- readRDS(testthat::test_path("fixtures", "fit_age_length_comp.RDS"))
+  fit <- FIMS::fit_big_optimized
   random_effects <- get_estimates(fit) |>
     dplyr::filter(estimation_type == "random_effects")
   random_summary <- summary(get_sdreport(fit), "random")
-  # Row names of the sdreport summary end in the parameter id
   summary_row <- match(
     random_effects[["parameter_id"]],
-    as.integer(sub(".*\\.", "", rownames(random_summary)))
+    as.integer(sub("^parameter_", "", rownames(random_summary)))
   )
 
   #' @description Test that every random effect in get_estimates() has a finite standard error.
@@ -47,19 +40,4 @@ test_that("get_estimates() reports the uncertainty of random effects", {
 })
 
 ## Edge handling ----
-test_that("get_estimates() works for a model without random effects", {
-  fit <- readRDS(
-    testthat::test_path("fixtures", "fit_age_length_comp_fixed_effects.RDS")
-  )
-  estimates <- get_estimates(fit)
-
-  #' @description Test that a model without random effects fits and reports standard errors for its fixed effects.
-  expect_s4_class(fit, "FIMSFit")
-  expect_equal(
-    object = sum(estimates[["estimation_type"]] == "random_effects", na.rm = TRUE),
-    expected = 0
-  )
-  expect_true(any(is.finite(
-    estimates[["uncertainty"]][estimates[["estimation_type"]] == "fixed_effects"]
-  )))
-})
+# No-random-effect coverage is in test-get_estimates.R and test-fimsfit.R.

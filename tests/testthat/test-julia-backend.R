@@ -950,6 +950,17 @@ test_that("Julia backend serializes VonBertalanffy growth parameters and masks",
     delta_prior_config[["parameter_prior_transforms"]],
     rep("identity", length(delta_labels))
   )
+  decreasing_lengths <- parameters |>
+    dplyr::mutate(value = dplyr::case_when(
+      .data$module_name == "Growth" & .data$label == "mean_length_young" ~ 800,
+      .data$module_name == "Growth" & .data$label == "mean_length_old" ~ 700,
+      TRUE ~ .data$value
+    ))
+  #' @description Test that Julia initialization retains the native increasing-reference-length validation.
+  expect_error(
+    FIMS:::as_julia_fims_parameters(decreasing_lengths, data),
+    "mean_length_old must be > mean_length_young"
+  )
 })
 
 test_that("Julia backend serializes fleet-specific VonBertalanffy length bins", {
@@ -1183,6 +1194,7 @@ test_that("Julia parameter estimates separate maturity and selectivity labels", 
   expect_equal(matched[["estimated"]], c(1.2, 2.1, 3.2, 4.3, 5.3, 6.4, 7.5))
   expect_equal(matched[["uncertainty"]], c(0.12, 0.21, 0.32, 0.43, 0.53, 0.64, 0.75))
   expect_equal(matched[["year_i"]], parameters[["timing"]])
+  expect_equal(matched[["parameter_id"]], c(5L, 1L, 2L, 6L, 3L, 4L, 7L))
 })
 
 test_that("Julia backend config preserves normal catch and lognormal index likelihoods", {
@@ -1701,8 +1713,53 @@ test_that("Julia backend fit_fims returns a FIMSFit object through the Julia bri
     length,
     integer(1)
   ) == 0L))
+  conversion <- array(
+    seq_len(n_ages * n_lengths * n_fleets),
+    dim = c(n_ages, n_lengths, n_fleets)
+  )
+  conversion_report <- mocked_report
+  conversion_report[["age_to_length_conversion_derived"]] <- conversion
+  conversion_input <- attr(result, "julia_input")
+  converted <- FIMS:::build_julia_backend_report(
+    conversion_input, list(report = conversion_report)
+  )
+  #' @description Test that a derived conversion tensor repeats age-major, length-minor cells for every year.
+  expect_equal(
+    converted[["age_to_length_conversion_derived"]][[1]],
+    rep(as.numeric(t(conversion[, , 1])), n_years)
+  )
+  expect_length(converted[["age_to_length_conversion_derived"]][[2]], 0L)
+  conversion_report[["age_to_length_conversion_derived_used"]] <- rep(1, n_fleets)
+  conversion_input[["data"]][["n_lengths_by_fleet"]] <- c(n_lengths, n_lengths - 1L)
+  conversion_input[["data"]][["lengths_by_fleet"]] <- cbind(
+    conversion_input[["data"]][["lengths"]],
+    c(conversion_input[["data"]][["lengths"]][-2L], 0)
+  )
+  converted <- FIMS:::build_julia_backend_report(
+    conversion_input, list(report = conversion_report)
+  )
+  #' @description Test that fleet-specific tensors exclude structural zero bins belonging to other fleets.
+  expect_equal(
+    converted[["age_to_length_conversion_derived"]][[2]],
+    rep(as.numeric(t(conversion[, -2L, 2])), n_years)
+  )
   #' @description Test that Julia backend fits produce estimate rows for catch and mortality quantities.
   expect_true(all(c("catch_expected", "mortality_F") %in% FIMS::get_estimates(fit)[["label"]]))
+  estimate_rows <- FIMS::get_estimates(fit)
+  expect_false(any(c("age_i", "timing", "value", "distribution_type") %in% names(estimate_rows)))
+  expect_true("log_like_cv" %in% names(estimate_rows))
+  age_rows <- estimate_rows |>
+    dplyr::filter(.data$label == "numbers_at_age")
+  expect_equal(age_rows[["age"]], rep(get_ages(data), n_report_years))
+  length_rows <- estimate_rows |>
+    dplyr::filter(.data$label == "lengthcomp_expected")
+  expect_equal(length_rows[["length"]], rep(get_lengths(data), n_years * n_fleets))
+  parameter_rows <- estimate_rows |>
+    dplyr::filter(.data$type == "parameter")
+  expect_equal(anyDuplicated(parameter_rows[["parameter_id"]]), 0L)
+  selectivity_rows <- parameter_rows |>
+    dplyr::filter(.data$module_name == "Selectivity")
+  expect_equal(selectivity_rows[["fleet"]], get_fleets(data)[selectivity_rows[["module_id"]]])
   expect_true(all(c(
     "unfished_numbers_at_age",
     "unfished_biomass",
@@ -2035,6 +2092,54 @@ test_that("real Julia full model matches the native optimum at fixed parameters"
     expect_true(length(expected) > 0L)
     expect_true(all(is.finite(actual)))
     expect_equal(actual, expected, tolerance = 1e-8, info = field)
+  }
+})
+
+test_that("the saved full Julia fit retains native optimized and uncertainty parity", {
+  reference <- readRDS(testthat::test_path(
+    "fixtures", "native-full-uncertainty-oracle.rds"
+  ))
+  fit <- FIMS::fit_big_optimized
+  expect_equal(get_number_of_parameters(fit),
+    c(fixed_effects = 49L, random_effects = 29L))
+  expect_equal(get_opt(fit)[["convergence"]], 0L)
+  expect_true(get_sdreport(fit)[["pdHess"]])
+  expect_lt(get_max_gradient(fit), 1e-3)
+  expect_equal(get_opt(fit)[["objective"]], reference[["marginal"]], tolerance = 1e-6)
+  keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
+  parameters <- get_estimates(fit) |>
+    dplyr::filter(.data$estimation_type %in% c("fixed_effects", "random_effects"))
+  matched <- dplyr::inner_join(
+    reference[["parameters"]], parameters, by = keys,
+    suffix = c("_native", "_julia"), relationship = "one-to-one"
+  )
+  expect_equal(nrow(parameters), 78L)
+  expect_equal(nrow(matched), 78L)
+  expect_equal(matched[["estimated_julia"]], matched[["estimated_native"]],
+    tolerance = 1e-4)
+  expect_equal(unname(matched[["uncertainty_julia"]]),
+    unname(matched[["uncertainty_native"]]), tolerance = 1e-4)
+  covariance <- environment(get_obj(fit)[["fn"]])[["fit_result"]][["covariance"]]
+  indices <- matched[["parameter_id_julia"]]
+  expect_equal(unname(covariance[indices, indices]),
+    reference[["covariance"]], tolerance = 1e-4)
+  derived <- get_estimates(fit) |>
+    dplyr::filter(.data$estimation_type == "derived_quantity") |>
+    dplyr::inner_join(
+      reference[["derived"]], by = keys,
+      suffix = c("_julia", "_native"), relationship = "one-to-one"
+    )
+  expect_equal(nrow(derived), nrow(reference[["derived"]]))
+  for (label in unique(reference[["derived"]][["label"]])) {
+    rows <- derived |>
+      dplyr::filter(.data$label == .env$label)
+    expect_equal(unname(rows[["uncertainty_julia"]]),
+      unname(rows[["uncertainty_native"]]), tolerance = 1e-4, info = label)
+    expect_equal(
+      unname(unlist(get_report(fit)[[label]])),
+      unname(unlist(reference[["report"]][[label]])),
+      tolerance = 1e-4, info = label
+    )
   }
 })
 

@@ -3,8 +3,16 @@
 * The Julia-only cutover below is work in progress, not release-ready.
   Shipped optimized and internal example fits have been regenerated with
   Julia, including the complete 49-fixed/29-random example with convergence
-  and positive-definite uncertainty. Broader covariance/report-standard-error
-  parity and a complete compiler-disabled R CMD check remain unverified.
+  and positive-definite uncertainty. Its optimized estimates, full covariance
+  and native derived-report standard errors pass saved native comparisons.
+  Broader configuration coverage remains outstanding. A complete
+  compiler-disabled R CMD check, including real Julia integration tests,
+  vignettes and the PDF manual, passes on Windows.
+  Release also requires full model fits, including uncertainty, to run no slower
+  than native C++/TMB, preferably faster. This performance gate is not yet met.
+  Comparisons must use matched data, starting parameters, estimation settings,
+  convergence requirements and outputs, distinguishing startup/compilation
+  costs from warm execution without weakening numerical parity.
 * Julia is now the sole backend. The high-level R workflow remains available;
   low-level native modules, mutable parameter vectors, native logging, and
   native module-ID JSON have been retired. Saved native fits must be refitted.
@@ -22,6 +30,18 @@
   sampling profile saved on exit.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
+  Estimate tables preserve their established columns, annotate age/length bins
+  and fleet ownership, and retain fleet-derived quantities and parameter IDs.
+  Distribution names and per-year multinomial log-likelihoods retain the
+  established R output conventions, including zero likelihood for missing rows.
+  Table metadata uses Julia parameter ordering and backend-independent types;
+  unused, constant-zero native `log_f_multiplier` placeholders are omitted.
+* Bounded `logit(a, b, x)` and `inv_logit(a, b, x)` transformations remain
+  available without the native module.
+* Objective derivatives avoid materializing report-only arrays. Full reports
+  remain available for extraction and uncertainty calculations.
+* Growth-derived age-to-length conversion tensors are reported automatically;
+  the retired mutable native report flag is no longer needed.
 * Objective simulation uses R's RNG to draw observations conditional on
   parameters and random-effect modes. Uncertainty summaries no longer use TMB.
 

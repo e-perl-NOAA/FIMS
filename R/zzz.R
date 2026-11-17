@@ -13,11 +13,22 @@ clear <- function() {
 }
 
 #' Transform probabilities to and from the logit scale
-#' @param x A numeric vector.
-#' @return A numeric vector on the transformed scale.
+#' @param a,b Numeric lower and upper bounds.
+#' @param x A single numeric value to transform.
+#' @return A single numeric value on the transformed scale.
 #' @export
-logit <- function(x) stats::qlogis(x)
+logit <- function(a, b, x) {
+  if (any(lengths(list(a, b, x)) != 1L)) {
+    cli::cli_abort("Expecting a single value for each of {.arg a}, {.arg b}, and {.arg x}.")
+  }
+  stats::qlogis((x - a) / (b - a))
+}
 
 #' @rdname logit
 #' @export
-inv_logit <- function(x) stats::plogis(x)
+inv_logit <- function(a, b, x) {
+  if (any(lengths(list(a, b, x)) != 1L)) {
+    cli::cli_abort("Expecting a single value for each of {.arg a}, {.arg b}, and {.arg x}.")
+  }
+  a + (b - a) * stats::plogis(x)
+}

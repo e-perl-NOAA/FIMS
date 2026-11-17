@@ -663,6 +663,11 @@ as_julia_fims_parameters <- function(parameters, data) {
         "Julia backend requires positive VonBertalanffySchnute lengths, growth coefficient, and length-weight parameters."
       )
     }
+    if (scalar_values[[2]] <= scalar_values[[1]]) {
+      cli::cli_abort(
+        "VonBertalanffySchnute mean_length_old must be > mean_length_young."
+      )
+    }
     if (scalar_values[[5]] <= scalar_values[[4]]) {
       cli::cli_abort(
         "VonBertalanffySchnute reference_age_for_length_old must exceed reference_age_for_length_young."
