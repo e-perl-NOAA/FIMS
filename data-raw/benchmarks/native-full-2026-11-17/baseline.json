@@ -1,0 +1,591 @@
+{
+  "schema": 1,
+  "checklist_item": "P2",
+  "status": "passed",
+  "date": "2026-11-17",
+  "candidate_revision": "b83f908f",
+  "scope": "Independent native full-model timing baseline; no Julia fit or performance comparison.",
+  "environment": {
+    "R": "R version 4.6.2 (2026-10-29 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "package_version": "0.11.0.9000",
+    "source_md5": {
+      "R/FIMS-package.R": "a3ff6e3b330c340ac787cf74d88e3113",
+      "R/Rcpp_exports.R": "cc5df56f21bd187e134365adde4e5bfb",
+      "R/augment-fims.R": "9f4dc0595b42c199a6a9c896be91333c",
+      "R/check_convergence.R": "81be1eb22ff30b094b0affd37921e7ed",
+      "R/check_fims.R": "736c92b106582f8427dbdbf264656717",
+      "R/data_big.R": "9244e733bd756def26b8f1c42210a782",
+      "R/distribution_formulas.R": "4deb6515602b04ec2fb9fe139258f940",
+      "R/fims_distributions.R": "963b356cf0b697d01dc38dfb4588d278",
+      "R/fims_input_types.R": "31f1b1689d265b6fa1850097faef6fd1",
+      "R/fims_likelihood.R": "18f0da0a6d6f52f21f642c033cef5a27",
+      "R/fims_retro.R": "b37e988e771104e636fc1a09ab1d0bfe",
+      "R/fimsfit.R": "fb8fabb9626dfe9a7dc3051209eb5c1f",
+      "R/fimsframe.R": "a7d514a298aeed43a926d84896afdeb1",
+      "R/initialize_modules.R": "324dd4e4a332f41a3cc7e012c340c44a",
+      "R/is_fims_verbose.R": "03d98c153f3978a631ceb23eaa20d64a",
+      "R/julia_backend.R": "9bb5cd03ce4ae8d73734fb2e054b7487",
+      "R/mohns_rho.R": "914a41acb16eabd3e31b8a79bca1de35",
+      "R/parse_data_distribution.R": "5527d0f5aba8ef03c1ba5343cfd40da8",
+      "R/plot_likelihood.R": "85894f07984984656f2f03298b42ce15",
+      "R/reshape_output.R": "37f5ffe93bf6f81d706230b7611ef6d3",
+      "R/run_modified_fims.R": "b2c428b8d05def8e2a94990ad7fb8d46",
+      "R/setup_default_parameters.R": "25f62ac84f384318b98820dcb3cd4da0",
+      "R/tidy-glance-fims.R": "af94324f2977a3baeb75a193b745272f",
+      "R/use-google-benchmark-template.R": "590925bffb1ba7c3c78fe90c5a1681cb",
+      "R/use-gtest-template.R": "a5e88c06416b858bbb2f53d1bb4f14fa",
+      "R/use-testthat-template.R": "9d72c3ced04e0077d936282d0f2f8211",
+      "R/utils.R": "159d216dc57ca2d936005a66fdcf3e91",
+      "R/zzz.R": "a29918a197a56e3f27268113a689424e",
+      "inst/julia/FIMSBackend/Project.toml": "f64c7a16d2a99d2ee1882f8d2d5e3c30",
+      "inst/julia/FIMSBackend/src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+      "inst/julia/FIMSBackend/src/modules/population.jl": "e03aab4f68a3324f08e240f64c9a70da",
+      "inst/julia/FIMSBackend/src/modules/recruitment.jl": "41fc044fa7593d8402a78dc22d73c7f1",
+      "inst/julia/FIMSBackend/src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+      "inst/julia/FIMSBackend/src/objective.jl": "54f453c02a70da64626a17ee04eb8618",
+      "inst/julia/FIMSBackend/src/optimizer.jl": "07d54acd6f26f11c0d7799c2857bfa09",
+      "inst/julia/FIMSBackend/test/runtests.jl": "c2942423d825b05488954abd5e2ce5c4"
+    },
+    "threads": {
+      "JULIA_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    },
+    "native_dll_md5": "7791104ab1295dcec1725062eb5f1f0a",
+    "loaded_package_versions": {
+      "FIMS": "0.11.0.9000",
+      "testthat": "3.3.2",
+      "Matrix": "1.7-6",
+      "gtable": "0.3.6",
+      "jsonlite": "2.0.0",
+      "dplyr": "1.2.1",
+      "compiler": "4.6.2",
+      "brio": "1.1.5",
+      "tidyselect": "1.2.1",
+      "Rcpp": "1.1.1-1.1",
+      "parallel": "4.6.2",
+      "JuliaCall": "0.17.6",
+      "globals": "0.19.1",
+      "scales": "1.4.0",
+      "lattice": "0.23-1",
+      "ggplot2": "4.0.3.9000",
+      "R6": "2.6.1",
+      "generics": "0.1.4",
+      "knitr": "1.51",
+      "future": "1.70.0",
+      "tibble": "3.3.1",
+      "stockplotr": "0.14.0",
+      "desc": "1.4.3",
+      "rprojroot": "2.1.1",
+      "TMB": "1.9.21",
+      "pillar": "1.11.1",
+      "RColorBrewer": "1.1-3",
+      "rlang": "1.3.0",
+      "xfun": "0.57",
+      "S7": "0.2.2",
+      "otel": "0.2.0",
+      "pkgload": "1.5.2",
+      "viridisLite": "0.4.3",
+      "cli": "3.6.6",
+      "magrittr": "2.0.5",
+      "digest": "0.6.39",
+      "grid": "4.6.2",
+      "lifecycle": "1.0.5",
+      "vctrs": "0.7.3",
+      "evaluate": "1.0.5",
+      "glue": "1.8.1",
+      "farver": "2.1.2",
+      "listenv": "0.10.1",
+      "furrr": "0.4.0",
+      "yardstick": "1.4.0",
+      "codetools": "0.2-20",
+      "parallelly": "1.47.0",
+      "purrr": "1.2.2",
+      "tools": "4.6.2",
+      "pkgconfig": "2.0.3"
+    }
+  },
+  "host": {
+    "CPU": "13th Gen Intel(R) Core(TM) i7-1365U",
+    "physical_cores": 10,
+    "logical_processors": 12,
+    "OS": "Windows 11 Enterprise 10.0.26200",
+    "memory_GiB": 15.35,
+    "preflight_free_memory_GiB": 2.75,
+    "power_scheme": "Balanced",
+    "preflight_CPU_load_percent": [19, 39, 43],
+    "during_cold_uncertainty_CPU_load_percent": 20,
+    "during_cold_uncertainty_free_memory_KiB": 2331952,
+    "exclusive_host": false,
+    "conditions": "Interactive workstation, not an isolated timing host. No other FIMS R/Julia jobs observed and no concurrent agent builds, tests, or model fits launched during collection. All four fits used one worker process, the same native DLL, identical input, fixed one-thread environment and unchanged power scheme. Lightweight progress/resource reads remained enabled."
+  },
+  "native_declared_revision": "1e5a64a8",
+  "native_revision_verified_by_git": false,
+  "native_source_provenance": "Preserved independent export and verified loaded DLL fingerprint.",
+  "preparation": {
+    "status": "prepared",
+    "seconds": 9.28,
+    "native_build": "preexisting DLL; build time not measured"
+  },
+  "protocol": {
+    "case": "full",
+    "counts": {
+      "fixed_effects": 49,
+      "random_effects": 29
+    },
+    "priors": null,
+    "control": {
+      "iter.max": 10000,
+      "eval.max": 10000,
+      "trace": 0
+    },
+    "restarts": 3,
+    "input_md5": "ad075166d27afabb8dbe224aa73b84c6",
+    "required_derived": ["agecomp_expected", "agecomp_proportion", "biomass", "catch_expected", "catch_numbers", "catch_numbers_at_age", "catch_numbers_at_length", "catch_weight", "catch_weight_at_age", "expected_recruitment", "index_expected", "index_numbers", "index_numbers_at_age", "index_numbers_at_length", "index_weight", "index_weight_at_age", "lengthcomp_expected", "lengthcomp_proportion", "log_catch_expected", "log_index_expected", "mortality_F", "mortality_M", "mortality_Z", "numbers_at_age", "proportion_mature_at_age", "spawning_biomass", "sum_selectivity", "total_catch_numbers", "total_catch_weight", "unfished_biomass", "unfished_numbers_at_age", "unfished_spawning_biomass"],
+    "harness_md5": {
+      "benchmark_backends.R": "021f47b8af1b422a2110867e2372bdba",
+      "benchmark_profile.jl": "e68b2f8eb170238e4e15dbf66e93ed7a"
+    }
+  },
+  "trials": [
+    {
+      "trial": "cold",
+      "initialize_seconds": 14.35,
+      "fit_seconds": 178.81,
+      "optimization_seconds": 9.03670692443848,
+      "optimization_passes": 4,
+      "uncertainty_seconds": 167.738034009933,
+      "uncertainty_passes": 1,
+      "fit_other_seconds": 2.03525906562805,
+      "extract_validate_seconds": 5.78999999999999,
+      "profile_setup_seconds": 0.00999999999999979,
+      "profile_finalize_seconds": 0.0200000000000102,
+      "trial_wall_seconds": 198.98,
+      "cold_process_to_result_seconds": 209.168735980988,
+      "convergence": 0,
+      "optimizer": {
+        "convergence": 0,
+        "iterations": 1,
+        "evaluations": [2, 1],
+        "message": "relative convergence (4)"
+      },
+      "max_absolute_fixed_gradient": 0.000359420286652812,
+      "marginal_objective": 3231.25994450208,
+      "joint_objective": 3164.83636970671,
+      "covariance_shape": [78, 78],
+      "covariance_cholesky_passed": true,
+      "derived_families": 32,
+      "derived_rows": 13091,
+      "Rprof_sampled_seconds": 127.82,
+      "Rprof_top_total_calls": [
+        {
+          "call": "\"tryCatch\"",
+          "total.time": 127.82,
+          "total.pct": 100,
+          "self.time": 0.16,
+          "self.pct": 0.13
+        },
+        {
+          "call": "\"tryCatchList\"",
+          "total.time": 127.82,
+          "total.pct": 100,
+          "self.time": 0.1,
+          "self.pct": 0.08
+        },
+        {
+          "call": "\"benchmark_worker\"",
+          "total.time": 127.82,
+          "total.pct": 100,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"FIMS::fit_fims\"",
+          "total.time": 114.88,
+          "total.pct": 89.88,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\".Call\"",
+          "total.time": 114.08,
+          "total.pct": 89.25,
+          "self.time": 106.54,
+          "self.pct": 83.35
+        },
+        {
+          "call": "\"TMB::sdreport\"",
+          "total.time": 107.76,
+          "total.pct": 84.31,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"EvalADFunObject\"",
+          "total.time": 101.44,
+          "total.pct": 79.36,
+          "self.time": 0.22,
+          "self.pct": 0.17
+        },
+        {
+          "call": "\"standardGeneric\"",
+          "total.time": 90.32,
+          "total.pct": 70.66,
+          "self.time": 0.64,
+          "self.pct": 0.5
+        },
+        {
+          "call": "\"lapply\"",
+          "total.time": 88.58,
+          "total.pct": 69.3,
+          "self.time": 0.5,
+          "self.pct": 0.39
+        },
+        {
+          "call": "\"FUN\"",
+          "total.time": 88.36,
+          "total.pct": 69.13,
+          "self.time": 2.3,
+          "self.pct": 1.8
+        }
+      ]
+    },
+    {
+      "trial": "warm-1",
+      "initialize_seconds": 15.36,
+      "fit_seconds": 178.47,
+      "optimization_seconds": 9.09121322631836,
+      "optimization_passes": 4,
+      "uncertainty_seconds": 166.993944168091,
+      "uncertainty_passes": 1,
+      "fit_other_seconds": 2.38484260559082,
+      "extract_validate_seconds": 5.98000000000002,
+      "profile_setup_seconds": 0.00999999999999091,
+      "profile_finalize_seconds": 0.0199999999999818,
+      "trial_wall_seconds": 199.86,
+      "cold_process_to_result_seconds": null,
+      "convergence": 0,
+      "optimizer": {
+        "convergence": 0,
+        "iterations": 1,
+        "evaluations": [2, 1],
+        "message": "relative convergence (4)"
+      },
+      "max_absolute_fixed_gradient": 0.000359420286652812,
+      "marginal_objective": 3231.25994450208,
+      "joint_objective": 3164.83636970671,
+      "covariance_shape": [78, 78],
+      "covariance_cholesky_passed": true,
+      "derived_families": 32,
+      "derived_rows": 13091,
+      "Rprof_sampled_seconds": 128.34,
+      "Rprof_top_total_calls": [
+        {
+          "call": "\"tryCatch\"",
+          "total.time": 128.34,
+          "total.pct": 100,
+          "self.time": 0.24,
+          "self.pct": 0.19
+        },
+        {
+          "call": "\"tryCatchList\"",
+          "total.time": 128.34,
+          "total.pct": 100,
+          "self.time": 0.04,
+          "self.pct": 0.03
+        },
+        {
+          "call": "\"benchmark_worker\"",
+          "total.time": 128.34,
+          "total.pct": 100,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\".Call\"",
+          "total.time": 114.9,
+          "total.pct": 89.53,
+          "self.time": 106.88,
+          "self.pct": 83.28
+        },
+        {
+          "call": "\"FIMS::fit_fims\"",
+          "total.time": 114.62,
+          "total.pct": 89.31,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"TMB::sdreport\"",
+          "total.time": 107.38,
+          "total.pct": 83.67,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"EvalADFunObject\"",
+          "total.time": 101.76,
+          "total.pct": 79.29,
+          "self.time": 0.28,
+          "self.pct": 0.22
+        },
+        {
+          "call": "\"standardGeneric\"",
+          "total.time": 90.42,
+          "total.pct": 70.45,
+          "self.time": 0.66,
+          "self.pct": 0.51
+        },
+        {
+          "call": "\"lapply\"",
+          "total.time": 87.8,
+          "total.pct": 68.41,
+          "self.time": 0.38,
+          "self.pct": 0.3
+        },
+        {
+          "call": "\"FUN\"",
+          "total.time": 87.54,
+          "total.pct": 68.21,
+          "self.time": 2.3,
+          "self.pct": 1.79
+        }
+      ]
+    },
+    {
+      "trial": "warm-2",
+      "initialize_seconds": 14.36,
+      "fit_seconds": 168,
+      "optimization_seconds": 9.07147073745728,
+      "optimization_passes": 4,
+      "uncertainty_seconds": 157.200980186462,
+      "uncertainty_passes": 1,
+      "fit_other_seconds": 1.72754907608032,
+      "extract_validate_seconds": 5.27999999999997,
+      "profile_setup_seconds": 0.0200000000000387,
+      "profile_finalize_seconds": 0.0100000000001046,
+      "trial_wall_seconds": 187.67,
+      "cold_process_to_result_seconds": null,
+      "convergence": 0,
+      "optimizer": {
+        "convergence": 0,
+        "iterations": 1,
+        "evaluations": [2, 1],
+        "message": "relative convergence (4)"
+      },
+      "max_absolute_fixed_gradient": 0.000359420286652812,
+      "marginal_objective": 3231.25994450208,
+      "joint_objective": 3164.83636970671,
+      "covariance_shape": [78, 78],
+      "covariance_cholesky_passed": true,
+      "derived_families": 32,
+      "derived_rows": 13091,
+      "Rprof_sampled_seconds": 120.46,
+      "Rprof_top_total_calls": [
+        {
+          "call": "\"tryCatch\"",
+          "total.time": 120.46,
+          "total.pct": 100,
+          "self.time": 0.14,
+          "self.pct": 0.12
+        },
+        {
+          "call": "\"tryCatchList\"",
+          "total.time": 120.46,
+          "total.pct": 100,
+          "self.time": 0.04,
+          "self.pct": 0.03
+        },
+        {
+          "call": "\"benchmark_worker\"",
+          "total.time": 120.46,
+          "total.pct": 100,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\".Call\"",
+          "total.time": 109.06,
+          "total.pct": 90.54,
+          "self.time": 101.7,
+          "self.pct": 84.43
+        },
+        {
+          "call": "\"FIMS::fit_fims\"",
+          "total.time": 107.86,
+          "total.pct": 89.54,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"TMB::sdreport\"",
+          "total.time": 100.92,
+          "total.pct": 83.78,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"EvalADFunObject\"",
+          "total.time": 96.5,
+          "total.pct": 80.11,
+          "self.time": 0.06,
+          "self.pct": 0.05
+        },
+        {
+          "call": "\"standardGeneric\"",
+          "total.time": 83.34,
+          "total.pct": 69.18,
+          "self.time": 0.44,
+          "self.pct": 0.37
+        },
+        {
+          "call": "\"lapply\"",
+          "total.time": 81.54,
+          "total.pct": 67.69,
+          "self.time": 0.24,
+          "self.pct": 0.2
+        },
+        {
+          "call": "\"FUN\"",
+          "total.time": 81.36,
+          "total.pct": 67.54,
+          "self.time": 1.78,
+          "self.pct": 1.48
+        }
+      ]
+    },
+    {
+      "trial": "warm-3",
+      "initialize_seconds": 13.3499999999999,
+      "fit_seconds": 166.17,
+      "optimization_seconds": 8.78124213218689,
+      "optimization_passes": 4,
+      "uncertainty_seconds": 155.501944065094,
+      "uncertainty_passes": 1,
+      "fit_other_seconds": 1.88681380271919,
+      "extract_validate_seconds": 4.88999999999999,
+      "profile_setup_seconds": 0.0100000000001046,
+      "profile_finalize_seconds": 0,
+      "trial_wall_seconds": 184.42,
+      "cold_process_to_result_seconds": null,
+      "convergence": 0,
+      "optimizer": {
+        "convergence": 0,
+        "iterations": 1,
+        "evaluations": [2, 1],
+        "message": "relative convergence (4)"
+      },
+      "max_absolute_fixed_gradient": 0.000359420286652812,
+      "marginal_objective": 3231.25994450208,
+      "joint_objective": 3164.83636970671,
+      "covariance_shape": [78, 78],
+      "covariance_cholesky_passed": true,
+      "derived_families": 32,
+      "derived_rows": 13091,
+      "Rprof_sampled_seconds": 118.42,
+      "Rprof_top_total_calls": [
+        {
+          "call": "\"tryCatch\"",
+          "total.time": 118.42,
+          "total.pct": 100,
+          "self.time": 0.14,
+          "self.pct": 0.12
+        },
+        {
+          "call": "\"benchmark_worker\"",
+          "total.time": 118.42,
+          "total.pct": 100,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"tryCatchList\"",
+          "total.time": 118.42,
+          "total.pct": 100,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"FIMS::fit_fims\"",
+          "total.time": 106.72,
+          "total.pct": 90.12,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\".Call\"",
+          "total.time": 106.66,
+          "total.pct": 90.07,
+          "self.time": 99.72,
+          "self.pct": 84.21
+        },
+        {
+          "call": "\"TMB::sdreport\"",
+          "total.time": 99.88,
+          "total.pct": 84.34,
+          "self.time": 0,
+          "self.pct": 0
+        },
+        {
+          "call": "\"EvalADFunObject\"",
+          "total.time": 94.68,
+          "total.pct": 79.95,
+          "self.time": 0.26,
+          "self.pct": 0.22
+        },
+        {
+          "call": "\"standardGeneric\"",
+          "total.time": 82.66,
+          "total.pct": 69.8,
+          "self.time": 0.54,
+          "self.pct": 0.46
+        },
+        {
+          "call": "\"lapply\"",
+          "total.time": 81.04,
+          "total.pct": 68.43,
+          "self.time": 0.44,
+          "self.pct": 0.37
+        },
+        {
+          "call": "\"FUN\"",
+          "total.time": 80.76,
+          "total.pct": 68.2,
+          "self.time": 2.18,
+          "self.pct": 1.84
+        }
+      ]
+    }
+  ],
+  "warm_trial_wall_seconds": {
+    "values": [199.86, 187.67, 184.42],
+    "mean": 190.65,
+    "median": 187.67,
+    "minimum": 184.42,
+    "maximum": 199.86,
+    "standard_deviation": 8.13994471725694
+  },
+  "validation": {
+    "all_four_trials_converged": true,
+    "fixed_gradients_below_1e_3": true,
+    "complete_78_by_78_covariance_finite_and_positive_definite": true,
+    "all_32_required_derived_SE_families_finite": true,
+    "full_precision_starts_identical_between_trials": true,
+    "warm_numerical_outputs_match_cold_at_existing_tolerances": true,
+    "serialized_artifacts_pointer_free": true,
+    "live_Rprof_samples_read_during_uncertainty": true
+  },
+  "raw_local_session_artifact": "p2-native-full-01",
+  "phase_timestamp_format": "LF-normalized portable copy; timestamps unchanged.",
+  "performance_parity_established": false,
+  "artifact_md5": {
+    "input.rds": "ad075166d27afabb8dbe224aa73b84c6",
+    "native/cold/result.rds": "17c9bac8d79c9ed3fdded8acdf9a1fa0",
+    "native/warm-1/result.rds": "6124e33d27ad91ed3884ecf96c5ac229",
+    "native/warm-2/result.rds": "b3e881ad915433a3a853e597c9b125ea",
+    "native/warm-3/result.rds": "019fae4134f10a8fc211f145cc6bc4f4",
+    "native/progress.tsv": "c44294316282b5d69361324e3b62457b"
+  }
+}

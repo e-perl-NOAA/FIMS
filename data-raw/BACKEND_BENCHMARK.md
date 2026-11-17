@@ -173,3 +173,55 @@ fresh output directory. It must fail rather than record a successful timing.
 
 The checked-in [P1 smoke evidence](backend-benchmark-smoke.json) records the
 bounded real run and failure checks. It is not a P2/P3 full-model benchmark.
+
+## P2 native full-model baseline: 2026-11-17
+
+The [baseline record](benchmarks/native-full-2026-11-17/baseline.json) retains
+the complete distribution, environment/source fingerprints, phase costs,
+R-level profile summaries, and artifact checksums. The adjacent `input.rds`
+and four `native/<trial>/result.rds` files are byte-for-byte copies of the
+full-precision native harness outputs, not regenerated Julia expectations.
+The native phase timestamps are retained as `native/progress.tsv`.
+
+Captured against candidate `b83f908f`, using the full native-only command
+above: 49 fixed/29 random parameters, no added priors, controls 10000/10000,
+three restarts, one cold trial, and three fresh-input warm repetitions.
+All four trials converged with maximum absolute fixed gradient
+`0.000359420286652812`, valid uncertainty, complete positive-definite
+78-by-78 covariance, and 32 derived-SE families covering 13,091 rows.
+Warm outputs also matched the cold output at the existing comparison
+tolerances. Each trial performed four optimization passes and one uncertainty
+pass; uncertainty was not rerun for extraction.
+
+| Trial | Initialize (s) | `fit_fims` (s) | Optimization (s) | Uncertainty (s) | Extract/validate (s) | Trial wall (s) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cold | 14.35 | 178.81 | 9.04 | 167.74 | 5.79 | 198.98 |
+| warm-1 | 15.36 | 178.47 | 9.09 | 166.99 | 5.98 | 199.86 |
+| warm-2 | 14.36 | 168.00 | 9.07 | 157.20 | 5.28 | 187.67 |
+| warm-3 | 13.35 | 166.17 | 8.78 | 155.50 | 4.89 | 184.42 |
+
+Cold **process launch to result** was **209.17 seconds**; its 198.98-second
+trial wall time excludes preceding process/package startup. Warm trial wall
+time had median **187.67 seconds**, mean **190.65 seconds**, and range
+**184.42-199.86 seconds**. Optimization and uncertainty are components of
+`fit_fims`, not additional costs to add to it.
+
+Environment: Windows 11 x64, R 4.6.2, TMB 1.9.21, Intel i7-1365U, Balanced
+power plan, and single-thread environment settings. This was an interactive
+workstation, not an exclusive timing host; preflight CPU load ranged from
+19% to 43%. No other FIMS jobs or concurrent agent builds/tests/model fits
+were launched during collection. Retain the distribution and these conditions
+for P3/P6 rather than treating the fastest trial as universal performance.
+Raw local session artifact `p2-native-full-01` additionally retains the
+complete logs and R profiles; native sampling data was readable during
+uncertainty calculation.
+
+Use the committed archive directly for P3, without relying on local session
+paths or rerunning the native baseline:
+
+```powershell
+& $Rscript --vanilla data-raw\benchmark_backends.R --case full --backend julia --julia $Julia --reference data-raw\benchmarks\native-full-2026-11-17 --output C:\benchmarks\julia-p3-new --warm-runs 3 --restarts 3
+```
+
+P2 establishes the native baseline only. No fresh Julia full-fit comparison
+or performance-parity decision is implied.
