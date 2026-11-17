@@ -45,3 +45,37 @@ The fixture contains only R values, not native pointers. The bundled Julia fit
 is compared with this reference at the existing `1e-6` objective and `1e-4`
 optimized-estimate/uncertainty tolerances. This saved-fit gate does not replace
 the fresh real-bridge integration gates or prove all supported combinations.
+
+`native-configuration-oracle.rds` adds five-year, two-fleet configurations:
+joint selectivity, catchability and recruitment estimation with six fixed and
+four random effects, with and without priors; and growth-derived
+VonBertalanffySchnute length compositions with nine fixed and four random
+effects. Constants and starting values use the independent full native fit
+where applicable. Comparisons cover two nonoptimal marginal objectives,
+gradients and conditional reports, optimized joint/marginal objectives,
+parameter estimates, the complete covariance and 32 derived-report SE families.
+
+The historical high-level native initializer does not accept `priors`.
+For the two prior cases, the oracle adds independent R `stats::dnorm` and
+`stats::dlnorm` log densities and analytic gradients to the native marginal
+objective. These priors target fixed effects only, so native conditional
+random modes are unchanged. Normal and lognormal families cover identity
+and exponentiated growth parameters; no change-of-variables Jacobian is
+added to a prior on a documented parameter scale. Density gradients were
+checked by centered finite differences at both comparison points.
+`TMB::sdreport()` receives the augmented marginal Hessian via `hessian.fixed`,
+including its contribution to fixed/random covariance and report SEs.
+Growth parameter estimates and SEs are converted from log optimization
+coordinates to their documented natural scale by the delta method; the
+stored covariance remains in optimization coordinates.
+
+To regenerate these cases, use the historical native checkout and DLL
+identified in the fixture provenance, the stored per-case data, parameter
+tibbles and priors, and the independent R density calculations above.
+Optimize with `nlminb` (400 iterations/1,000 evaluations per attempt and up
+to three restarts), requiring convergence, gradient below `1e-3` and
+positive-definite uncertainty. Evaluate both stored fixed-coordinate points.
+Use `optimHess` on the augmented analytic gradient with step `1e-4` before
+calling `sdreport(getJointPrecision = TRUE)`. Do not use Julia to generate
+or repair these expectations. Random-effect priors and every supported
+configuration are not established by this fixture.

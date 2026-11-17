@@ -40,6 +40,12 @@
   available without the native module.
 * Objective derivatives avoid materializing report-only arrays. Full reports
   remain available for extraction and uncertainty calculations.
+* Real Julia comparison gates now cover joint selectivity, catchability and
+  recruitment estimation with four random effects, and joint parametric
+  growth estimation with growth-derived length compositions. Independent
+  native likelihoods plus R density oracles cover normal/lognormal fixed-effect
+  priors and natural-scale growth transforms, including nonoptimal gradients,
+  full covariance and 32 derived-report standard-error families.
 * Growth-derived age-to-length conversion tensors are reported automatically;
   the retired mutable native report flag is no longer needed.
 * Objective simulation uses R's RNG to draw observations conditional on

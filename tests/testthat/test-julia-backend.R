@@ -2184,6 +2184,86 @@ test_that("real Julia fits retain the saved optimized native comparisons", {
   }
 })
 
+test_that("real Julia joint configurations retain native gradients and uncertainty", {
+  skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
+    "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
+  oracle <- readRDS(testthat::test_path("fixtures", "native-configuration-oracle.rds"))
+  keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
+  for (case in oracle[["cases"]]) {
+    name <- case[["name"]]
+    input <- initialize_fims(
+      case[["parameters"]], FIMSFrame(case[["data"]]), priors = case[["priors"]]
+    )
+    config <- attr(input, "julia_model_config")
+    config[["diagnostic_file"]] <- file.path(
+      tempdir(), paste0("fims-configuration-", name, ".progress")
+    )
+    attr(input, "julia_model_config") <- config
+    fit <- fit_fims(input, control = list(iter.max = 400, eval.max = 1000))
+    expect_equal(get_opt(fit)[["convergence"]], 0L, info = name)
+    expect_true(get_sdreport(fit)[["pdHess"]], info = name)
+    expect_true(get_max_gradient(fit) < 1e-3, info = name)
+    expect_equal(get_opt(fit)[["objective"]], case[["marginal"]],
+      tolerance = 1e-6, info = name)
+    expect_equal(get_report(fit)[["jnll"]], case[["report"]][["jnll"]],
+      tolerance = 1e-6, info = name)
+    parameters <- get_estimates(fit) |>
+      dplyr::filter(.data$estimation_type %in% c("fixed_effects", "random_effects"))
+    reference <- case[["parameters_table"]]
+    matched <- dplyr::inner_join(
+      reference, parameters, by = keys,
+      suffix = c("_native", "_julia"), relationship = "one-to-one"
+    )
+    expect_equal(nrow(parameters), nrow(reference), info = name)
+    expect_equal(nrow(matched), nrow(reference), info = name)
+    expect_equal(matched[["estimated_julia"]], matched[["estimated_native"]],
+      tolerance = 1e-4, info = name)
+    expect_equal(unname(matched[["uncertainty_julia"]]),
+      unname(matched[["uncertainty_native"]]), tolerance = 1e-4, info = name)
+    objective <- get_obj(fit)
+    covariance <- environment(objective[["fn"]])[["fit_result"]][["covariance"]]
+    indices <- matched[["parameter_id"]]
+    expect_equal(unname(covariance[indices, indices]), case[["covariance"]],
+      tolerance = 1e-4, info = name)
+    derived <- get_estimates(fit) |>
+      dplyr::filter(.data$estimation_type == "derived_quantity") |>
+      dplyr::inner_join(
+        case[["derived"]], by = keys,
+        suffix = c("_julia", "_native"), relationship = "one-to-one"
+      )
+    expect_equal(nrow(derived), nrow(case[["derived"]]), info = name)
+    for (label in unique(case[["derived"]][["label"]])) {
+      rows <- derived |> dplyr::filter(.data$label == .env$label)
+      expect_equal(unname(rows[["uncertainty_julia"]]),
+        unname(rows[["uncertainty_native"]]), tolerance = 1e-4,
+        info = paste(name, label))
+    }
+    fixed_rows <- matched |>
+      dplyr::filter(.data$estimation_type_native == "fixed_effects")
+    fixed_ids <- which(config[["fixed_parameter_mask"]])
+    fixed_order <- match(fixed_rows[["parameter_id"]], fixed_ids)
+    expect_setequal(fixed_order, seq_along(objective[["par"]]))
+    for (point in case[["points"]]) {
+      values <- objective[["par"]]
+      values[fixed_order] <- point[["fixed"]]
+      expect_equal(objective[["fn"]](values), as.numeric(point[["marginal"]]),
+        tolerance = 1e-8, info = name)
+      expect_equal(unname(objective[["gr"]](values)[fixed_order]),
+        point[["gradient"]], tolerance = 1e-6, info = name)
+      report <- objective[["report"]](values)
+      for (field in c(
+        "jnll", "numbers_at_age", "biomass", "spawning_biomass",
+        "expected_recruitment", "mortality_F", "mortality_M", "mortality_Z",
+        "catch_expected", "index_expected", "agecomp_expected", "lengthcomp_expected"
+      )) {
+        expect_equal(unname(unlist(report[[field]])),
+          unname(unlist(point[["report"]][[field]])), tolerance = 1e-8,
+          info = paste(name, field))
+      }
+    }
+  }
+})
+
 test_that("Julia likelihood plots count equal-valued components separately", {
   estimates <- tibble::tibble(
     value_log_rzero = rep(c(1, 2), each = 3),
