@@ -7,10 +7,11 @@
 
 # Overview
 
-> **Cutover in progress:** this branch is not release-ready. Bundled fitted
-> examples still need regeneration with Julia; full-model optimized parity,
-> final workflow regressions, and a complete compiler-disabled `R CMD check`
-> have not been verified. See the development notes in `NEWS.md`.
+> **Cutover in progress:** this branch is not release-ready. Bundled examples
+> have been regenerated with Julia, and a complete compiler-disabled
+> `R CMD check` passes on Windows. Full-fit performance parity, remaining
+> configuration and full-scale workflow coverage, and verification across
+> supported platforms remain release gates. See `NEWS.md`.
 
 FIMS is an R package for fitting integrated statistical population-dynamics models to fishery data. Julia implements the population model, likelihood, automatic differentiation, optimization, and uncertainty calculations. The high-level R data, parameter, fitting, and diagnostic interfaces remain available.
 
@@ -102,8 +103,14 @@ The `get_model_output()` JSON now contains `backend`, `estimates`, and `report`;
 the native module-ID JSON schema is retired.
 
 Native-versus-Julia comparisons passed for deterministic EWAA and
-VonBertalanffySchnute models and narrow catchability fits, with and without a
-recruitment random effect. Those checks do not prove every supported combination.
+VonBertalanffySchnute models, narrow catchability fits, and fresh joint
+selectivity/catchability/recruitment fits with four random effects. Joint
+parametric growth fits also exercise growth-derived length compositions and
+normal/lognormal fixed-effect priors using independent native/R oracles.
+The saved complete 49-fixed/29-random fit passes native comparisons of estimates,
+full covariance and 32 derived-report standard-error families; this saved-fit
+check is not a fresh full-fit benchmark. These checks do not prove every
+supported combination or establish performance parity.
 The historical native implementation and comparison job remain available at
 commit `1e5a64a8`; the Julia-only suite retains numerical and analytic regressions.
 Do not interpret mocked bridge tests as numerical or real bridge evidence.
@@ -132,6 +139,8 @@ fixed parameters and conditional random-effect modes, using R's RNG and
 sample sizes to integers. It does not sample random effects or priors.
 `clear()` releases shared bridge input but does not invalidate existing fits.
 Parallel diagnostics use separate R worker sessions rather than forks.
+Install the current FIMS version before running them: `pkgload::load_all()` in
+the parent session does not update an older package installed for workers.
 They prepare dependencies before launching workers and retain the runtime
 selected with `setup_julia(julia = ...)`.
 

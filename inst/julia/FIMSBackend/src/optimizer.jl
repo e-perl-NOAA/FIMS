@@ -135,6 +135,7 @@ end
 
 function _laplace_gradient(
   joint_objective, parameters, fixed_indices, random_indices; diagnostic_file = nothing,
+  random_hessian = nothing,
 )
   isempty(fixed_indices) && return Float64[]
   fixed_count = length(fixed_indices)
@@ -145,24 +146,32 @@ function _laplace_gradient(
     random_indices, values[(fixed_count + 1):end],
   ))
   isempty(random_indices) && return _bounded_gradient(active_joint, active_parameters)
-  _optimizer_checkpoint(diagnostic_file, "laplace_joint_hessian:start")
-  random_gradient = values -> begin
-    random_objective = random -> joint_objective(_compose_parameter_vector(
-      parameters, fixed_indices, values[1:fixed_count], random_indices, random,
-    ))
-    _bounded_gradient(random_objective, values[(fixed_count + 1):end])
-  end
-  random_curvature = _bounded_jacobian(random_gradient, active_parameters)
-  _optimizer_checkpoint(diagnostic_file, "laplace_joint_hessian:complete")
-  random_positions = (fixed_count + 1):length(active_indices)
-  random_factor = cholesky(Symmetric(random_curvature[:, random_positions]))
-  mode_sensitivity = -(
-    random_factor \
-    random_curvature[:, 1:fixed_count]
-  )
-  random_directions = inv(random_factor.U)
   fixed_start = parameters[fixed_indices]
   random_start = parameters[random_indices]
+  isnothing(random_hessian) ||
+    size(random_hessian) == (length(random_indices), length(random_indices)) ||
+    throw(DimensionMismatch("Random-effect Hessian must match the random-effect count."))
+  _optimizer_checkpoint(diagnostic_file, "laplace_joint_hessian:start")
+  random_gradient = (fixed_values, random_values) -> begin
+    random_objective = random -> joint_objective(_compose_parameter_vector(
+      parameters, fixed_indices, fixed_values, random_indices, random,
+    ))
+    _bounded_gradient(random_objective, random_values)
+  end
+  cross_curvature = if isnothing(random_hessian)
+    random_curvature = _bounded_jacobian(
+      values -> random_gradient(values[1:fixed_count], values[(fixed_count + 1):end]),
+      active_parameters,
+    )
+    random_hessian = random_curvature[:, (fixed_count + 1):end]
+    random_curvature[:, 1:fixed_count]
+  else
+    _bounded_jacobian(values -> random_gradient(values, random_start), fixed_start)
+  end
+  _optimizer_checkpoint(diagnostic_file, "laplace_joint_hessian:complete")
+  random_factor = cholesky(Symmetric(random_hessian))
+  mode_sensitivity = -(random_factor \ cross_curvature)
+  random_directions = inv(random_factor.U)
   # d logdet(H) = tr(inv(H) dH). Freeze B with B*B' = inv(H), and
   # differentiate sum(b' * H * b) instead of a full dual-valued Hessian.
   linearized_marginal = fixed_values -> begin
@@ -303,6 +312,7 @@ function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, 
     _laplace_gradient(
       joint_objective, result.parameters, fixed_indices, random_indices;
       diagnostic_file = diagnostic_file,
+      random_hessian = result.random_hessian,
     )
   end
   if derivative_order == 3
@@ -467,10 +477,11 @@ function fit_model(init_params, data_dict, config = Dict())
   joint_objective = parameters ->
     evaluate_nll(_named_component_array(parameters, parameter_layout), data_dict, objective_config)
 
-  function conditional_mode(fixed_values)
+  function conditional_mode(fixed_values, initial_parameters = x0)
     _optimizer_checkpoint(diagnostic_file, "conditional_mode:start")
     result = _conditional_mode(
-      x0, fixed_indices, fixed_values, random_indices, joint_objective, optimizer_options,
+      initial_parameters, fixed_indices, fixed_values, random_indices, joint_objective,
+      optimizer_options,
     )
     _optimizer_checkpoint(diagnostic_file, "conditional_mode:complete")
     result
@@ -481,11 +492,12 @@ function fit_model(init_params, data_dict, config = Dict())
     _optimizer_checkpoint(diagnostic_file, "outer_objective:value=$value")
     value
   end
-  marginal_gradient = fixed_values -> begin
-    result = conditional_mode(fixed_values)
+  function marginal_gradient(fixed_values, initial_parameters = x0)
+    result = conditional_mode(fixed_values, initial_parameters)
     _laplace_gradient(
       joint_objective, result.parameters, fixed_indices, random_indices;
       diagnostic_file = diagnostic_file,
+      random_hessian = result.random_hessian,
     )
   end
   outer_gradient! = (storage, fixed_values) -> begin
@@ -545,7 +557,7 @@ function fit_model(init_params, data_dict, config = Dict())
   elseif isempty(random_indices)
     Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   elseif compute_standard_errors
-    _numerical_gradient_hessian(marginal_gradient, fixed_hat)
+    _numerical_gradient_hessian(values -> marginal_gradient(values, xhat), fixed_hat)
   else
     Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   end
@@ -610,7 +622,7 @@ function fit_model(init_params, data_dict, config = Dict())
     fixed_gradient = if isempty(random_indices)
       gradient(marginal_objective, fixed_hat)
     else
-      marginal_gradient(fixed_hat)
+      marginal_gradient(fixed_hat, xhat)
     end
     fit_gradient[fixed_indices] .= fixed_gradient
   end

@@ -2,7 +2,7 @@ using FIMSBackend
 using Test
 using ComponentArrays: ComponentArray
 using ForwardDiff: derivative
-using LinearAlgebra: diag
+using LinearAlgebra: diag, Diagonal
 using SpecialFunctions: erf
 
 @testset "Beverton-Holt recruitment" begin
@@ -118,6 +118,30 @@ end
   @test conditional.converged
   @test conditional.parameters ≈ parameters atol = 1e-8
   @test conditional.marginal_nll ≈ marginal(fixed) atol = 1e-8
+  shifted_fixed = fixed .+ [0.03, -0.02]
+  warm_conditional = FIMSBackend._conditional_mode(
+    conditional.parameters, fixed_indices, shifted_fixed, random_indices,
+    joint_objective, options,
+  )
+  @test warm_conditional.converged
+  @test warm_conditional.parameters ≈ mode_parameters(shifted_fixed) atol = 1e-8
+  @test warm_conditional.marginal_nll ≈ marginal(shifted_fixed) atol = 1e-8
+  random_hessian = values -> begin
+    positive, negative = exp(values[2]), exp(-values[2])
+    [0.09 * positive + negative 0.3 * positive + 0.2 * negative;
+     0.3 * positive + 0.2 * negative positive + 0.04 * negative]
+  end
+  reused_gradient = values -> FIMSBackend._laplace_gradient(
+    joint_objective, mode_parameters(values), fixed_indices, random_indices;
+    random_hessian = random_hessian(values),
+  )
+  @test reused_gradient(fixed) ≈ marginal_gradient(fixed) atol = 1e-10
+  @test FIMSBackend._numerical_gradient_hessian(reused_gradient, fixed) ≈
+        [inv(0.49) 0.0; 0.0 inv(0.16) + exp(fixed[2])] rtol = 1e-8
+  @test_throws DimensionMismatch FIMSBackend._laplace_gradient(
+    joint_objective, parameters, fixed_indices, random_indices;
+    random_hessian = ones(1, 1),
+  )
 
   # Exceed the differentiation chunk width and retain mode sensitivity.
   wide_fixed = collect(range(-0.2, 0.3; length = 6))
@@ -141,6 +165,10 @@ end
       "laplace_joint_hessian:start", "laplace_joint_hessian:complete",
       "laplace_third_derivatives:start", "laplace_third_derivatives:complete",
     ]
+    @test FIMSBackend._laplace_gradient(
+      wide_objective, wide_parameters, collect(1:6), collect(7:12);
+      random_hessian = Matrix(Diagonal(exp.(wide_fixed))),
+    ) ≈ actual atol = 1e-10
   end
 end
 

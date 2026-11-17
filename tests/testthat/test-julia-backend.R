@@ -2330,4 +2330,15 @@ test_that("real Julia profiles and retrospective refits retain their priors", {
   expect_true(all(is.finite(retrospective_parameters[["estimated"]])))
   expect_identical(attr(get_input(fit), "julia_priors"), priors)
   expect_true(is.finite(generics::glance(fit)[["marginal_nll"]]))
+  parallel_profile <- run_fims_likelihood(
+    fit, parameters, raw, parameter_name = "log_rzero",
+    n_cores = 2, min = -0.01, max = 0.01, length = 3
+  )
+  expect_equal(parallel_profile, profile, tolerance = 1e-8)
+  expect_equal(future::nbrOfWorkers(), 1L)
+  parallel_retrospective <- run_fims_retrospective(
+    0:1, raw, parameters, n_cores = 2, priors = priors
+  )
+  expect_equal(parallel_retrospective, retrospective, tolerance = 1e-8)
+  expect_equal(future::nbrOfWorkers(), 1L)
 })

@@ -28,6 +28,14 @@
   approximating the derivatives.
   Example-fit regeneration records live phase timings separately from the
   sampling profile saved on exit.
+* Laplace gradients reuse the random-effect Hessian calculated at the same
+  conditional mode, differentiating only the remaining fixed/random cross
+  curvature. Alternating warm probes of this stage on the complete example
+  reduced median time from 3.87 to 3.53 seconds and allocations from 5.32 to
+  4.69 GB. These probes exclude conditional-mode optimization and startup;
+  they do not establish end-to-end or native-versus-Julia performance parity.
+  Uncertainty perturbations start their conditional optimizations from the
+  fitted random effects rather than the original starting values.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
@@ -50,6 +58,10 @@
   the retired mutable native report flag is no longer needed.
 * Objective simulation uses R's RNG to draw observations conditional on
   parameters and random-effect modes. Uncertainty summaries no longer use TMB.
+* Real Julia profile and retrospective regressions compare complete serial
+  and two-worker results, including priors and worker cleanup. This bounded
+  workflow coverage does not replace full-scale diagnostic runs. Workers need
+  the current FIMS package installed, not just source-loaded in the parent.
 
 # FIMS 0.11.0
 
