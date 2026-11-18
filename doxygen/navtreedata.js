@@ -29,27 +29,13 @@ var NAVTREE =
       [ "Population and Recruitment", "glossary.html#autotoc_md0", null ],
       [ "Mortality", "glossary.html#autotoc_md1", null ],
       [ "Biomass", "glossary.html#autotoc_md2", null ],
-      [ "Stock–Recruitment (Beverton–Holt)", "glossary.html#autotoc_md3", null ],
+      [ "Stock&ndash;Recruitment (Beverton&ndash;Holt)", "glossary.html#autotoc_md3", null ],
       [ "Growth", "glossary.html#autotoc_md4", null ],
       [ "Catch", "glossary.html#autotoc_md5", null ],
       [ "Index of Abundance", "glossary.html#autotoc_md6", null ],
       [ "Index Variables", "glossary.html#autotoc_md7", null ],
       [ "Statistical", "glossary.html#autotoc_md8", null ],
       [ "Common Abbreviations", "glossary.html#autotoc_md9", null ]
-    ] ],
-    [ "C++ Directory Structure", "md_inst_2include_2README.html", [
-      [ "inst/include/", "md_inst_2include_2README.html#autotoc_md11", [
-        [ "inst/include/common/", "md_inst_2include_2README.html#autotoc_md12", null ],
-        [ "inst/include/distributions/", "md_inst_2include_2README.html#autotoc_md13", null ],
-        [ "inst/include/interface/", "md_inst_2include_2README.html#autotoc_md14", [
-          [ "inst/include/interface/interface.hpp", "md_inst_2include_2README.html#autotoc_md15", null ],
-          [ "inst/include/interface/rcpp", "md_inst_2include_2README.html#autotoc_md16", null ],
-          [ "inst/include/interface/TMB", "md_inst_2include_2README.html#autotoc_md17", null ]
-        ] ],
-        [ "inst/include/models/", "md_inst_2include_2README.html#autotoc_md18", null ],
-        [ "inst/include/population_dynamics/", "md_inst_2include_2README.html#autotoc_md19", null ],
-        [ "inst/include/utilities/", "md_inst_2include_2README.html#autotoc_md20", null ]
-      ] ]
     ] ],
     [ "Namespaces", "namespaces.html", [
       [ "Namespace List", "namespaces.html", "namespaces_dup" ],
@@ -90,10 +76,11 @@ var NAVTREEINDEX =
 "classSharedReal.html#a67a9b97cee17f1240b6b2b99d10c68cf",
 "classfims__info_1_1Information.html#ad07784f2c8952afd95d5bdffa6d5dcff",
 "classfims__popdy_1_1SizeDistributionProviderBase.html#a08d3c78a8c9fec839c459b173131b27a",
-"functions_vars_w.html",
-"structfims__data__object_1_1DataObject.html#a5470cadac16a5928af44aca733013257",
-"structfims__popdy_1_1GrowthProducts.html#a8c00ca40796b8afba1c803f86b09cfea"
+"growth__model__adapter_8hpp_source.html",
+"structfims__distributions_1_1MultinomialLPMF.html",
+"structfims__popdy_1_1LogisticSelectivity.html#a47d008ca4b862abca4f361d68b07d4f0"
 ];
 
-var SYNCONMSG = 'click to disable panel synchronisation';
-var SYNCOFFMSG = 'click to enable panel synchronisation';
+var SYNCONMSG = 'click to disable panel synchronization';
+var SYNCOFFMSG = 'click to enable panel synchronization';
+var LISTOFALLMEMBERS = 'List of all members';

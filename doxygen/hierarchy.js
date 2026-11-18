@@ -82,11 +82,11 @@ var hierarchy =
         [ "LogisticSelectivityInterface", "classLogisticSelectivityInterface.html", null ]
       ] ]
     ] ],
-    [ "fims_popdy::GrowthModelBase< Type >", "classfims__popdy_1_1GrowthModelBase.html", [
+    [ "fims_popdy::GrowthModelBase&lt; Type &gt;", "classfims__popdy_1_1GrowthModelBase.html", [
       [ "fims_popdy::GrowthModel< Type >", "classfims__popdy_1_1GrowthModel.html", null ]
     ] ],
-    [ "fims_popdy::GrowthProducts< Type >", "structfims__popdy_1_1GrowthProducts.html", null ],
-    [ "fims_info::Information< Type >", "classfims__info_1_1Information.html", null ],
+    [ "fims_popdy::GrowthProducts&lt; Type &gt;", "structfims__popdy_1_1GrowthProducts.html", null ],
+    [ "fims_info::Information&lt; Type &gt;", "classfims__info_1_1Information.html", null ],
     [ "fims::JsonParser", "classfims_1_1JsonParser.html", null ],
     [ "fims::JsonValue", "classfims_1_1JsonValue.html", null ],
     [ "fims::LogEntry", "structfims_1_1LogEntry.html", null ],
@@ -96,18 +96,14 @@ var hierarchy =
     [ "SharedReal", "classSharedReal.html", null ],
     [ "SharedString", "classSharedString.html", null ],
     [ "fims_popdy::SizeBinMapping", "structfims__popdy_1_1SizeBinMapping.html", null ],
-    [ "fims_popdy::SizeDistributionProviderBase< Type >", "classfims__popdy_1_1SizeDistributionProviderBase.html", [
+    [ "fims_popdy::SizeDistributionProviderBase&lt; Type &gt;", "classfims__popdy_1_1SizeDistributionProviderBase.html", [
       [ "fims_popdy::GrowthDerivedSizeProvider< Type >", "classfims__popdy_1_1GrowthDerivedSizeProvider.html", null ]
     ] ],
     [ "fims_popdy::SizeGrid", "structfims__popdy_1_1SizeGrid.html", null ],
     [ "fims_popdy::SizeGridBuilder", "structfims__popdy_1_1SizeGridBuilder.html", null ],
-    [ "fims_popdy::SizeProducts< Type >", "structfims__popdy_1_1SizeProducts.html", null ],
-    [ "fims_popdy::Subpopulation< Type >", "classfims__popdy_1_1Subpopulation.html", null ],
+    [ "fims_popdy::SizeProducts&lt; Type &gt;", "structfims__popdy_1_1SizeProducts.html", null ],
+    [ "fims_popdy::Subpopulation&lt; Type &gt;", "classfims__popdy_1_1Subpopulation.html", null ],
     [ "Variable", "classVariable.html", null ],
     [ "VariableVector", "classVariableVector.html", null ],
-    [ "fims::Vector< Type >", "classfims_1_1Vector.html", null ],
-    [ "fims::Vector< double >", "classfims_1_1Vector.html", null ],
-    [ "fims::Vector< int >", "classfims_1_1Vector.html", null ],
-    [ "fims::Vector< size_t >", "classfims_1_1Vector.html", null ],
-    [ "fims::Vector< std::string >", "classfims_1_1Vector.html", null ]
+    [ "fims::Vector&lt; Type &gt;", "classfims_1_1Vector.html", null ]
 ];

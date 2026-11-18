@@ -36,7 +36,7 @@ base_model <- parameters |>
   fit_fims(optimize = TRUE)
 #> ✔ Starting optimization ...
 #> ℹ Restarting optimizer 3 times to improve gradient.
-#> ℹ Maximum gradient went from 0.00683 to 0.00041 after 3 steps.
+#> ℹ Maximum gradient went from 0.00187 to 0.00028 after 3 steps.
 #> ✔ Finished optimization
 #> ✔ Finished sdreport
 #> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
@@ -61,13 +61,13 @@ base_model <- parameters |>
 #> 
 #> ✔ Convergence: "OK"
 #> ℹ FIMS model version: 0.11.0.9000
-#> ℹ Total run time was 1.07123 minutes
+#> ℹ Total run time was 34.83999 seconds
 #> ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-#> ℹ Maximum gradient= 0.00041
+#> ℹ Maximum gradient= 0.00028
 #> ℹ Negative log likelihood (NLL):
 #> • Marginal NLL= 3231.28735
 #> • Total NLL= 3164.86339
-#> ℹ Terminal SB= 1728.6764
+#> ℹ Terminal SB= 1728.681
 
 # Clear memory post-run
 clear()
@@ -131,7 +131,7 @@ type.](fims-diagnostics_files/figure-html/unnamed-chunk-2-1.png)
 
 This function creates a `ggplot` object that can be customized and added
 onto. The default theme is
-[`stockplotr::theme_noaa`](https://noaa-fisheries-integrated-toolbox.r-universe.dev/stockplotr/reference/theme_noaa.html),
+[`stockplotr::theme_noaa`](https://rdrr.io/pkg/stockplotr/man/theme_noaa.html),
 however to change the theme or colors used, you can simply add them
 after the main plot function.
 
@@ -205,7 +205,7 @@ retro_fit <- run_fims_retrospective(
 #> ℹ running model with 0 years of data removed
 #> ✔ Starting optimization ...
 #> ℹ Restarting optimizer 3 times to improve gradient.
-#> ℹ Maximum gradient went from 0.00683 to 0.00041 after 3 steps.
+#> ℹ Maximum gradient went from 0.00187 to 0.00028 after 3 steps.
 #> ✔ Finished optimization
 #> ✔ Finished sdreport
 #> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
@@ -222,18 +222,18 @@ retro_fit <- run_fims_retrospective(
 #> 
 #> ✔ Convergence: "OK"
 #> ℹ FIMS model version: 0.11.0.9000
-#> ℹ Total run time was 1.12688 minutes
+#> ℹ Total run time was 35.66924 seconds
 #> ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-#> ℹ Maximum gradient= 0.00041
+#> ℹ Maximum gradient= 0.00028
 #> ℹ Negative log likelihood (NLL):
 #> • Marginal NLL= 3231.28735
 #> • Total NLL= 3164.86339
-#> ℹ Terminal SB= 1728.6764
+#> ℹ Terminal SB= 1728.681
 #> ℹ running model with 1 years of data removed
 #> 
 #> ✔ Starting optimization ...
 #> ℹ Restarting optimizer 3 times to improve gradient.
-#> ℹ Maximum gradient went from 0.00786 to 0.00031 after 3 steps.
+#> ℹ Maximum gradient went from 0.00203 to 0.00033 after 3 steps.
 #> ✔ Finished optimization
 #> ✔ Finished sdreport
 #> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
@@ -250,18 +250,18 @@ retro_fit <- run_fims_retrospective(
 #> 
 #> ✔ Convergence: "OK"
 #> ℹ FIMS model version: 0.11.0.9000
-#> ℹ Total run time was 1.14574 minutes
+#> ℹ Total run time was 34.51519 seconds
 #> ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-#> ℹ Maximum gradient= 0.00031
+#> ℹ Maximum gradient= 0.00033
 #> ℹ Negative log likelihood (NLL):
 #> • Marginal NLL= 3132.00827
 #> • Total NLL= 3066.98892
-#> ℹ Terminal SB= 1654.16298
+#> ℹ Terminal SB= 1654.16189
 #> ℹ running model with 2 years of data removed
 #> 
 #> ✔ Starting optimization ...
 #> ℹ Restarting optimizer 3 times to improve gradient.
-#> ℹ Maximum gradient went from 0.00366 to 0.00039 after 3 steps.
+#> ℹ Maximum gradient went from 0.0074 to 0.00054 after 3 steps.
 #> ✔ Finished optimization
 #> ✔ Finished sdreport
 #> Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
@@ -278,13 +278,13 @@ retro_fit <- run_fims_retrospective(
 #> 
 #> ✔ Convergence: "OK"
 #> ℹ FIMS model version: 0.11.0.9000
-#> ℹ Total run time was 1.068 minutes
+#> ℹ Total run time was 32.43813 seconds
 #> ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-#> ℹ Maximum gradient= 0.00039
+#> ℹ Maximum gradient= 0.00054
 #> ℹ Negative log likelihood (NLL):
 #> • Marginal NLL= 3036.85438
-#> • Total NLL= 2973.27387
-#> ℹ Terminal SB= 1500.15838
+#> • Total NLL= 2973.27386
+#> ℹ Terminal SB= 1500.13452
 ```
 
 ### Mohn’s Rho

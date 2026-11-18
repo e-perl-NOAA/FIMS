@@ -207,7 +207,7 @@ checks to follow so that the code is ready for a pull request:
 - Build the package down site using
   [`pkgdown::build_site()`](https://pkgdown.r-lib.org/reference/build_site.html).
 - Run the code coverage report using
-  [`covr::report()`](http://covr.r-lib.org/reference/report.md) to
+  [`covr::report()`](https://covr.r-lib.org/reference/report.html) to
   ensure that all of the code is covered, with the goal of maintaining
   80 percent code coverage.
 
@@ -224,12 +224,10 @@ ensures health and continuous improvement of the FIMS codebase, while
 simultaneously helping FIMS developers become familiar with the
 codebase. [Google’s code review
 guide](https://google.github.io/eng-practices/review/) provides a useful
-set of guidelines for both reviewers and code authors. Each PR is
-accompanied by a [checklist of major considerations for code
-reviews](https://github.com/NOAA-FIMS/FIMS/blob/main/.github/workflows/pr-checklist.yml)
-to guide reviewers through the PR. Additional guidance can be found at
-[Conventional Comments](https://conventionalcomments.org/) for
-formatting/structuring your reviewer comments. Navigate to the [Perforce
+set of guidelines for both reviewers and code authors. Additional
+guidance can be found at [Conventional
+Comments](https://conventionalcomments.org/) for formatting/structuring
+your reviewer comments. Navigate to the [Perforce
 Blog](https://www.perforce.com/blog/qac/9-best-practices-for-code-review)
 for nine best practices for code review and use the [FIMS Style
 Guide](#style-guide) to settle any style arguments.

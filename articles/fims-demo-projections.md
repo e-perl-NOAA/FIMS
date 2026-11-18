@@ -312,7 +312,7 @@ projection_fit <- parameters_projection |>
 
     ## ✔ Starting optimization ...
     ## ℹ Restarting optimizer 3 times to improve gradient.
-    ## ℹ Maximum gradient went from 0.00222 to 0.00019 after 3 steps.
+    ## ℹ Maximum gradient went from 0.00378 to 0.00026 after 3 steps.
     ## ✔ Finished optimization
     ## ✔ Finished sdreport
     ## Found more than one class "tbl_df" in cache; using the first, from namespace 'FIMS'
@@ -337,13 +337,13 @@ projection_fit <- parameters_projection |>
     ## 
     ## ✔ Convergence: "OK"
     ## ℹ FIMS model version: 0.11.0.9000
-    ## ℹ Total run time was 11.33092 seconds
+    ## ℹ Total run time was 8.0563 seconds
     ## ℹ Number of parameters: fixed_effects=49, random_effects=29, and total=78
-    ## ℹ Maximum gradient= 0.00019
+    ## ℹ Maximum gradient= 0.00026
     ## ℹ Negative log likelihood (NLL):
     ## • Marginal NLL= 1624.68892
     ## • Total NLL= 1560.83065
-    ## ℹ Terminal SB= 988.67095
+    ## ℹ Terminal SB= 988.67011
 
 ``` r
 
@@ -354,7 +354,7 @@ clear()
 
 We use {stockplotr} to plot the model results. In the code below, we
 pass a single model to
-[`stockplotr::plot_biomass()`](https://noaa-fisheries-integrated-toolbox.r-universe.dev/stockplotr/reference/plot_biomass.html)
+[`stockplotr::plot_biomass()`](https://rdrr.io/pkg/stockplotr/man/plot_biomass.html)
 but the list can contain multiple models, where the start and end year
 of each model that is included need not align. Thus, if we had fit the
 model without projections we could have plotted that here as well for
@@ -362,19 +362,17 @@ comparison.
 
 ``` r
 
-stockplotr::plot_biomass(
-  list(
-    "age" = get_estimates(projection_fit) |>
-      dplyr::mutate(
-        uncertainty_label = "se",
-        year = year_i,
-        estimate = estimated
-      )
-  )
-)
+# estimates <- dplyr::bind_rows(get_estimates(projection_fit)) |>
+#   dplyr::filter(label == "spawning_biomass") |>
+#   dplyr::mutate(
+#     uncertainty_label = "se",
+#     year = year_i,
+#     estimate = estimated
+#   )
+
+# stockplotr::plot_spawning_biomass(
+#   list(age = estimates),
+#   unit_label = "mt",
+#   interactive = FALSE
+# )
 ```
-
-    ## ! biomass_msy not found for age
-
-![Plot of spawning biomass for projection
-model.](fims-demo-projections_files/figure-html/fit-plot-projections-1.png)

@@ -1,11 +1,6 @@
 var classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter =
 [
-    [ "LengthReferenceParameterization", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#a0349ac095e889a84f39112b70ff1093a", [
-      [ "kEstimatedReferenceLengths", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#a0349ac095e889a84f39112b70ff1093aa94a218dfab95afd9aeb352182d952525", null ],
-      [ "kConstantLengthYoungEstimatedLengthOld", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#a0349ac095e889a84f39112b70ff1093aa4acca7e58db64949c413c5e43f57fdb5", null ],
-      [ "kEstimatedLengthYoungBelowConstantLengthOld", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#a0349ac095e889a84f39112b70ff1093aaa3fdba367ca44e2379216657d87445b1", null ],
-      [ "kBothConstant", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#a0349ac095e889a84f39112b70ff1093aa8d8dd8a4fc4869e6c4587af96b4726bc", null ]
-    ] ],
+    [ "LengthReferenceParameterization", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#a0349ac095e889a84f39112b70ff1093a", null ],
     [ "evaluate", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#a1c7c189013299146e110cfa00f6c97c8", null ],
     [ "EvaluateWeightAtLength", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#aa4f0dd2f92ef05f97876ed68b55c7526", null ],
     [ "GrowthCoefficientVector", "classfims__popdy_1_1VonBertalanffySchnuteGrowthModelAdapter.html#af2283cc55b6c4c48e2b4ff9ce5f4ed93", null ],
