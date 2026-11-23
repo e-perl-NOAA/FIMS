@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **P4**.
+   Name that item before starting. The default next item is **P5**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -276,7 +276,7 @@ fit is not acceptance evidence.
   environment, and logs. These are explicitly partial evidence; only the
   final four-fit record above closes P3.
 
-- [ ] **P4 - Remove a measured conditional-mode/curvature bottleneck.**
+- [x] **P4 - Remove a measured conditional-mode/curvature bottleneck.**
   **Depends on:** P3; conditional on its profiling showing this work is needed.
   **Done when:** one focused change reduces the measured uncertainty-stage
   conditional-solve/curvature cost. Consider using already available fitted
@@ -285,6 +285,59 @@ fit is not acceptance evidence.
   perturbed gradients, and the fresh configuration gates. Demonstrate a
   repeatable improvement in paired, warmed measurements without shifting cost
   into a larger end-to-end regression. A code change alone does not close it.
+
+  **Completed:** 2026-11-23; implementation/measured candidate `b6faa47b`,
+  independently exported P3 Julia baseline `47e3ff97`. Reuse fitted random
+  joint curvature only as an uncertainty L-BFGS preconditioner. Every
+  perturbed mode, random Hessian and exact Laplace gradient is recomputed.
+  Starts, optimizer controls/restarts, finite-difference steps, inferential
+  covariance and comparison tolerances are unchanged; a failed preconditioned
+  uncertainty solve now errors explicitly.
+
+  **Verification:** 260 backend assertions, including coupled/permuted-order
+  analytic modes/gradients and the nonconvergence failure path, plus 216
+  fresh real R-to-Julia configuration comparisons passed. Both signs of all
+  49 full-model uncertainty coordinates passed complete perturbed-gradient,
+  mode and objective comparisons; maximum absolute gradient difference
+  `1.61546e-9`. All 98 candidate solves were faster: median iterations 17
+  to 2, median solve time 0.809876 to 0.227025 seconds, median paired time
+  ratio 0.292588, and median allocated bytes 1.320 GB to 0.576 GB.
+
+  **Repeatable full-fit result:** after one excluded cold warm-up per
+  implementation, three AB/BA/AB warm pairs took baseline/candidate
+  269.49/232.11, 277.47/236.67 and 296.72/264.19 seconds. All complete
+  numerical comparisons passed, including full covariance and report SEs.
+  The median paired complete-fit reduction was 13.9%; all three pairs
+  improved (11.0%-14.7%). Their 98-solve uncertainty stage fell from
+  62.04/60.52/61.96 to 19.21/19.13/20.82 seconds. These timers cover the
+  entire Julia fit, including uncertainty, but exclude high-level R adapters
+  symmetrically; no cost was shifted into an overall regression.
+
+  **Fresh real R full gate:** the unchanged P1 command against P2 completed
+  one cold and three original-input warm fits within the 7,200-second worker
+  cap. All four passed native joint/marginal objectives, 78 estimates and
+  parameter SEs, complete positive-definite 78-by-78 covariance, and 32
+  derived-SE families (13,091 rows); maximum fixed gradient
+  `9.70785316717349e-10`. Cold process-to-result was 371.14 seconds; warm
+  trial walls were 222.58/225.86/229.97 seconds. Windows x64, R 4.6.2,
+  Julia 1.10.10, single-thread settings, same shared interactive workstation.
+  Timings include live profiling without subtraction.
+
+  **Evidence:** [full-precision probe, paired-fit and real R results](../data-raw/benchmarks/uncertainty-curvature-2026-11-23/comparison.json)
+  and [commands, timing boundaries and measured costs](../data-raw/BACKEND_BENCHMARK.md#p4-completed-conditional-solve-improvement-2026-11-23).
+  Runtime hashes, all six preserved baseline source files against Git,
+  portable artifacts and archive checksums were rechecked. Local artifacts
+  `p4-perturbed-gradients-02`, `p4-paired-fits-01`, and `p4-julia-full-01`
+  retain complete profiles, logs and dependency provenance. The probe was
+  precommit; its runtime source hashes match `b6faa47b`.
+
+  **P6 is still open:** fresh R warm median 225.86 seconds is 1.20 times
+  P2's 187.67 seconds, and cold startup remains slower. Native and current
+  Julia full runs were on different dates, not interleaved or isolated.
+  Do not attribute the much larger historical P3-to-P4 timing drop solely
+  to this change; the paired full-fit improvement above is the P4 evidence.
+  The remaining third-derivative trace takes about 133 seconds per warm
+  full fit and is the next P5 target.
 
 - [ ] **P5 - Remove a measured third-derivative trace bottleneck.**
   **Depends on:** P3; conditional on its profiling showing this work is needed.

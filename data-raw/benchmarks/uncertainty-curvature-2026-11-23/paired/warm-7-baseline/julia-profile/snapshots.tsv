@@ -1,0 +1,12 @@
+epoch_seconds	file	stage	raw_entries	write_seconds
+1.795476097762e9	snapshot-000001.txt	profile:start	0	0.053999900817871094
+1.795476128941e9	snapshot-000002.txt	laplace_third_derivatives:complete	20890	0.2330000400543213
+1.795476159471e9	snapshot-000003.txt	laplace_third_derivatives:complete	18231	0.20799994468688965
+1.795476190538e9	snapshot-000004.txt	laplace_third_derivatives:complete	18507	0.21599984169006348
+1.795476221927e9	snapshot-000005.txt	laplace_third_derivatives:complete	18650	0.24500012397766113
+1.795476253377e9	snapshot-000006.txt	laplace_third_derivatives:complete	18652	0.2369999885559082
+1.795476284162e9	snapshot-000007.txt	laplace_third_derivatives:complete	18345	0.2109999656677246
+1.795476314645e9	snapshot-000008.txt	laplace_joint_hessian:complete	18190	0.17400002479553223
+1.795476345735e9	snapshot-000009.txt	laplace_third_derivatives:complete	18518	0.19899988174438477
+1.795476377343e9	snapshot-000010.txt	laplace_third_derivatives:complete	18982	0.20799994468688965
+1.79547639461e9	snapshot-000011.txt	profile:complete	10288	0.1269998550415039

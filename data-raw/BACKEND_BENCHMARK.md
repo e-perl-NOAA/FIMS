@@ -380,6 +380,84 @@ Repeat the separate high-level full benchmark against P2 to verify actual
 R workflow parity on the changed candidate. A faster isolated solve alone
 does not close P4 or the P6 release gate.
 
+### P4 completed conditional-solve improvement: 2026-11-23
+
+Measured candidate `b6faa47b` against the immutable P3 Julia export
+`47e3ff97`. All six exported source files were checked against their Git
+blobs. The [portable evidence record](benchmarks/uncertainty-curvature-2026-11-23/comparison.json)
+includes source/driver fingerprints, dependency versions, the full-precision
+98-pair probe and eight complete Julia fits, four separate real R full-fit
+results, phase records, snapshot indices and verified artifact checksums.
+Raw local artifacts `p4-perturbed-gradients-02`, `p4-paired-fits-01` and
+`p4-julia-full-01` retain full sampling snapshots/logs and active dependency
+Project/Manifest files. The probe preceded the implementation commit; its
+runtime source hashes match the committed candidate. Later changes added
+a failure-path test and driver provenance metadata, not numerical changes.
+
+All 98 perturbed modes and complete gradients matched; maximum absolute
+gradient difference was `1.61546e-9` (required below `1e-6`).
+All candidate solves were faster. Median iterations fell from 17 to 2,
+median solve time from 0.809876 to 0.227025 seconds, and median allocated
+bytes from 1,320,014,952 to 575,881,480. The median paired time ratio was
+0.292588 (70.7% less solve time); these are conditional solves, not full fits.
+Coupled/permuted-order analytic checks, explicit failure propagation,
+all 260 backend assertions and 216 fresh real configuration comparisons
+also passed.
+
+| Warm pair order | Baseline full fit (s) | Candidate full fit (s) | Candidate/baseline | Baseline/candidate uncertainty solves (s) |
+| --- | ---: | ---: | ---: | ---: |
+| AB | 269.4923 | 232.1094 | 0.861284 | 62.038 / 19.214 |
+| BA | 277.4701 | 236.6728 | 0.852967 | 60.521 / 19.130 |
+| AB | 296.7172 | 264.1884 | 0.890371 | 61.962 / 20.815 |
+
+These are complete Julia `fit_model` timers with the boundaries above.
+All three pairs improved, with a median paired reduction of **13.9%**.
+The uncertainty-solve column sums all 98 exact conditional solves inside
+each marginal Hessian. Complete-fit allocated memory fell from about
+615.54 to 548.80 GiB per warm fit (cumulative allocations, not resident RAM).
+All paired objectives, estimates, covariance, fixed Hessians, parameter SEs
+and report values/SEs matched at unchanged tolerances.
+Excluded first-call warm-ups took 417.17 seconds baseline and 287.76 seconds
+candidate; these share a process and are not separate cold-process timings.
+Warm paired snapshot writes took 1.65-2.11 seconds, included without
+subtraction.
+
+The separate real R command was the existing full benchmark, not the paired
+Julia timer:
+
+```powershell
+& $Rscript --vanilla data-raw\benchmark_backends.R --case full --backend julia --julia $Julia --reference data-raw\benchmarks\native-full-2026-11-17 --output C:\benchmarks\p4-r-full-new --warm-runs 3 --restarts 3
+```
+
+Preparation took 3.83 seconds separately. Cold process-to-result took
+**371.14 seconds**, cold trial wall 357.81 seconds; warm trial walls were
+**222.58, 225.86 and 229.97 seconds** (median 225.86, mean 226.14).
+All four fresh fits passed independent native objectives, all 78
+estimates/parameter SEs, positive-definite complete 78-by-78 covariance,
+and 32 required report-SE families (13,091 rows). Maximum fixed gradient
+was `9.70785316717349e-10`; starts, input checksum, controls 10000/10000,
+three restarts and the original 7,200-second worker cap were unchanged.
+Cold snapshot writes took 29.19 seconds; warm writes took 1.58-1.92 seconds,
+included in elapsed times.
+
+Environment: Windows 11 x64, R 4.6.2, Julia 1.10.10, Intel i7-1365U,
+Balanced power, one Julia/BLAS thread. Actual dependencies were Optim
+1.13.3, ForwardDiff 0.10.39, ComponentArrays 0.15.50, Functors 0.5.5 and
+StatsBase 0.34.14. Preflight before the high-level R run recorded 15% CPU
+load and 2,897,964 KiB free memory. This was a shared interactive
+workstation, not an exclusive timing host; no competing agent builds,
+tests or model fits were launched during collection.
+
+**P4 is complete, not P6.** The current high-level warm median is still
+1.20 times P2's 187.67 seconds, and cold startup is slower. P2 and the
+current R run were on different dates. Likewise, the larger historical
+P3-to-P4 absolute timing drop is not an isolated measurement of this change;
+the interleaved pairs above establish its complete-fit improvement.
+The median R warm trial still spends 193.15 seconds in the marginal
+uncertainty Hessian: 18.19 in conditional solves, 39.86 in cross-curvature
+and 133.09 in exact third-derivative traces (nested timings, not extra
+costs to add to the parent). P5 targets that remaining trace bottleneck.
+
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
 **This earlier attempt did not complete P3.** The cold Julia fit passed the full native numerical
