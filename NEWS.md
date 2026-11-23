@@ -36,6 +36,11 @@
   they do not establish end-to-end or native-versus-Julia performance parity.
   Uncertainty perturbations start their conditional optimizations from the
   fitted random effects rather than the original starting values.
+* Outer objective/gradient evaluations reuse conditional modes only at
+  identical fixed-parameter points. Outer L-BFGS retains a bounded 10-50
+  curvature pairs for coupled fixed effects. Live benchmark profiles omit
+  expensive typed method signatures while preserving sampled frame locations
+  and counts. Complete-fit performance acceptance remains outstanding.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

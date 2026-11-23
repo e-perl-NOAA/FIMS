@@ -179,6 +179,17 @@ fit is not acceptance evidence.
   This item can finish even if Julia is slower: it completes the reproducible
   measurement and fresh numerical gate, not the performance release gate.
 
+  **Recovery plan (2026-11-23):** keep the exact P2 workload, starting values,
+  restarts, tolerances, and two-hour process budget. First remove expensive
+  nested-type rendering from live profiles while preserving sampled function/
+  file/line identity and counts. Reuse conditional results only for identical
+  outer fixed points; retain a bounded, larger L-BFGS curvature history for
+  coupled fixed effects. Verify cache invalidation, analytic derivatives,
+  compact-profile lifecycle, and real native-oracle fits before rerunning
+  the one-cold/three-warm full-model protocol. Archive all four numerical
+  comparisons and phase timings before checking off P3; do not extend the
+  cap or treat the earlier partial result as completion.
+
   **Blocked attempt:** 2026-11-23; evidence commit `a283b28c`, candidate
   `3767cc54`. The documented matched protocol completed one real cold Julia
   fit. All 78 estimates/parameter SEs, complete positive-definite 78-by-78

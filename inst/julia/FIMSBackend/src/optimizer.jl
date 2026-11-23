@@ -275,6 +275,19 @@ function _conditional_mode(x0, fixed_indices, fixed_values, random_indices, join
   )
 end
 
+function _cached_conditional_mode(evaluate, fixed_start)
+  previous_values = copy(fixed_start)
+  previous_result = Ref(evaluate(fixed_start))
+  fixed_values -> begin
+    if !isequal(fixed_values, previous_values)
+      result = evaluate(fixed_values)
+      copyto!(previous_values, fixed_values)
+      previous_result[] = result
+    end
+    previous_result[]
+  end
+end
+
 function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, derivative_order = 0)
   objective_config = normalize_keys(config)
   x0, parameter_layout = _flatten_init_params(init_params, objective_config)
@@ -491,13 +504,17 @@ function fit_model(init_params, data_dict, config = Dict())
     result
   end
 
+  outer_conditional_mode = isempty(random_indices) ?
+    conditional_mode : _cached_conditional_mode(conditional_mode, fixed_start)
   marginal_objective = fixed_values -> begin
-    value = conditional_mode(fixed_values).marginal_nll
+    value = outer_conditional_mode(fixed_values).marginal_nll
     _optimizer_checkpoint(diagnostic_file, "outer_objective:value=$value")
     value
   end
   function marginal_gradient(fixed_values, initial_parameters = x0)
-    result = conditional_mode(fixed_values, initial_parameters)
+    result = initial_parameters === x0 ?
+      outer_conditional_mode(fixed_values) :
+      conditional_mode(fixed_values, initial_parameters)
     _laplace_gradient(
       joint_objective, result.parameters, fixed_indices, random_indices;
       diagnostic_file = diagnostic_file,
@@ -516,20 +533,22 @@ function fit_model(init_params, data_dict, config = Dict())
     copyto!(storage, values)
   end
 
+  # Retain small-model curvature history without unbounded memory growth.
+  outer_memory = max(10, min(length(fixed_indices), 50))
   outer_result = if isempty(fixed_indices)
     nothing
   else
     result = optimize(
       OnceDifferentiable(marginal_objective, outer_gradient!, fixed_start),
       fixed_start,
-      LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
+      LBFGS(m = outer_memory, alphaguess = LineSearches.InitialStatic(scaled = true)),
       optimizer_options,
     )
     for _ in 1:optimizer_restarts
       result = optimize(
         OnceDifferentiable(marginal_objective, outer_gradient!, minimizer(result)),
         minimizer(result),
-        LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
+        LBFGS(m = outer_memory, alphaguess = LineSearches.InitialStatic(scaled = true)),
         optimizer_options,
       )
     end
@@ -537,7 +556,7 @@ function fit_model(init_params, data_dict, config = Dict())
   end
   fixed_hat = _primal_float.(isnothing(outer_result) ? fixed_start : minimizer(outer_result))
   _optimizer_checkpoint(diagnostic_file, "outer_optimization:complete")
-  conditional_result = conditional_mode(fixed_hat)
+  conditional_result = outer_conditional_mode(fixed_hat)
   xhat = _primal_float.(conditional_result.parameters)
   estimate_components = _named_component_array(xhat, parameter_layout)
   evaluated_model = evaluate_model(estimate_components, data_dict, objective_config)

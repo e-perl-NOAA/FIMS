@@ -5,6 +5,16 @@ using Profile
 
 const state = Ref{Any}(nothing)
 
+function compact_frames(frames)
+  Dict(address => [
+    Base.StackTraces.StackFrame(
+      frame.func, frame.file, frame.line, nothing,
+      frame.from_c, frame.inlined, frame.pointer,
+    )
+    for frame in stack
+  ] for (address, stack) in frames)
+end
+
 function snapshot(stage; force = false, resume = true)
   current = state[]
   isnothing(current) && return nothing
@@ -22,7 +32,9 @@ function snapshot(stage; force = false, resume = true)
       if isempty(samples)
         println(io, "No samples collected in this window.")
       else
-        Profile.print(IOContext(io, :displaysize => (100, 240)), samples;
+        # Rendering nested AD method signatures can take longer than sampling.
+        frames = compact_frames(Profile.getdict(samples))
+        Profile.print(IOContext(io, :displaysize => (100, 240)), samples, frames;
           format = :flat, sortedby = :count, C = true)
       end
     end

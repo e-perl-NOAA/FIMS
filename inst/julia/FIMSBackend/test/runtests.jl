@@ -197,6 +197,39 @@ end
   end
 end
 
+@testset "conditional modes are reused only at identical fixed points" begin
+  calls = Ref(0)
+  fixed = [0.2, -0.3]
+  joint = values -> 0.5 * sum(abs2, values[1:2]) +
+    0.5 * exp(values[1]) * (values[3] - values[1]^2 - values[2])^2
+  options = FIMSBackend._optimizer_options(Dict())
+  evaluate = values -> begin
+    all(isfinite, values) || error("nonfinite fixed point")
+    calls[] += 1
+    FIMSBackend._conditional_mode(
+      [0.2, -0.3, 0.0], [1, 2], values, [3], joint, options,
+    )
+  end
+  cached = FIMSBackend._cached_conditional_mode(evaluate, fixed)
+  first = cached(copy(fixed))
+  @test calls[] == 1
+  @test first.converged
+  @test first.parameters ≈ [fixed; fixed[1]^2 + fixed[2]] atol = 1e-8
+  @test cached(copy(fixed)) === first
+  @test calls[] == 1
+  fixed[1] += 0.05
+  changed = cached(fixed)
+  @test calls[] == 2
+  @test changed.marginal_nll ≈ evaluate(fixed).marginal_nll atol = 1e-12
+  @test changed.parameters ≈ [fixed; fixed[1]^2 + fixed[2]] atol = 1e-8
+  @test_throws ErrorException cached([NaN, fixed[2]])
+  @test cached(copy(fixed)) === changed
+  @test calls[] == 3
+  fixed[2] -= 0.1
+  @test cached(fixed).parameters ≈ [fixed; fixed[1]^2 + fixed[2]] atol = 1e-8
+  @test calls[] == 4
+end
+
 @testset "population proportion-female parameter layouts" begin
   parameter_values = (
     log_init_naa = log.([1000.0, 800.0, 600.0]),

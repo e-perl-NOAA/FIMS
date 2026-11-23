@@ -142,6 +142,9 @@ the trial's `optimizer.progress` plus `julia-profile` directory:
 - `snapshots.tsv` records stage, timestamp, raw sample entries, and write cost.
   Windows are cleared after persistence to bound sampling-buffer use; a full
   buffer fails explicitly rather than silently dropping samples.
+- Julia frames retain function, file, line, and sample counts, but omit typed
+  method signatures when rendering. Formatting deeply nested differentiation
+  signatures can dominate the measured fit; snapshot costs remain recorded.
 - Snapshots run **synchronously on the optimizer's Julia task** at the first
   checkpoint after the requested interval, plus start/completion snapshots.
   Long non-yielding JIT/AD operations can delay them: the interval is not a
@@ -225,6 +228,28 @@ paths or rerunning the native baseline:
 
 P2 establishes the native baseline only. No fresh Julia full-fit comparison
 or performance-parity decision is implied.
+
+## P3 recovery implementation
+
+The recovery keeps the matched inputs, three restarts, optimizer tolerances,
+exact derivatives, full uncertainty, and two-hour process budget unchanged.
+Live Julia snapshots omit expensive typed method signatures, not sampled
+frames. The outer objective and gradient reuse a conditional-mode result only
+at an identical fixed-parameter point; changing the point invalidates it.
+Uncertainty perturbations retain their separate fitted-mode initializations.
+Outer L-BFGS retains `max(10, min(number_of_fixed_parameters, 50))` curvature
+pairs, rather than always ten, to accommodate coupled fixed effects without
+unbounded history. Random-effect optimization is unchanged.
+
+Run the backend regressions and developer-profiler checks together with:
+
+```powershell
+& $Julia --project=inst\julia\FIMSBackend -e 'using Pkg; Pkg.test(); include(raw"data-raw\test_benchmark_profile.jl")'
+```
+
+These implementation changes do not close P3: a new complete one-cold/
+three-warm full-model run must pass the native comparisons and retain measured
+phase and snapshot costs. The previous incomplete attempt remains below.
 
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
