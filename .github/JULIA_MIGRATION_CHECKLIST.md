@@ -179,6 +179,39 @@ fit is not acceptance evidence.
   This item can finish even if Julia is slower: it completes the reproducible
   measurement and fresh numerical gate, not the performance release gate.
 
+  **Blocked attempt:** 2026-11-23; evidence commit `a283b28c`, candidate
+  `3767cc54`. The documented matched protocol completed one real cold Julia
+  fit. All 78 estimates/parameter SEs, complete positive-definite 78-by-78
+  covariance, joint/marginal objectives, and all 32 required report-SE
+  families (13,091 rows) passed the existing native comparisons. Maximum
+  absolute fixed gradient was `9.581246067033161e-9`; starts and input
+  checksum matched P2 exactly. No controls or tolerances were relaxed.
+
+  **Why this is not complete:** cold process launch to result took 6,161.14
+  seconds (102.69 minutes). After the user chose to keep the two-hour cap,
+  preserve completed results, and diagnose the slowdown, the partial first
+  warm fit was stopped before the limit and process termination verified.
+  Zero warm fits completed. There is no four-fit success summary, no warm
+  timing distribution, and no P3 or performance-parity completion claim.
+
+  **Measured diagnosis:** outer optimization took 3,870.61 seconds, with
+  321 marginal-gradient evaluations and 642 conditional solves. Marginal
+  uncertainty curvature took 1,898.72 seconds and required another 98 full
+  marginal gradients/conditional solves. Synchronous formatting/writing of
+  109 sampling snapshots consumed 2,629.05 seconds overall; this overlaps
+  those phase costs and is absent from sampled hot stacks because sampling
+  pauses during formatting. Host contention also rose substantially.
+  First reduce profiler observer overhead, then investigate duplicated
+  conditional solves/near-optimum optimizer work and exact derivative cost;
+  preserve the original acceptance criteria when rerunning P3.
+
+  **Preserved evidence:** [attempt record and per-family numerical differences](../data-raw/benchmarks/julia-full-2026-11-23-incomplete/attempt.json),
+  adjacent full-precision input/cold result and completed/partial phase
+  records, plus [phase/profile diagnosis](../data-raw/BACKEND_BENCHMARK.md#p3-incomplete-attempt-and-diagnosis-2026-11-23).
+  Raw local artifact `p3-julia-full-01` retains the full profiles, dependency
+  environment, and logs. These are explicitly partial evidence. P3 remains
+  unchecked; P4/P5/P6 have not been completed or dispositioned.
+
 - [ ] **P4 - Remove a measured conditional-mode/curvature bottleneck.**
   **Depends on:** P3; conditional on its profiling showing this work is needed.
   **Done when:** one focused change reduces the measured uncertainty-stage
