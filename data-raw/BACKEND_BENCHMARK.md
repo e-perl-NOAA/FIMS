@@ -225,3 +225,84 @@ paths or rerunning the native baseline:
 
 P2 establishes the native baseline only. No fresh Julia full-fit comparison
 or performance-parity decision is implied.
+
+## P3 incomplete attempt and diagnosis: 2026-11-23
+
+**P3 remains blocked.** The cold Julia fit passed the full native numerical
+comparison, but no warm fit completed. After the user chose to retain the
+two-hour process cap and diagnose the slowdown, the partial first warm fit
+was stopped. There was no timeout extension or successful controller summary.
+No optimization controls, numerical methods, or comparison tolerances changed.
+
+The [attempt record](benchmarks/julia-full-2026-11-23-incomplete/attempt.json)
+retains the passing cold result, per-family differences, environment/source
+fingerprints, phase costs, and artifact checksums. Adjacent `input.rds` and
+`julia/cold/result.rds` are byte-for-byte copies of the actual harness
+outputs. Completed cold and partial warm phase/snapshot indexes are retained.
+Raw local artifact `p3-julia-full-01` additionally preserves the full profiles,
+dependency environment, and logs. These are **partial evidence**, not the
+four-fit P3 deliverable.
+
+The run used candidate `3767cc54`, the same R/Julia versions and hardware as
+the preceding smoke/native work, the exact P2 input checksum
+`ad075166d27afabb8dbe224aa73b84c6`, controls 10000/10000, three restarts,
+and 30-second safe-point snapshots. The cold fit converged with maximum
+absolute fixed gradient `9.581246067033161e-9`; all 78 estimates/parameter
+SEs, complete positive-definite 78-by-78 covariance, joint/marginal objectives,
+and 32 derived-SE families (13,091 rows) passed existing native comparisons.
+The actual serialized starting values also matched native exactly.
+
+Cold process launch to result took **6,161.14 seconds (102.69 minutes)**.
+The trial itself took 6,102.37 seconds, including 6,026.57 seconds inside
+`fit_fims`. Synchronously rendering/writing 109 sampling snapshots consumed
+**2,629.05 seconds (43.82 minutes)**. Median snapshot write time was 20.21
+seconds; the maximum was 89.04 seconds. A requested 30-second sampling window
+does not make that formatting overhead negligible.
+
+| Cold Julia stage | Elapsed seconds | Approximate overlapping snapshot-write seconds |
+| --- | ---: | ---: |
+| Outer optimization, including restarts | 3,870.61 | 1,422.96 |
+| Fitted random mode and model report | 6.78 | 0 |
+| Joint uncertainty Hessian | 33.52 | 0 |
+| Marginal uncertainty Hessian | 1,898.72 | 1,010.01 |
+| Covariance assembly | 8.94 | 0 |
+| Report SEs | 109.56 | 73.08 |
+| Final gradient | 56.81 | 41.24 |
+
+These are checkpoint intervals, not a disjoint CPU-time attribution. They
+include synchronous observer costs at their boundaries; some profiler,
+bridge, initialization, and extraction work falls outside the listed stages.
+Do not add nested derivative timings to their parent stage, or subtract
+snapshot times and call the remainder an unprofiled benchmark.
+
+The diagnosis identifies three concrete costs:
+
+1. **The profiler has a large observer effect.** Sampling stops before
+   `Profile.print`, so its costly formatting/writes do not appear in the sampled
+   hot stacks. They are explicitly measured in `snapshots.tsv`. Reduce
+   synchronous rendering cost before another expensive timing collection,
+   while preserving usable during-run snapshots.
+2. **Optimization repeats expensive work near the native solution.** It
+   performed 321 full marginal-gradient evaluations and 642 conditional-mode
+   solves, despite starting at independent native fitted values. The first
+   maximum fixed gradient was about `7.58e-4`; the last was about `9.58e-9`.
+   The objective and gradient callbacks each perform their own conditional
+   solve from the original random starts. Investigate reuse at *identical*
+   fixed points and improved optimizer conditioning, without loosening
+   convergence or changing starts.
+3. **Uncertainty multiplies the derivative workload.** The 49-column centered
+   Hessian calculation requires 98 additional complete marginal gradients
+   and conditional solves. Each exact Laplace gradient uses 13 fixed-variable
+   chunks and 29 random-curvature directional terms per chunk. Live profile
+   windows show nested ForwardDiff under `_laplace_gradient` and
+   `_numerical_gradient_hessian`; sampled self-time also includes Julia
+   dispatch/type lookup and allocation/GC helpers. This is repeated model/
+   derivative work, not simply Julia startup.
+
+Host conditions also deteriorated: observed CPU load rose from 2% before the
+run to as high as 100%, with free memory observed near 0.7 GiB. No competing
+agent builds/tests/model fits were launched, but this interactive workstation
+was not an isolated timing host. P2 and P3 ran on different dates, not in
+interleaved pairs. The instrumented cold result therefore demonstrates a
+serious measurement/performance problem, not an unbiased cold/warm speed
+ratio or a prediction of the unmeasured warm distribution.

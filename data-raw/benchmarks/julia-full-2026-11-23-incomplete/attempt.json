@@ -1,0 +1,554 @@
+{
+  "schema": 1,
+  "checklist_item": "P3",
+  "status": "blocked",
+  "date": "2026-11-23",
+  "candidate_revision": "3767cc54bcbed7cda122fbb46fb3876245f011e7",
+  "completed_trials": "cold",
+  "completed_warm_trials": 0,
+  "interruption": {
+    "reason": "Cold result preserved; partial warm-1 stopped because three warm fits could not complete within the retained two-hour process budget.",
+    "user_decision": "Keep the two-hour cap, preserve completed results, and diagnose the slowdown.",
+    "stopped_before_timeout": true,
+    "worker_exit_status": null,
+    "process_tree_termination_verified": true,
+    "controller_success_summary_absent": true
+  },
+  "environment": {
+    "R": "R version 4.6.2 (2026-10-29 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "package_version": "0.11.0.9000",
+    "revision": "3767cc54bcbed7cda122fbb46fb3876245f011e7",
+    "source_md5": {
+      "R/FIMS-package.R": "66d8d4ca69920506fb513dace3184bc3",
+      "R/augment-fims.R": "9f4dc0595b42c199a6a9c896be91333c",
+      "R/check_convergence.R": "62115dea9869d7f8d6752a116dd28bff",
+      "R/data_big.R": "9244e733bd756def26b8f1c42210a782",
+      "R/distribution_families.R": "4ff36327b895d5ae8fea70525e80fb62",
+      "R/fims_distributions.R": "963b356cf0b697d01dc38dfb4588d278",
+      "R/fims_input_types.R": "31f1b1689d265b6fa1850097faef6fd1",
+      "R/fims_likelihood.R": "0f3a25af5f5455660e4d76eb7379dbed",
+      "R/fims_retro.R": "ef97e4aec04e89acb6ffe339625f30fa",
+      "R/fimsfit.R": "2e7c10772cd71e69e3c056b8cff1e883",
+      "R/fimsframe.R": "0add5dda7266f5b37dedd1227b741c70",
+      "R/initialize_modules.R": "813741b245aa85b76ff849c41b21acad",
+      "R/is_fims_verbose.R": "03d98c153f3978a631ceb23eaa20d64a",
+      "R/julia_backend.R": "0fb09141cf587acbabfee6478463db8e",
+      "R/mohns_rho.R": "914a41acb16eabd3e31b8a79bca1de35",
+      "R/parse_data_distribution.R": "5527d0f5aba8ef03c1ba5343cfd40da8",
+      "R/plot_likelihood.R": "ff24ab3ff81ed07aba55f1b89c7e02aa",
+      "R/run_modified_fims.R": "04c021ff7d01446b95f4163747a65b08",
+      "R/setup_default_parameters.R": "42ee2651bc3bec2ec2e0806064b51438",
+      "R/setup_julia.R": "2aed38975029c26111e78bd280d958ed",
+      "R/simulate_julia.R": "0e50c84d5b70f7ff300834e2d81f3628",
+      "R/tidy-glance-fims.R": "0f848153d7b433561d5227c7cd3f2c48",
+      "R/use-testthat-template.R": "9d72c3ced04e0077d936282d0f2f8211",
+      "R/utils.R": "159d216dc57ca2d936005a66fdcf3e91",
+      "R/zzz.R": "435298f94386f2fe9b4c23bd6efc0a9c",
+      "inst/julia/FIMSBackend/Project.toml": "e770dc45f78e53dfb8a6038ddd74eb8b",
+      "inst/julia/FIMSBackend/src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+      "inst/julia/FIMSBackend/src/modules/population.jl": "e03aab4f68a3324f08e240f64c9a70da",
+      "inst/julia/FIMSBackend/src/modules/recruitment.jl": "aa7798fb92987f38c9375213cfba1107",
+      "inst/julia/FIMSBackend/src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+      "inst/julia/FIMSBackend/src/objective.jl": "cdfb21455516325cd6b9dbf60a534bf1",
+      "inst/julia/FIMSBackend/src/optimizer.jl": "53ac93210a85f7805e4a8d86290430b5",
+      "inst/julia/FIMSBackend/test/runtests.jl": "c47eb9423f46e6c4ce1952b23b127a8a",
+      "inst/julia/setup.jl": "870e7eb2c3d367164d1420c25f2f297c"
+    },
+    "threads": {
+      "JULIA_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    },
+    "julia_version": "1.10.10",
+    "julia_blas": "LBTConfig([ILP64] libopenblas64_.dll)",
+    "julia_blas_threads": 1,
+    "load_setup_seconds": 58.15,
+    "loaded_R_package_versions": {
+      "FIMS": "0.11.0.9000",
+      "testthat": "3.3.2",
+      "gtable": "0.3.6",
+      "jsonlite": "2.0.0",
+      "dplyr": "1.2.1",
+      "compiler": "4.6.2",
+      "brio": "1.1.5",
+      "tidyselect": "1.2.1",
+      "Rcpp": "1.1.1-1.1",
+      "parallel": "4.6.2",
+      "JuliaCall": "0.17.6",
+      "globals": "0.19.1",
+      "scales": "1.4.0",
+      "ggplot2": "4.0.3.9000",
+      "R6": "2.6.1",
+      "generics": "0.1.4",
+      "knitr": "1.51",
+      "future": "1.70.0",
+      "tibble": "3.3.1",
+      "stockplotr": "0.14.0",
+      "desc": "1.4.3",
+      "rprojroot": "2.1.1",
+      "pillar": "1.11.1",
+      "RColorBrewer": "1.1-3",
+      "rlang": "1.3.0",
+      "xfun": "0.57",
+      "S7": "0.2.2",
+      "otel": "0.2.0",
+      "pkgload": "1.5.2",
+      "viridisLite": "0.4.3",
+      "cli": "3.6.6",
+      "magrittr": "2.0.5",
+      "digest": "0.6.39",
+      "grid": "4.6.2",
+      "lifecycle": "1.0.5",
+      "vctrs": "0.7.3",
+      "evaluate": "1.0.5",
+      "glue": "1.8.1",
+      "farver": "2.1.2",
+      "listenv": "0.10.1",
+      "furrr": "0.4.0",
+      "yardstick": "1.4.0",
+      "codetools": "0.2-20",
+      "parallelly": "1.47.0",
+      "purrr": "1.2.2",
+      "tools": "4.6.2",
+      "pkgconfig": "2.0.3"
+    }
+  },
+  "host": {
+    "CPU": "13th Gen Intel(R) Core(TM) i7-1365U",
+    "OS": "Windows 11 Enterprise 10.0.26200",
+    "power_scheme": "Balanced",
+    "preflight_CPU_load_percent": 2,
+    "observed_during_run_CPU_load_percent": [39, 61, 100],
+    "preflight_free_memory_KiB": 2166136,
+    "observed_low_free_memory_KiB": 711816,
+    "exclusive_host": false,
+    "conditions": "Interactive workstation with substantial changing contention; no other agent builds/tests or model fits launched. Not an isolated or interleaved timing comparison."
+  },
+  "native_reference": "data-raw/benchmarks/native-full-2026-11-17",
+  "protocol": {
+    "case": "full",
+    "counts": {
+      "fixed_effects": 49,
+      "random_effects": 29
+    },
+    "priors": null,
+    "control": {
+      "iter.max": 10000,
+      "eval.max": 10000,
+      "trace": 0
+    },
+    "restarts": 3,
+    "input_md5": "ad075166d27afabb8dbe224aa73b84c6",
+    "required_derived": [
+      "agecomp_expected",
+      "agecomp_proportion",
+      "biomass",
+      "catch_expected",
+      "catch_numbers",
+      "catch_numbers_at_age",
+      "catch_numbers_at_length",
+      "catch_weight",
+      "catch_weight_at_age",
+      "expected_recruitment",
+      "index_expected",
+      "index_numbers",
+      "index_numbers_at_age",
+      "index_numbers_at_length",
+      "index_weight",
+      "index_weight_at_age",
+      "lengthcomp_expected",
+      "lengthcomp_proportion",
+      "log_catch_expected",
+      "log_index_expected",
+      "mortality_F",
+      "mortality_M",
+      "mortality_Z",
+      "numbers_at_age",
+      "proportion_mature_at_age",
+      "spawning_biomass",
+      "sum_selectivity",
+      "total_catch_numbers",
+      "total_catch_weight",
+      "unfished_biomass",
+      "unfished_numbers_at_age",
+      "unfished_spawning_biomass"
+    ],
+    "harness_md5": {
+      "benchmark_backends.R": "021f47b8af1b422a2110867e2372bdba",
+      "benchmark_profile.jl": "e68b2f8eb170238e4e15dbf66e93ed7a"
+    }
+  },
+  "cold": {
+    "timing": {
+      "initialize_seconds": 14.43,
+      "fit_seconds": 6026.57,
+      "extract_seconds": 1.52000000000044,
+      "profile_setup_seconds": 3.29,
+      "profile_finalize_seconds": 56.54,
+      "trial_wall_seconds": 6102.37,
+      "cold_process_to_result_seconds": 6161.14233803749,
+      "profile": {
+        "snapshots": 109,
+        "snapshot_write_seconds": 2629.05299949646
+      },
+      "input_md5": "ad075166d27afabb8dbe224aa73b84c6"
+    },
+    "convergence": 0,
+    "max_absolute_fixed_gradient": 9.58124606703316e-09,
+    "marginal_objective": 3231.25994449837,
+    "joint_objective": 3164.83637094898,
+    "covariance_shape": [78, 78],
+    "covariance_cholesky_passed": true,
+    "numerical_comparison": {
+      "status": "passed",
+      "parameters": 78,
+      "derived_families": 32,
+      "derived_rows": 13091
+    },
+    "absolute_errors": {
+      "marginal_objective": 3.70710040442646e-09,
+      "joint_objective": 1.24226289699436e-06,
+      "maximum_estimate": 8.327945662856e-06,
+      "maximum_parameter_SE": 2.11008332384743e-06,
+      "maximum_covariance": 1.12708149722918e-06,
+      "derived_by_family": [
+        {
+          "label": "agecomp_expected",
+          "rows": 720,
+          "maximum_absolute_value_difference": 6.10931973774598e-05,
+          "maximum_absolute_SE_difference": 9.50993478543438e-06
+        },
+        {
+          "label": "agecomp_proportion",
+          "rows": 720,
+          "maximum_absolute_value_difference": 3.05465986880082e-07,
+          "maximum_absolute_SE_difference": 4.75496739274495e-08
+        },
+        {
+          "label": "biomass",
+          "rows": 31,
+          "maximum_absolute_value_difference": 0.0245496659417768,
+          "maximum_absolute_SE_difference": 0.000781293975705921
+        },
+        {
+          "label": "catch_expected",
+          "rows": 60,
+          "maximum_absolute_value_difference": 2.53864509431878e-05,
+          "maximum_absolute_SE_difference": 6.44696175555737e-07
+        },
+        {
+          "label": "catch_numbers",
+          "rows": 60,
+          "maximum_absolute_value_difference": 0.191629552515224,
+          "maximum_absolute_SE_difference": 0.016445076211312
+        },
+        {
+          "label": "catch_numbers_at_age",
+          "rows": 720,
+          "maximum_absolute_value_difference": 0.0883252737985458,
+          "maximum_absolute_SE_difference": 0.00836611923659802
+        },
+        {
+          "label": "catch_numbers_at_length",
+          "rows": 1380,
+          "maximum_absolute_value_difference": 0.0554220004851231,
+          "maximum_absolute_SE_difference": 0.00498864981273073
+        },
+        {
+          "label": "catch_weight",
+          "rows": 60,
+          "maximum_absolute_value_difference": 2.53864509431878e-05,
+          "maximum_absolute_SE_difference": 6.44696175555737e-07
+        },
+        {
+          "label": "catch_weight_at_age",
+          "rows": 720,
+          "maximum_absolute_value_difference": 0.000293649894729242,
+          "maximum_absolute_SE_difference": 2.4708061476808e-05
+        },
+        {
+          "label": "expected_recruitment",
+          "rows": 31,
+          "maximum_absolute_value_difference": 3.91129609872587,
+          "maximum_absolute_SE_difference": 0.209905275434721
+        },
+        {
+          "label": "index_expected",
+          "rows": 60,
+          "maximum_absolute_value_difference": 0.0200191063377133,
+          "maximum_absolute_SE_difference": 0.000805899265401422
+        },
+        {
+          "label": "index_numbers",
+          "rows": 60,
+          "maximum_absolute_value_difference": 6.78518547583371,
+          "maximum_absolute_SE_difference": 0.225296152784722
+        },
+        {
+          "label": "index_numbers_at_age",
+          "rows": 720,
+          "maximum_absolute_value_difference": 2.04479691159213,
+          "maximum_absolute_SE_difference": 0.247753836156335
+        },
+        {
+          "label": "index_numbers_at_length",
+          "rows": 1380,
+          "maximum_absolute_value_difference": 1.30557370960014,
+          "maximum_absolute_SE_difference": 0.0626886342361104
+        },
+        {
+          "label": "index_weight",
+          "rows": 60,
+          "maximum_absolute_value_difference": 0.0200191063377133,
+          "maximum_absolute_SE_difference": 0.000805899265401422
+        },
+        {
+          "label": "index_weight_at_age",
+          "rows": 720,
+          "maximum_absolute_value_difference": 0.0107234486094967,
+          "maximum_absolute_SE_difference": 0.00238752814783538
+        },
+        {
+          "label": "lengthcomp_expected",
+          "rows": 1380,
+          "maximum_absolute_value_difference": 1.00716387727573e-05,
+          "maximum_absolute_SE_difference": 6.73121114402875e-07
+        },
+        {
+          "label": "lengthcomp_proportion",
+          "rows": 1380,
+          "maximum_absolute_value_difference": 5.03581938648967e-08,
+          "maximum_absolute_SE_difference": 3.36560557548382e-09
+        },
+        {
+          "label": "log_catch_expected",
+          "rows": 60,
+          "maximum_absolute_value_difference": 5.44378738709383e-06,
+          "maximum_absolute_SE_difference": 6.52771792258866e-07
+        },
+        {
+          "label": "log_index_expected",
+          "rows": 60,
+          "maximum_absolute_value_difference": 4.85770542191233e-06,
+          "maximum_absolute_SE_difference": 4.34454431916254e-07
+        },
+        {
+          "label": "mortality_F",
+          "rows": 360,
+          "maximum_absolute_value_difference": 2.63982833093035e-06,
+          "maximum_absolute_SE_difference": 6.9359863053009e-07
+        },
+        {
+          "label": "mortality_M",
+          "rows": 360,
+          "maximum_absolute_value_difference": 0,
+          "maximum_absolute_SE_difference": 0
+        },
+        {
+          "label": "mortality_Z",
+          "rows": 360,
+          "maximum_absolute_value_difference": 2.63982833093035e-06,
+          "maximum_absolute_SE_difference": 6.9359863053009e-07
+        },
+        {
+          "label": "numbers_at_age",
+          "rows": 372,
+          "maximum_absolute_value_difference": 3.91129609872587,
+          "maximum_absolute_SE_difference": 0.247748085886997
+        },
+        {
+          "label": "proportion_mature_at_age",
+          "rows": 372,
+          "maximum_absolute_value_difference": 0,
+          "maximum_absolute_SE_difference": 0
+        },
+        {
+          "label": "spawning_biomass",
+          "rows": 31,
+          "maximum_absolute_value_difference": 0.0107776725478743,
+          "maximum_absolute_SE_difference": 0.000386536304006313
+        },
+        {
+          "label": "sum_selectivity",
+          "rows": 360,
+          "maximum_absolute_value_difference": 9.10200040671327e-07,
+          "maximum_absolute_SE_difference": 2.1116305875743e-08
+        },
+        {
+          "label": "total_catch_numbers",
+          "rows": 30,
+          "maximum_absolute_value_difference": 0.191629552515224,
+          "maximum_absolute_SE_difference": 0.016445076211312
+        },
+        {
+          "label": "total_catch_weight",
+          "rows": 30,
+          "maximum_absolute_value_difference": 2.53864509431878e-05,
+          "maximum_absolute_SE_difference": 6.44696175555737e-07
+        },
+        {
+          "label": "unfished_biomass",
+          "rows": 31,
+          "maximum_absolute_value_difference": 0.0152895761784748,
+          "maximum_absolute_SE_difference": 0.000607731107038489
+        },
+        {
+          "label": "unfished_numbers_at_age",
+          "rows": 372,
+          "maximum_absolute_value_difference": 0.700170004391111,
+          "maximum_absolute_SE_difference": 0.0278304046660196
+        },
+        {
+          "label": "unfished_spawning_biomass",
+          "rows": 31,
+          "maximum_absolute_value_difference": 0.00718111881360528,
+          "maximum_absolute_SE_difference": 0.000285435596424577
+        }
+      ]
+    },
+    "phases": {
+      "optimization": {
+        "elapsed_seconds": 3870.61199998856,
+        "overlapping_snapshot_write_seconds": 1422.95799946785,
+        "conditional_modes": {
+          "calls": 642,
+          "inclusive_seconds": 1018.91999483109
+        },
+        "cross_curvature": {
+          "calls": 321,
+          "inclusive_seconds": 321.653998374939
+        },
+        "third_derivative_trace": {
+          "calls": 321,
+          "inclusive_seconds": 1095.96200037003
+        }
+      },
+      "fitted_mode_and_model_report": {
+        "elapsed_seconds": 6.78400015830994,
+        "overlapping_snapshot_write_seconds": 0,
+        "conditional_modes": {
+          "calls": 1,
+          "inclusive_seconds": 1.28999996185303
+        },
+        "cross_curvature": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        },
+        "third_derivative_trace": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        }
+      },
+      "uncertainty_joint_hessian": {
+        "elapsed_seconds": 33.5160000324249,
+        "overlapping_snapshot_write_seconds": 0,
+        "conditional_modes": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        },
+        "cross_curvature": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        },
+        "third_derivative_trace": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        }
+      },
+      "uncertainty_marginal_hessian": {
+        "elapsed_seconds": 1898.71700000763,
+        "overlapping_snapshot_write_seconds": 1010.0110001564,
+        "conditional_modes": {
+          "calls": 98,
+          "inclusive_seconds": 222.523999929428
+        },
+        "cross_curvature": {
+          "calls": 98,
+          "inclusive_seconds": 147.575998544693
+        },
+        "third_derivative_trace": {
+          "calls": 98,
+          "inclusive_seconds": 516.251999616623
+        }
+      },
+      "covariance_assembly": {
+        "elapsed_seconds": 8.94200015068054,
+        "overlapping_snapshot_write_seconds": 0,
+        "conditional_modes": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        },
+        "cross_curvature": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        },
+        "third_derivative_trace": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        }
+      },
+      "report_standard_errors": {
+        "elapsed_seconds": 109.563999891281,
+        "overlapping_snapshot_write_seconds": 73.0820000171661,
+        "conditional_modes": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        },
+        "cross_curvature": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        },
+        "third_derivative_trace": {
+          "calls": 0,
+          "inclusive_seconds": 0
+        }
+      },
+      "final_gradient": {
+        "elapsed_seconds": 56.8090000152588,
+        "overlapping_snapshot_write_seconds": 41.2420001029968,
+        "conditional_modes": {
+          "calls": 1,
+          "inclusive_seconds": 1.63499999046326
+        },
+        "cross_curvature": {
+          "calls": 1,
+          "inclusive_seconds": 3.67000007629395
+        },
+        "third_derivative_trace": {
+          "calls": 1,
+          "inclusive_seconds": 10.175999879837
+        }
+      }
+    },
+    "outer_gradient_evaluations": 321,
+    "first_outer_gradient_maximum": 0.000757513375396802,
+    "last_outer_gradient_maximum": 9.58124606703316e-09,
+    "native_cold_process_to_result_seconds": 209.168735980988,
+    "native_cold_trial_wall_seconds": 198.98
+  },
+  "diagnosis": {
+    "optimizer_repeated_work": "321 full marginal-gradient evaluations and 642 conditional solves during outer optimization, including restarts; starting close to the native optimum did not make optimization cheap.",
+    "uncertainty_repeated_work": "49-column centered gradient differencing requires 98 additional full marginal gradients and conditional modes for the marginal Hessian.",
+    "derivative_structure": "Each bounded 49-fixed gradient uses 13 chunks; each differentiates the objective plus 29 random-curvature directional terms. This is a source-derived work count, not a sampled invocation count.",
+    "profiler_observer_effect": "Sampling is stopped before synchronous Profile.print; its formatting/write cost is absent from sampled hot stacks but measured separately by snapshots.tsv.",
+    "sampled_hot_path": "Live snapshots 100/101 show nested ForwardDiff under _laplace_gradient and _numerical_gradient_hessian; sampled self-time also includes Julia dispatch/type lookup and allocation/GC helpers.",
+    "attribution_limits": "Checkpoint intervals and nested durations include observer costs. Snapshot overlap is approximate. No subtraction is presented as an unprofiled benchmark; compilation and changing host contention are not independently controlled.",
+    "next_bounded_work": "Reduce synchronous profile rendering overhead; then investigate duplicated conditional solves and optimizer progress near the numerical floor, followed by the exact third-derivative trace cost. Preserve tolerances and rerun P3 after verified changes."
+  },
+  "live_snapshot_count": 109,
+  "live_snapshots_observed_before_exit": true,
+  "raw_local_session_artifact": "p3-julia-full-01",
+  "performance_parity_established": false,
+  "phase_timestamp_format": "LF-normalized portable copies; timestamps unchanged.",
+  "artifact_md5": {
+    "input.rds": "ad075166d27afabb8dbe224aa73b84c6",
+    "julia/cold/result.rds": "289e5c4e44f32761ca47b72cb81aa653",
+    "julia/progress.tsv": "d74a95f69070220b2fea0525b34677f9",
+    "julia/cold/optimizer.progress": "cf5912c1f13a259392d616aa0e1fe656",
+    "julia/warm-1/optimizer.progress": "8399d03350d91e99215cc479384c8bed",
+    "julia/cold/julia-profile/snapshots.tsv": "25547c06b74f8978df1f1464c40b437c",
+    "julia/warm-1/julia-profile/snapshots.tsv": "7f68289f6566e79a4121c80a858d6480"
+  }
+}
