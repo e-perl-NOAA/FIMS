@@ -135,6 +135,13 @@ end
         FIMSBackend._numerical_gradient(marginal, fixed) rtol = 1e-8
   @test FIMSBackend._numerical_gradient_hessian(marginal_gradient, fixed) ≈
         [inv(0.49) 0.0; 0.0 inv(0.16) + exp(fixed[2])] rtol = 1e-8
+  preconditioner = FIMSBackend._outer_preconditioner(
+    joint_objective, parameters, fixed_indices, random_indices,
+  )
+  @test Matrix(preconditioner) ≈
+        [inv(0.49) 0.0; 0.0 inv(0.16) + exp(fixed[2])] atol = 1e-10
+  @test preconditioner \ [1.0, 2.0] ≈
+        [0.49, 2 / (inv(0.16) + exp(fixed[2]))] atol = 1e-10
   options = FIMSBackend._optimizer_options(Dict())
   conditional = FIMSBackend._conditional_mode(
     parameters, fixed_indices, fixed, random_indices,
@@ -194,6 +201,15 @@ end
       wide_objective, wide_parameters, collect(1:6), collect(7:12);
       random_hessian = Matrix(Diagonal(exp.(wide_fixed))),
     ) ≈ actual atol = 1e-10
+  end
+end
+
+@testset "indefinite profile curvature disables only preconditioning" begin
+  objective = values -> -0.5 * values[2]^2 + 0.5 * (values[1] - values[2])^2
+  @test_logs (:warn, r"Initial profiled joint curvature") begin
+    @test isnothing(FIMSBackend._outer_preconditioner(
+      objective, [0.0, 0.0], [2], [1],
+    ))
   end
 end
 
@@ -1140,6 +1156,8 @@ end
       :parameter_prior_sds => [prior_sds[2]],
     ))
     singular_fit = @test_logs (
+      :warn, r"Initial profiled joint curvature"
+    ) (
       :warn, r"Parameter Hessian is non-finite or not positive definite"
     ) fit_model(parameters, prior_only_data, singular_config)
     @test singular_fit["uncertainty_status"] == "invalid_hessian"

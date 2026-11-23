@@ -240,6 +240,12 @@ Uncertainty perturbations retain their separate fitted-mode initializations.
 Outer L-BFGS retains `max(10, min(number_of_fixed_parameters, 50))` curvature
 pairs, rather than always ten, to accommodate coupled fixed effects without
 unbounded history. Random-effect optimization is unchanged.
+For coupled fixed/random fits, the initial conditional-mode joint Hessian
+also supplies a fixed-effect Schur-complement preconditioner, reused across
+outer restarts. It changes search directions, not the exact Laplace objective,
+gradients, or final uncertainty. Non-positive-definite or non-finite profiled
+curvature disables only this preconditioner with an explicit warning; it is
+never substituted for an inferential covariance.
 
 Run the backend regressions and developer-profiler checks together with:
 
@@ -250,6 +256,19 @@ Run the backend regressions and developer-profiler checks together with:
 These implementation changes do not close P3: a new complete one-cold/
 three-warm full-model run must pass the native comparisons and retain measured
 phase and snapshot costs. The previous incomplete attempt remains below.
+
+The [first recovery record](benchmarks/julia-full-recovery-2026-11-23-incomplete/comparison.json)
+preserves a passing cold fit and one passing warm fit at `65ff6f58`, before
+curvature preconditioning. Cold process-to-result fell to 2,302.61 seconds;
+the warm trial took 2,157.16 seconds. Outer optimization required 170 exact
+marginal gradients rather than 321, with one conditional solve per evaluated
+point instead of two. Cold snapshot writing fell to 296.74 seconds and warm
+snapshot writing took 44.35 seconds. Both trials passed all native numerical
+comparisons, but this was still too slow for four fits within two hours.
+The partial second warm fit was stopped and its raw progress retained locally;
+this recovery record is explicitly incomplete, not a P3 success. The shared
+host had only 0.43 GiB free memory at one observation, so these are not isolated
+paired performance measurements.
 
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 

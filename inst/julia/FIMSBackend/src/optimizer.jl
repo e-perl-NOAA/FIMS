@@ -288,6 +288,28 @@ function _cached_conditional_mode(evaluate, fixed_start)
   end
 end
 
+function _outer_preconditioner(joint_objective, parameters, fixed_indices, random_indices)
+  fixed_count = length(fixed_indices)
+  active_indices = vcat(fixed_indices, random_indices)
+  active_objective = values -> joint_objective(_compose_parameter_vector(
+    parameters, fixed_indices, values[1:fixed_count],
+    random_indices, values[(fixed_count + 1):end],
+  ))
+  curvature = hessian(active_objective, parameters[active_indices])
+  fixed = 1:fixed_count
+  random = (fixed_count + 1):length(active_indices)
+  random_factor = cholesky(Symmetric(curvature[random, random]))
+  # Profile the joint curvature; exact Laplace gradients still drive every step.
+  profiled = curvature[fixed, fixed] -
+    curvature[fixed, random] * (random_factor \ curvature[random, fixed])
+  if all(isfinite, profiled)
+    factor = cholesky(Symmetric(profiled); check = false)
+    isposdef(factor) && return factor
+  end
+  @warn "Initial profiled joint curvature is not finite and positive definite; outer L-BFGS will run without preconditioning."
+  nothing
+end
+
 function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, derivative_order = 0)
   objective_config = normalize_keys(config)
   x0, parameter_layout = _flatten_init_params(init_params, objective_config)
@@ -535,20 +557,33 @@ function fit_model(init_params, data_dict, config = Dict())
 
   # Retain small-model curvature history without unbounded memory growth.
   outer_memory = max(10, min(length(fixed_indices), 50))
+  _optimizer_checkpoint(diagnostic_file, "outer_preconditioner:start")
+  outer_preconditioner = if isempty(fixed_indices) || isempty(random_indices)
+    nothing
+  else
+    _outer_preconditioner(
+      joint_objective, outer_conditional_mode(fixed_start).parameters,
+      fixed_indices, random_indices,
+    )
+  end
+  _optimizer_checkpoint(diagnostic_file, "outer_preconditioner:enabled=$(!isnothing(outer_preconditioner))")
+  _optimizer_checkpoint(diagnostic_file, "outer_preconditioner:complete")
   outer_result = if isempty(fixed_indices)
     nothing
   else
     result = optimize(
       OnceDifferentiable(marginal_objective, outer_gradient!, fixed_start),
       fixed_start,
-      LBFGS(m = outer_memory, alphaguess = LineSearches.InitialStatic(scaled = true)),
+      LBFGS(m = outer_memory, P = outer_preconditioner,
+        alphaguess = LineSearches.InitialStatic(scaled = true)),
       optimizer_options,
     )
     for _ in 1:optimizer_restarts
       result = optimize(
         OnceDifferentiable(marginal_objective, outer_gradient!, minimizer(result)),
         minimizer(result),
-        LBFGS(m = outer_memory, alphaguess = LineSearches.InitialStatic(scaled = true)),
+        LBFGS(m = outer_memory, P = outer_preconditioner,
+          alphaguess = LineSearches.InitialStatic(scaled = true)),
         optimizer_options,
       )
     end

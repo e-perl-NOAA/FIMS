@@ -41,6 +41,9 @@
   curvature pairs for coupled fixed effects. Live benchmark profiles omit
   expensive typed method signatures while preserving sampled frame locations
   and counts. Complete-fit performance acceptance remains outstanding.
+  Coupled fits precondition outer search directions with positive-definite
+  profiled joint curvature at the initial conditional mode; exact Laplace
+  derivatives and inferential covariance calculations are unchanged.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

@@ -1,0 +1,11 @@
+epoch_seconds	stage
+1795460589.832962	cold:start
+1795460716.688575	cold:fit:start
+1795462828.447079	cold:fit:complete
+1795462830.573558	cold:complete
+1795462830.854663	warm-1:start
+1795462843.278992	warm-1:fit:start
+1795464987.828332	warm-1:fit:complete
+1795464988.125245	warm-1:complete
+1795464988.498538	warm-2:start
+1795465012.237534	warm-2:fit:start

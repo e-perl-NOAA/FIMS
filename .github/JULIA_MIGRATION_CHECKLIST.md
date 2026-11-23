@@ -190,6 +190,16 @@ fit is not acceptance evidence.
   comparisons and phase timings before checking off P3; do not extend the
   cap or treat the earlier partial result as completion.
 
+  **Recovery refinement:** the profiler/cache/history changes at `65ff6f58`
+  passed real configuration regressions and preserved passing full cold and
+  warm results, but the warm trial still took 2,157.16 seconds. The partial
+  second warm trial was stopped rather than exceed the retained cap.
+  [Both completed trials and phase costs](../data-raw/benchmarks/julia-full-recovery-2026-11-23-incomplete/comparison.json)
+  are preserved. Precondition the remaining outer search with initial-mode
+  profiled joint curvature; retain exact Laplace derivatives and full
+  inferential uncertainty, verify the coupled-curvature oracle and real
+  configurations, then repeat the complete protocol.
+
   **Blocked attempt:** 2026-11-23; evidence commit `a283b28c`, candidate
   `3767cc54`. The documented matched protocol completed one real cold Julia
   fit. All 78 estimates/parameter SEs, complete positive-definite 78-by-78
