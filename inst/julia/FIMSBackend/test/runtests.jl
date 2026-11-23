@@ -2,7 +2,7 @@ using FIMSBackend
 using Test
 using ComponentArrays: ComponentArray
 using ForwardDiff: derivative
-using LinearAlgebra: diag, Diagonal
+using LinearAlgebra: cholesky, diag, Diagonal, Symmetric
 using SpecialFunctions: erf
 
 @testset "Beverton-Holt recruitment" begin
@@ -162,6 +162,20 @@ end
     positive, negative = exp(values[2]), exp(-values[2])
     [0.09 * positive + negative 0.3 * positive + 0.2 * negative;
      0.3 * positive + 0.2 * negative positive + 0.04 * negative]
+  end
+  mode_preconditioner = cholesky(Symmetric(conditional.random_hessian))
+  for point in (shifted_fixed, fixed .- [0.03, -0.02])
+    guided = FIMSBackend._conditional_mode(
+      conditional.parameters, fixed_indices, point, random_indices,
+      joint_objective, options; preconditioner = mode_preconditioner,
+    )
+    @test guided.converged
+    @test guided.parameters ≈ mode_parameters(point) atol = 1e-8
+    @test guided.marginal_nll ≈ marginal(point) atol = 1e-8
+    @test FIMSBackend._laplace_gradient(
+      joint_objective, guided.parameters, fixed_indices, random_indices;
+      random_hessian = guided.random_hessian,
+    ) ≈ marginal_gradient(point) atol = 1e-8
   end
   reused_gradient = values -> FIMSBackend._laplace_gradient(
     joint_objective, mode_parameters(values), fixed_indices, random_indices;
@@ -1074,6 +1088,15 @@ end
     @test gaussian_fit["standard_errors"]["log_q"] ≈ prior_sds rtol = 1e-5
     @test gaussian_fit["covariance"][log_q_start, log_q_start + 1] ≈ 0.0 atol = 1e-8
     @test gaussian_fit["pd_hessian"]
+    limited_parameters = copy(parameters)
+    limited_parameters.log_q[2] = log(0.3)
+    @test_throws r"Preconditioned random-effect optimization did not converge while evaluating uncertainty" fit_model(
+      limited_parameters, prior_only_data, merge(gaussian_config, Dict(
+        :optimizer_max_iterations => 1,
+        :parameter_prior_transforms => ["identity", "exp"],
+        :parameter_prior_means => [prior_means[1], 0.2],
+      )),
+    )
     active_indices = findall(gaussian_fixed_mask .| gaussian_random_mask)
     full_joint_hessian = FIMSBackend.hessian(
       values -> evaluate_nll(

@@ -334,6 +334,52 @@ The wide distribution is retained rather than selecting the fastest trial.
 **4.21 times** the native median of 187.67 seconds. P4/P5 remain available
 for measured uncertainty/derivative improvements, and P6 stays unchecked.
 
+## P4 paired uncertainty-curvature benchmark
+
+The candidate reuses the fitted joint Hessian's random-effect block to
+precondition the conditional solves used by the marginal uncertainty
+Hessian. The factorization is prepared once. Each perturbed point still
+optimizes its conditional mode and recomputes its own exact random curvature
+and Laplace gradient; fitted curvature is not substituted for perturbed
+curvature or inferential covariance. Optimizer tolerances, fixed starts,
+outer optimization, finite-difference steps, and the 98 perturbations are
+unchanged. Unavailable fitted curvature disables only preconditioning with
+an explicit warning.
+
+Preserve the P3 backend before measuring, using a new export directory:
+
+```powershell
+git archive --format=zip --output=C:\benchmarks\p4-baseline.zip 47e3ff97 inst\julia\FIMSBackend
+Expand-Archive -LiteralPath C:\benchmarks\p4-baseline.zip -DestinationPath C:\benchmarks\p4-baseline
+$Baseline = 'C:\benchmarks\p4-baseline\inst\julia\FIMSBackend'
+$env:JULIA_HOME = Split-Path $Julia
+$env:JULIA_BINDIR = $env:JULIA_HOME
+& $Rscript --vanilla data-raw\benchmark_uncertainty_preconditioner.R probe $Baseline C:\benchmarks\p4-probe-new
+& $Rscript --vanilla data-raw\benchmark_uncertainty_preconditioner.R fits $Baseline C:\benchmarks\p4-fits-new
+```
+
+Both commands enforce a 7,200-second worker cap and refuse output-directory
+reuse. They load the independently exported old Julia module and the
+candidate in one real Julia process, with identical data and single-thread
+settings. They do not mix historical native and Julia R namespaces.
+The `probe` command checks both signs of all 49 uncertainty coordinates
+against the P3 fitted point, alternating baseline/candidate order and
+verifying modes, objectives, and complete perturbed gradients. It records
+conditional-solve time, iterations, allocations, and gradient time.
+The `fits` command performs one excluded cold warm-up per implementation,
+then three warm complete-fit pairs in AB/BA/AB order, comparing objectives,
+estimates, full covariance, Hessians, parameter SEs, and report values/SEs.
+
+Complete-fit paired timers cover `FIMSBackend.fit_model`, including all
+optimization and uncertainty work, on both sides. They exclude R
+initialization, adapters/extraction and between-trial garbage collection;
+they are not mislabeled as high-level R process-to-result timings. Live
+phase records and compact sampling snapshots remain enabled for both
+implementations. Preserve all pairs, source hashes and profiling costs.
+Repeat the separate high-level full benchmark against P2 to verify actual
+R workflow parity on the changed candidate. A faster isolated solve alone
+does not close P4 or the P6 release gate.
+
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
 **This earlier attempt did not complete P3.** The cold Julia fit passed the full native numerical

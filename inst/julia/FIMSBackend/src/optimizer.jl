@@ -233,7 +233,10 @@ function _optimizer_options(config)
   )
 end
 
-function _conditional_mode(x0, fixed_indices, fixed_values, random_indices, joint_objective, options)
+function _conditional_mode(
+  x0, fixed_indices, fixed_values, random_indices, joint_objective, options;
+  preconditioner = nothing,
+)
   if isempty(random_indices)
     parameters = _compose_parameter_vector(x0, fixed_indices, fixed_values, random_indices, Float64[])
     joint_nll = joint_objective(parameters)
@@ -255,7 +258,7 @@ function _conditional_mode(x0, fixed_indices, fixed_values, random_indices, join
   random_result = optimize(
     OnceDifferentiable(random_objective, random_gradient!, random_start),
     random_start,
-    LBFGS(alphaguess = LineSearches.InitialStatic(scaled = true)),
+    LBFGS(P = preconditioner, alphaguess = LineSearches.InitialStatic(scaled = true)),
     options,
   )
   random_mode = minimizer(random_result)
@@ -516,11 +519,11 @@ function fit_model(init_params, data_dict, config = Dict())
   joint_objective = parameters ->
     evaluate_nll(_named_component_array(parameters, parameter_layout), data_dict, objective_config)
 
-  function conditional_mode(fixed_values, initial_parameters = x0)
+  function conditional_mode(fixed_values, initial_parameters = x0; preconditioner = nothing)
     _optimizer_checkpoint(diagnostic_file, "conditional_mode:start")
     result = _conditional_mode(
       initial_parameters, fixed_indices, fixed_values, random_indices, joint_objective,
-      optimizer_options,
+      optimizer_options; preconditioner = preconditioner,
     )
     _optimizer_checkpoint(diagnostic_file, "conditional_mode:complete")
     result
@@ -533,10 +536,13 @@ function fit_model(init_params, data_dict, config = Dict())
     _optimizer_checkpoint(diagnostic_file, "outer_objective:value=$value")
     value
   end
-  function marginal_gradient(fixed_values, initial_parameters = x0)
+  function marginal_gradient(fixed_values, initial_parameters = x0; preconditioner = nothing)
     result = initial_parameters === x0 ?
       outer_conditional_mode(fixed_values) :
-      conditional_mode(fixed_values, initial_parameters)
+      conditional_mode(fixed_values, initial_parameters; preconditioner = preconditioner)
+    if !isnothing(preconditioner) && !result.converged
+      throw(ArgumentError("Preconditioned random-effect optimization did not converge while evaluating uncertainty."))
+    end
     _laplace_gradient(
       joint_objective, result.parameters, fixed_indices, random_indices;
       diagnostic_file = diagnostic_file,
@@ -609,13 +615,31 @@ function fit_model(init_params, data_dict, config = Dict())
   end
   _optimizer_checkpoint(diagnostic_file, "uncertainty_joint_hessian:complete")
   compute_standard_errors = Bool(get(objective_config, :compute_standard_errors, true))
+  mode_preconditioner = if compute_standard_errors &&
+    !isempty(fixed_indices) && !isempty(random_indices)
+    curvature = joint_hessian[random_indices, random_indices]
+    factor = all(isfinite, curvature) ?
+      cholesky(Symmetric(curvature); check = false) : nothing
+    if !isnothing(factor) && isposdef(factor)
+      factor
+    else
+      @warn "Fitted random-effect curvature is not finite and positive definite; uncertainty conditional solves will run without preconditioning."
+      nothing
+    end
+  else
+    nothing
+  end
+  _optimizer_checkpoint(diagnostic_file, "uncertainty_preconditioner:enabled=$(!isnothing(mode_preconditioner))")
   _optimizer_checkpoint(diagnostic_file, "uncertainty_marginal_hessian:start")
   fixed_hessian = if isempty(fixed_indices)
     zeros(Float64, 0, 0)
   elseif isempty(random_indices)
     Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   elseif compute_standard_errors
-    _numerical_gradient_hessian(values -> marginal_gradient(values, xhat), fixed_hat)
+    _numerical_gradient_hessian(
+      values -> marginal_gradient(values, xhat; preconditioner = mode_preconditioner),
+      fixed_hat,
+    )
   else
     Matrix(Symmetric(joint_hessian[fixed_indices, fixed_indices]))
   end

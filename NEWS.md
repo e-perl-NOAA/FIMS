@@ -47,6 +47,10 @@
   Fresh matched cold and three warm full fits pass the native numerical
   gates. Julia's warm median is 790.36 seconds versus native's 187.67;
   the complete-fit performance requirement is not yet met.
+* Marginal-uncertainty conditional solves reuse fitted random-effect curvature
+  as an L-BFGS preconditioner. Each perturbed mode, Hessian, and exact Laplace
+  gradient is still recomputed; starts and convergence tolerances are
+  unchanged. Nonconverged preconditioned uncertainty solves fail explicitly.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
