@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **P3**.
+   Name that item before starting. The default next item is **P4**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -170,7 +170,7 @@ fit is not acceptance evidence.
   No fresh Julia full-fit comparison or performance-parity decision has
   been made.
 
-- [ ] **P3 - Capture fresh matched Julia full fits and compare all outputs.**
+- [x] **P3 - Capture fresh matched Julia full fits and compare all outputs.**
   **Depends on:** P1, P2.
   **Done when:** the same protocol produces at least one cold-process run and
   three warm full fits, and fresh results pass the full numerical comparisons
@@ -178,6 +178,49 @@ fit is not acceptance evidence.
   Publish timings and an uncertainty/optimization phase-cost breakdown.
   This item can finish even if Julia is slower: it completes the reproducible
   measurement and fresh numerical gate, not the performance release gate.
+
+  **Completed:** 2026-11-23; implementation commits `65ff6f58` and
+  `7b6da71c`, measured candidate `7b6da71c`. The unchanged full Julia-only
+  benchmark command completed one cold and three fresh-input warm fits
+  within the original 7,200-second run-process cap. Controls 10000/10000,
+  three restarts, single-thread settings, full-precision P2 starts/input
+  checksum, exact Laplace derivatives, and comparison tolerances were
+  unchanged. Windows x64, R 4.6.2, Julia 1.10.10.
+
+  **Numerical result:** all four fits converged with maximum absolute fixed
+  gradient `9.70785316717349e-10`. Each passed independent native joint/
+  marginal objectives, all 78 estimates and parameter SEs, complete
+  positive-definite 78-by-78 covariance, and all 32 applicable derived-SE
+  families (13,091 rows). Full-precision starting values were identical
+  across trials; repeated outputs also passed cold-versus-warm comparisons.
+  Backend, coupled-curvature, profiler lifecycle, and 216 real configuration
+  comparisons passed before the benchmark.
+
+  **Measured result:** cold process launch to result was 1,235.13 seconds
+  (20.59 minutes), with trial wall 1,209.99 seconds. Warm trial walls were
+  995.91, 790.36, and 558.92 seconds: median 790.36 (13.17 minutes), mean
+  781.73, range 558.92-995.91. Initial profiled joint-curvature
+  preconditioning reduced outer work from the first recovery's 170 exact
+  gradients/170 conditional solves to 11 gradients/eight solves per trial.
+  Marginal uncertainty still requires 98 complete gradients/conditional
+  solves; its phase took 830.70 seconds cold and 853.56/683.77/512.03 warm.
+  Live snapshots remained available; writing took 117.08 seconds cold and
+  23.15/15.01/7.01 warm, included in elapsed times without subtraction.
+
+  **Evidence:** [portable full-precision results and comparison record](../data-raw/benchmarks/julia-full-2026-11-23/comparison.json),
+  adjacent input, all four results, phase timestamps and snapshot indices,
+  plus [command, environment and phase breakdown](../data-raw/BACKEND_BENCHMARK.md#p3-completed-matched-full-model-gate-2026-11-23).
+  Checksums, pointer-free portability, covariance Cholesky decompositions,
+  all comparisons and profile-write sums were independently rechecked.
+  Raw local artifact `p3-julia-full-03` retains full profiles, logs, and the
+  actual bridge Project/Manifest. Optim 1.13.3, ForwardDiff 0.10.39,
+  ComponentArrays 0.15.50, Functors 0.5.5, StatsBase 0.34.14.
+
+  **Performance is not accepted:** Julia's warm median is 4.21 times P2's
+  187.67 seconds. Both were instrumented on the same shared workstation,
+  not interleaved or isolated; the wide Julia distribution is retained.
+  P4/P5 and especially P6 remain unchecked. The previous incomplete
+  attempts below are historical evidence, not the basis for closing P3.
 
   **Recovery plan (2026-11-23):** keep the exact P2 workload, starting values,
   restarts, tolerances, and two-hour process budget. First remove expensive
@@ -208,7 +251,7 @@ fit is not acceptance evidence.
   absolute fixed gradient was `9.581246067033161e-9`; starts and input
   checksum matched P2 exactly. No controls or tolerances were relaxed.
 
-  **Why this is not complete:** cold process launch to result took 6,161.14
+  **Why that attempt did not complete P3:** cold process launch to result took 6,161.14
   seconds (102.69 minutes). After the user chose to keep the two-hour cap,
   preserve completed results, and diagnose the slowdown, the partial first
   warm fit was stopped before the limit and process termination verified.
@@ -230,8 +273,8 @@ fit is not acceptance evidence.
   adjacent full-precision input/cold result and completed/partial phase
   records, plus [phase/profile diagnosis](../data-raw/BACKEND_BENCHMARK.md#p3-incomplete-attempt-and-diagnosis-2026-11-23).
   Raw local artifact `p3-julia-full-01` retains the full profiles, dependency
-  environment, and logs. These are explicitly partial evidence. P3 remains
-  unchecked; P4/P5/P6 have not been completed or dispositioned.
+  environment, and logs. These are explicitly partial evidence; only the
+  final four-fit record above closes P3.
 
 - [ ] **P4 - Remove a measured conditional-mode/curvature bottleneck.**
   **Depends on:** P3; conditional on its profiling showing this work is needed.

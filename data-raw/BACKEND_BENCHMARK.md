@@ -253,9 +253,10 @@ Run the backend regressions and developer-profiler checks together with:
 & $Julia --project=inst\julia\FIMSBackend -e 'using Pkg; Pkg.test(); include(raw"data-raw\test_benchmark_profile.jl")'
 ```
 
-These implementation changes do not close P3: a new complete one-cold/
-three-warm full-model run must pass the native comparisons and retain measured
-phase and snapshot costs. The previous incomplete attempt remains below.
+Implementation alone does not close P3: a complete one-cold/three-warm
+full-model run must pass the native comparisons and retain measured phase
+and snapshot costs. The completed run and earlier incomplete attempts are
+preserved below.
 
 The [first recovery record](benchmarks/julia-full-recovery-2026-11-23-incomplete/comparison.json)
 preserves a passing cold fit and one passing warm fit at `65ff6f58`, before
@@ -270,9 +271,72 @@ this recovery record is explicitly incomplete, not a P3 success. The shared
 host had only 0.43 GiB free memory at one observation, so these are not isolated
 paired performance measurements.
 
+## P3 completed matched full-model gate: 2026-11-23
+
+The [comparison record](benchmarks/julia-full-2026-11-23/comparison.json)
+archives candidate `7b6da71c`, all four full-precision Julia results, identical
+P2 input, phase timestamps, snapshot indices, numerical differences by
+family, source/dependency provenance, and artifact checksums. The Julia-only
+full command above used the committed native P2 reference, three restarts,
+controls 10000/10000, 30-second safe-point snapshots, and the unchanged
+7,200-second run-process cap. All four fits completed within that cap.
+
+Each fit converged with maximum absolute fixed gradient
+`9.70785316717349e-10` and valid uncertainty. Existing native comparisons
+passed for joint/marginal objectives, all 78 estimates and parameter SEs,
+complete positive-definite 78-by-78 covariance, and all 32 applicable
+derived-SE families / 13,091 rows. Starts reproduced input MD5
+`ad075166d27afabb8dbe224aa73b84c6` and were identical between trials.
+All warm outputs also passed comparisons against the cold Julia result.
+Independent read-back checks repeated these comparisons, covariance
+Cholesky decompositions, portable/pointer-free scans, snapshot-write sums,
+and artifact checksums.
+
+| Trial | `fit_fims` (s) | Optimization (s) | Joint Hessian (s) | Marginal Hessian (s) | Report SEs (s) | Trial wall (s) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cold | 1188.00 | 231.16 | 19.69 | 830.70 | 28.81 | 1209.99 |
+| warm-1 | 966.60 | 99.95 | 3.42 | 853.56 | 0.16 | 995.91 |
+| warm-2 | 771.73 | 82.77 | 2.18 | 683.77 | 0.07 | 790.36 |
+| warm-3 | 552.61 | 33.93 | 1.52 | 512.03 | 0.12 | 558.92 |
+
+Cold **process launch to result** was **1,235.13 seconds (20.59 minutes)**,
+including preceding process/package startup. Warm trial wall median was
+**790.36 seconds (13.17 minutes)**, mean 781.73, standard deviation 218.62,
+and range 558.92-995.91 seconds. The machine-readable record also retains
+initialization, fitted-mode/report evaluation, covariance assembly, final
+gradient, extraction, and profiler setup/finalization costs. Phase values
+are components of `fit_fims`, not extra costs to add to it.
+
+The initial joint-curvature preconditioner was enabled in every trial,
+costing 21.72 seconds cold and 3.64/3.20/1.06 seconds warm, inside the
+optimization phase. Outer optimization required **11 exact gradients and
+eight conditional solves** per trial, versus 170/170 in the first recovery.
+The marginal Hessian still required **98 full exact gradients and conditional
+solves** per trial. This is now the dominant measured remaining cost, not
+an omitted uncertainty pass.
+
+Live profiling retained 34/32/26/19 snapshots. Snapshot writing took
+117.08 seconds cold and 23.15/15.01/7.01 seconds warm, already included
+in the timings. Sampling snapshots were inspected before process exit;
+the raw local artifact `p3-julia-full-03` retains full profiles/logs and
+the actual active Julia Project/Manifest.
+
+Environment: Windows 11 x64, R 4.6.2, Julia 1.10.10, Intel i7-1365U,
+Balanced power, one BLAS/Julia thread. Preflight CPU load was 33% with
+4,420,616 KiB free memory. This was the same shared interactive workstation
+as P2, on a different date, not an isolated or interleaved timing pair.
+No competing agent builds, tests, or model fits ran during collection.
+Actual bridge dependencies included Optim 1.13.3, ForwardDiff 0.10.39,
+ComponentArrays 0.15.50, Functors 0.5.5, and StatsBase 0.34.14.
+The wide distribution is retained rather than selecting the fastest trial.
+
+**P3 is complete; performance acceptance is not.** Julia's warm median is
+**4.21 times** the native median of 187.67 seconds. P4/P5 remain available
+for measured uncertainty/derivative improvements, and P6 stays unchecked.
+
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
-**P3 remains blocked.** The cold Julia fit passed the full native numerical
+**This earlier attempt did not complete P3.** The cold Julia fit passed the full native numerical
 comparison, but no warm fit completed. After the user chose to retain the
 two-hour process cap and diagnose the slowdown, the partial first warm fit
 was stopped. There was no timeout extension or successful controller summary.

@@ -1,0 +1,1339 @@
+{
+  "schema": 1,
+  "checklist_item": "P3",
+  "status": "passed",
+  "date": "2026-11-23",
+  "candidate_revision": "7b6da71cdc3628c7be636fbe691c76ac0de31e21",
+  "scope": "Fresh matched real R-to-Julia full fits; numerical gate, not performance acceptance.",
+  "environment": {
+    "R": "R version 4.6.2 (2026-10-29 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "package_version": "0.11.0.9000",
+    "revision": "7b6da71cdc3628c7be636fbe691c76ac0de31e21",
+    "source_md5": {
+      "R/FIMS-package.R": "66d8d4ca69920506fb513dace3184bc3",
+      "R/augment-fims.R": "9f4dc0595b42c199a6a9c896be91333c",
+      "R/check_convergence.R": "62115dea9869d7f8d6752a116dd28bff",
+      "R/data_big.R": "9244e733bd756def26b8f1c42210a782",
+      "R/distribution_families.R": "4ff36327b895d5ae8fea70525e80fb62",
+      "R/fims_distributions.R": "963b356cf0b697d01dc38dfb4588d278",
+      "R/fims_input_types.R": "31f1b1689d265b6fa1850097faef6fd1",
+      "R/fims_likelihood.R": "0f3a25af5f5455660e4d76eb7379dbed",
+      "R/fims_retro.R": "ef97e4aec04e89acb6ffe339625f30fa",
+      "R/fimsfit.R": "2e7c10772cd71e69e3c056b8cff1e883",
+      "R/fimsframe.R": "0add5dda7266f5b37dedd1227b741c70",
+      "R/initialize_modules.R": "813741b245aa85b76ff849c41b21acad",
+      "R/is_fims_verbose.R": "03d98c153f3978a631ceb23eaa20d64a",
+      "R/julia_backend.R": "0fb09141cf587acbabfee6478463db8e",
+      "R/mohns_rho.R": "914a41acb16eabd3e31b8a79bca1de35",
+      "R/parse_data_distribution.R": "5527d0f5aba8ef03c1ba5343cfd40da8",
+      "R/plot_likelihood.R": "ff24ab3ff81ed07aba55f1b89c7e02aa",
+      "R/run_modified_fims.R": "04c021ff7d01446b95f4163747a65b08",
+      "R/setup_default_parameters.R": "42ee2651bc3bec2ec2e0806064b51438",
+      "R/setup_julia.R": "2aed38975029c26111e78bd280d958ed",
+      "R/simulate_julia.R": "0e50c84d5b70f7ff300834e2d81f3628",
+      "R/tidy-glance-fims.R": "0f848153d7b433561d5227c7cd3f2c48",
+      "R/use-testthat-template.R": "9d72c3ced04e0077d936282d0f2f8211",
+      "R/utils.R": "159d216dc57ca2d936005a66fdcf3e91",
+      "R/zzz.R": "435298f94386f2fe9b4c23bd6efc0a9c",
+      "inst/julia/FIMSBackend/Project.toml": "e770dc45f78e53dfb8a6038ddd74eb8b",
+      "inst/julia/FIMSBackend/src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+      "inst/julia/FIMSBackend/src/modules/population.jl": "e03aab4f68a3324f08e240f64c9a70da",
+      "inst/julia/FIMSBackend/src/modules/recruitment.jl": "aa7798fb92987f38c9375213cfba1107",
+      "inst/julia/FIMSBackend/src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+      "inst/julia/FIMSBackend/src/objective.jl": "cdfb21455516325cd6b9dbf60a534bf1",
+      "inst/julia/FIMSBackend/src/optimizer.jl": "3983c70e306d6757b585c1043aa940ea",
+      "inst/julia/FIMSBackend/test/runtests.jl": "4082576b0cc9214588de9081fc79aeaf",
+      "inst/julia/setup.jl": "870e7eb2c3d367164d1420c25f2f297c"
+    },
+    "threads": {
+      "JULIA_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    },
+    "julia_version": "1.10.10",
+    "julia_blas": "LBTConfig([ILP64] libopenblas64_.dll)",
+    "julia_blas_threads": 1,
+    "load_setup_seconds": 24.72,
+    "loaded_R_package_versions": {
+      "FIMS": "0.11.0.9000",
+      "testthat": "3.3.2",
+      "gtable": "0.3.6",
+      "jsonlite": "2.0.0",
+      "dplyr": "1.2.1",
+      "compiler": "4.6.2",
+      "brio": "1.1.5",
+      "tidyselect": "1.2.1",
+      "Rcpp": "1.1.1-1.1",
+      "parallel": "4.6.2",
+      "JuliaCall": "0.17.6",
+      "globals": "0.19.1",
+      "scales": "1.4.0",
+      "ggplot2": "4.0.3.9000",
+      "R6": "2.6.1",
+      "generics": "0.1.4",
+      "knitr": "1.51",
+      "future": "1.70.0",
+      "tibble": "3.3.1",
+      "stockplotr": "0.14.0",
+      "desc": "1.4.3",
+      "rprojroot": "2.1.1",
+      "pillar": "1.11.1",
+      "RColorBrewer": "1.1-3",
+      "rlang": "1.3.0",
+      "xfun": "0.57",
+      "S7": "0.2.2",
+      "otel": "0.2.0",
+      "pkgload": "1.5.2",
+      "viridisLite": "0.4.3",
+      "cli": "3.6.6",
+      "magrittr": "2.0.5",
+      "digest": "0.6.39",
+      "grid": "4.6.2",
+      "lifecycle": "1.0.5",
+      "vctrs": "0.7.3",
+      "evaluate": "1.0.5",
+      "glue": "1.8.1",
+      "farver": "2.1.2",
+      "listenv": "0.10.1",
+      "furrr": "0.4.0",
+      "yardstick": "1.4.0",
+      "codetools": "0.2-20",
+      "parallelly": "1.47.0",
+      "purrr": "1.2.2",
+      "tools": "4.6.2",
+      "pkgconfig": "2.0.3"
+    },
+    "Julia_package_versions": {
+      "Optim": "1.13.3",
+      "ForwardDiff": "0.10.39",
+      "ComponentArrays": "0.15.50",
+      "Functors": "0.5.5",
+      "StatsBase": "0.34.14"
+    }
+  },
+  "host": {
+    "CPU": "13th Gen Intel(R) Core(TM) i7-1365U",
+    "physical_cores": 10,
+    "logical_processors": 12,
+    "OS": "Microsoft Windows 11 Enterprise 10.0.26200",
+    "memory_GiB": 15.35,
+    "preflight_free_memory_KiB": 4420616,
+    "preflight_CPU_load_percent": 33,
+    "power_scheme": "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+    "captured_at": "2026-11-23T15:58:30.3650599-05:00",
+    "exclusive_host": false,
+    "conditions": "Interactive workstation, same hardware and power scheme as P2. P2 and P3 were captured on different dates, not interleaved timing pairs. No concurrent agent builds/tests or other model fits launched during collection. P2 preflight load was 19-43%; actual recovery preflight is recorded above. All timings include profiling overhead without subtraction; safe-point intervals include observer snapshot costs at their start."
+  },
+  "recovery": {
+    "previous_incomplete_attempt": "julia-full-2026-11-23-incomplete",
+    "compact_profiles": "Preserve sampled function/file/line/counts; omit typed method signatures.",
+    "conditional_cache": "Reuse the last conditional result only at an identical outer fixed point.",
+    "outer_LBFGS_memory": 49,
+    "outer_preconditioner": "Initial conditional-mode joint-curvature Schur complement; exact Laplace derivatives unchanged.",
+    "changed_tolerances_or_workload": false,
+    "process_timeout_seconds": 7200
+  },
+  "completed_trials": ["cold", "warm-1", "warm-2", "warm-3"],
+  "four_fit_P3_gate_passed": true,
+  "interruption": null,
+  "native_reference": "data-raw/benchmarks/native-full-2026-11-17",
+  "native_declared_revision": "1e5a64a8",
+  "preparation": {
+    "status": "prepared",
+    "seconds": 42.03,
+    "native_build": null
+  },
+  "protocol": {
+    "case": "full",
+    "counts": {
+      "fixed_effects": 49,
+      "random_effects": 29
+    },
+    "priors": null,
+    "control": {
+      "iter.max": 10000,
+      "eval.max": 10000,
+      "trace": 0
+    },
+    "restarts": 3,
+    "input_md5": "ad075166d27afabb8dbe224aa73b84c6",
+    "required_derived": [
+      "agecomp_expected",
+      "agecomp_proportion",
+      "biomass",
+      "catch_expected",
+      "catch_numbers",
+      "catch_numbers_at_age",
+      "catch_numbers_at_length",
+      "catch_weight",
+      "catch_weight_at_age",
+      "expected_recruitment",
+      "index_expected",
+      "index_numbers",
+      "index_numbers_at_age",
+      "index_numbers_at_length",
+      "index_weight",
+      "index_weight_at_age",
+      "lengthcomp_expected",
+      "lengthcomp_proportion",
+      "log_catch_expected",
+      "log_index_expected",
+      "mortality_F",
+      "mortality_M",
+      "mortality_Z",
+      "numbers_at_age",
+      "proportion_mature_at_age",
+      "spawning_biomass",
+      "sum_selectivity",
+      "total_catch_numbers",
+      "total_catch_weight",
+      "unfished_biomass",
+      "unfished_numbers_at_age",
+      "unfished_spawning_biomass"
+    ],
+    "harness_md5": {
+      "benchmark_backends.R": "021f47b8af1b422a2110867e2372bdba",
+      "benchmark_profile.jl": "50f5fa46397894180e9c3c5a12b356d3"
+    }
+  },
+  "trials": [
+    {
+      "trial": "cold",
+      "initialize_seconds": 9.12,
+      "fit_seconds": 1188,
+      "optimization_including_initial_mode_seconds": 231.163999795914,
+      "initial_curvature_preconditioner_seconds": 21.720999956131,
+      "outer_preconditioner_enabled": true,
+      "fitted_mode_and_report_evaluation_seconds": 11.9720001220703,
+      "uncertainty_joint_hessian_seconds": 19.6900000572205,
+      "uncertainty_marginal_hessian_seconds": 830.700999975204,
+      "covariance_assembly_seconds": 3.91699981689453,
+      "report_standard_errors_seconds": 28.8140001296997,
+      "final_gradient_seconds": 35.5969998836517,
+      "nested_costs": {
+        "conditional_mode": {
+          "optimization": {
+            "calls": 8,
+            "seconds": 33.9009997844696
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 208.118000745773
+          }
+        },
+        "laplace_joint_hessian": {
+          "optimization": {
+            "calls": 11,
+            "seconds": 32.9489996433258
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 140.064999818802
+          }
+        },
+        "laplace_third_derivatives": {
+          "optimization": {
+            "calls": 11,
+            "seconds": 74.4229998588562
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 457.994999885559
+          }
+        }
+      },
+      "extract_validate_seconds": 0.6400000000001,
+      "profile_setup_seconds": 6.79,
+      "profile_finalize_seconds": 5.40999999999985,
+      "profile_snapshot_write_seconds": 117.078000068665,
+      "profile_snapshot_count": 34,
+      "trial_wall_seconds": 1209.99,
+      "cold_process_to_result_seconds": 1235.13364911079,
+      "native_trial_wall_seconds": 198.98,
+      "trial_wall_ratio_to_native": 6.08096291084531,
+      "convergence": 0,
+      "optimizer": {
+        "convergence": 0,
+        "2": null,
+        "3": null,
+        "message": "converged"
+      },
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "marginal_objective": 3231.25994449968,
+      "joint_objective": 3164.83637094901,
+      "covariance_shape": [78, 78],
+      "covariance_cholesky_passed": true,
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "absolute_errors": {
+        "marginal_objective": 2.40015651797876e-09,
+        "joint_objective": 1.24230246001389e-06,
+        "maximum_estimate": 8.32792796323645e-06,
+        "maximum_parameter_SE": 2.11012385403775e-06,
+        "maximum_covariance": 1.12710314613407e-06,
+        "derived_by_family": [
+          {
+            "label": "agecomp_expected",
+            "rows": 720,
+            "maximum_absolute_value_difference": 6.10929661579718e-05,
+            "maximum_absolute_SE_difference": 9.50980549285774e-06
+          },
+          {
+            "label": "agecomp_proportion",
+            "rows": 720,
+            "maximum_absolute_value_difference": 3.0546483078403e-07,
+            "maximum_absolute_SE_difference": 4.75490274619295e-08
+          },
+          {
+            "label": "biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0245502468624181,
+            "maximum_absolute_SE_difference": 0.000785241853236585
+          },
+          {
+            "label": "catch_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "catch_numbers",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.191579460981302,
+            "maximum_absolute_SE_difference": 0.0163916901765333
+          },
+          {
+            "label": "catch_numbers_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.0883143658284098,
+            "maximum_absolute_SE_difference": 0.00839524482216802
+          },
+          {
+            "label": "catch_numbers_at_length",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 0.0554075190157164,
+            "maximum_absolute_SE_difference": 0.00500504182309669
+          },
+          {
+            "label": "catch_weight",
+            "rows": 60,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "catch_weight_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.00029365047612373,
+            "maximum_absolute_SE_difference": 2.47079653421522e-05
+          },
+          {
+            "label": "expected_recruitment",
+            "rows": 31,
+            "maximum_absolute_value_difference": 3.91141201858409,
+            "maximum_absolute_SE_difference": 0.210297581492341
+          },
+          {
+            "label": "index_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.0200192535630777,
+            "maximum_absolute_SE_difference": 0.000809644190894687
+          },
+          {
+            "label": "index_numbers",
+            "rows": 60,
+            "maximum_absolute_value_difference": 6.78539207181893,
+            "maximum_absolute_SE_difference": 0.230114382167812
+          },
+          {
+            "label": "index_numbers_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 2.04484728846001,
+            "maximum_absolute_SE_difference": 0.247788164546364
+          },
+          {
+            "label": "index_numbers_at_length",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 1.30562732345425,
+            "maximum_absolute_SE_difference": 0.063810059982643
+          },
+          {
+            "label": "index_weight",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.0200192535630777,
+            "maximum_absolute_SE_difference": 0.000809644190894687
+          },
+          {
+            "label": "index_weight_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.0107234259189681,
+            "maximum_absolute_SE_difference": 0.00238785896021909
+          },
+          {
+            "label": "lengthcomp_expected",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 1.00707452936888e-05,
+            "maximum_absolute_SE_difference": 6.69288807930712e-07
+          },
+          {
+            "label": "lengthcomp_proportion",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 5.03537264662235e-08,
+            "maximum_absolute_SE_difference": 3.34644404027806e-09
+          },
+          {
+            "label": "log_catch_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 5.44392148071893e-06,
+            "maximum_absolute_SE_difference": 6.48707492112433e-07
+          },
+          {
+            "label": "log_index_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 4.85782150683178e-06,
+            "maximum_absolute_SE_difference": 4.31029648056969e-07
+          },
+          {
+            "label": "mortality_F",
+            "rows": 360,
+            "maximum_absolute_value_difference": 2.6398523740867e-06,
+            "maximum_absolute_SE_difference": 6.91688092385734e-07
+          },
+          {
+            "label": "mortality_M",
+            "rows": 360,
+            "maximum_absolute_value_difference": 0,
+            "maximum_absolute_SE_difference": 0
+          },
+          {
+            "label": "mortality_Z",
+            "rows": 360,
+            "maximum_absolute_value_difference": 2.63985237403119e-06,
+            "maximum_absolute_SE_difference": 6.91688092385734e-07
+          },
+          {
+            "label": "numbers_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 3.91141201858409,
+            "maximum_absolute_SE_difference": 0.247782413141977
+          },
+          {
+            "label": "proportion_mature_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 0,
+            "maximum_absolute_SE_difference": 0
+          },
+          {
+            "label": "spawning_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0107779439313163,
+            "maximum_absolute_SE_difference": 0.000388351859271552
+          },
+          {
+            "label": "sum_selectivity",
+            "rows": 360,
+            "maximum_absolute_value_difference": 9.10207067494895e-07,
+            "maximum_absolute_SE_difference": 2.11894292355408e-08
+          },
+          {
+            "label": "total_catch_numbers",
+            "rows": 30,
+            "maximum_absolute_value_difference": 0.191579460981302,
+            "maximum_absolute_SE_difference": 0.0163916901765333
+          },
+          {
+            "label": "total_catch_weight",
+            "rows": 30,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "unfished_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0152893252598005,
+            "maximum_absolute_SE_difference": 0.000621804014372174
+          },
+          {
+            "label": "unfished_numbers_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 0.700158513849601,
+            "maximum_absolute_SE_difference": 0.0284748585982015
+          },
+          {
+            "label": "unfished_spawning_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0071810009649198,
+            "maximum_absolute_SE_difference": 0.00029204527731963
+          }
+        ]
+      }
+    },
+    {
+      "trial": "warm-1",
+      "initialize_seconds": 28.78,
+      "fit_seconds": 966.6,
+      "optimization_including_initial_mode_seconds": 99.9479999542236,
+      "initial_curvature_preconditioner_seconds": 3.64299988746643,
+      "outer_preconditioner_enabled": true,
+      "fitted_mode_and_report_evaluation_seconds": 0.0160000324249268,
+      "uncertainty_joint_hessian_seconds": 3.41799998283386,
+      "uncertainty_marginal_hessian_seconds": 853.55999994278,
+      "covariance_assembly_seconds": 0.00399994850158691,
+      "report_standard_errors_seconds": 0.156000137329102,
+      "final_gradient_seconds": 6.08399987220764,
+      "nested_costs": {
+        "conditional_mode": {
+          "optimization": {
+            "calls": 8,
+            "seconds": 17.3019998073578
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 214.651001214981
+          }
+        },
+        "laplace_joint_hessian": {
+          "optimization": {
+            "calls": 11,
+            "seconds": 16.9449999332428
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 139.353000640869
+          }
+        },
+        "laplace_third_derivatives": {
+          "optimization": {
+            "calls": 11,
+            "seconds": 59.5159995555878
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 478.359000205994
+          }
+        }
+      },
+      "extract_validate_seconds": 0.0500000000001819,
+      "profile_setup_seconds": 0.1099999999999,
+      "profile_finalize_seconds": 0.369999999999891,
+      "profile_snapshot_write_seconds": 23.1530003547668,
+      "profile_snapshot_count": 32,
+      "trial_wall_seconds": 995.91,
+      "cold_process_to_result_seconds": null,
+      "native_trial_wall_seconds": 199.86,
+      "trial_wall_ratio_to_native": 4.98303812668868,
+      "convergence": 0,
+      "optimizer": {
+        "convergence": 0,
+        "2": null,
+        "3": null,
+        "message": "converged"
+      },
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "marginal_objective": 3231.25994449968,
+      "joint_objective": 3164.83637094901,
+      "covariance_shape": [78, 78],
+      "covariance_cholesky_passed": true,
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "absolute_errors": {
+        "marginal_objective": 2.40015651797876e-09,
+        "joint_objective": 1.24230246001389e-06,
+        "maximum_estimate": 8.32792796323645e-06,
+        "maximum_parameter_SE": 2.11012385403775e-06,
+        "maximum_covariance": 1.12710314613407e-06,
+        "derived_by_family": [
+          {
+            "label": "agecomp_expected",
+            "rows": 720,
+            "maximum_absolute_value_difference": 6.10929661579718e-05,
+            "maximum_absolute_SE_difference": 9.50980549285774e-06
+          },
+          {
+            "label": "agecomp_proportion",
+            "rows": 720,
+            "maximum_absolute_value_difference": 3.0546483078403e-07,
+            "maximum_absolute_SE_difference": 4.75490274619295e-08
+          },
+          {
+            "label": "biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0245502468624181,
+            "maximum_absolute_SE_difference": 0.000785241853236585
+          },
+          {
+            "label": "catch_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "catch_numbers",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.191579460981302,
+            "maximum_absolute_SE_difference": 0.0163916901765333
+          },
+          {
+            "label": "catch_numbers_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.0883143658284098,
+            "maximum_absolute_SE_difference": 0.00839524482216802
+          },
+          {
+            "label": "catch_numbers_at_length",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 0.0554075190157164,
+            "maximum_absolute_SE_difference": 0.00500504182309669
+          },
+          {
+            "label": "catch_weight",
+            "rows": 60,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "catch_weight_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.00029365047612373,
+            "maximum_absolute_SE_difference": 2.47079653421522e-05
+          },
+          {
+            "label": "expected_recruitment",
+            "rows": 31,
+            "maximum_absolute_value_difference": 3.91141201858409,
+            "maximum_absolute_SE_difference": 0.210297581492341
+          },
+          {
+            "label": "index_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.0200192535630777,
+            "maximum_absolute_SE_difference": 0.000809644190894687
+          },
+          {
+            "label": "index_numbers",
+            "rows": 60,
+            "maximum_absolute_value_difference": 6.78539207181893,
+            "maximum_absolute_SE_difference": 0.230114382167812
+          },
+          {
+            "label": "index_numbers_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 2.04484728846001,
+            "maximum_absolute_SE_difference": 0.247788164546364
+          },
+          {
+            "label": "index_numbers_at_length",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 1.30562732345425,
+            "maximum_absolute_SE_difference": 0.063810059982643
+          },
+          {
+            "label": "index_weight",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.0200192535630777,
+            "maximum_absolute_SE_difference": 0.000809644190894687
+          },
+          {
+            "label": "index_weight_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.0107234259189681,
+            "maximum_absolute_SE_difference": 0.00238785896021909
+          },
+          {
+            "label": "lengthcomp_expected",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 1.00707452936888e-05,
+            "maximum_absolute_SE_difference": 6.69288807930712e-07
+          },
+          {
+            "label": "lengthcomp_proportion",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 5.03537264662235e-08,
+            "maximum_absolute_SE_difference": 3.34644404027806e-09
+          },
+          {
+            "label": "log_catch_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 5.44392148071893e-06,
+            "maximum_absolute_SE_difference": 6.48707492112433e-07
+          },
+          {
+            "label": "log_index_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 4.85782150683178e-06,
+            "maximum_absolute_SE_difference": 4.31029648056969e-07
+          },
+          {
+            "label": "mortality_F",
+            "rows": 360,
+            "maximum_absolute_value_difference": 2.6398523740867e-06,
+            "maximum_absolute_SE_difference": 6.91688092385734e-07
+          },
+          {
+            "label": "mortality_M",
+            "rows": 360,
+            "maximum_absolute_value_difference": 0,
+            "maximum_absolute_SE_difference": 0
+          },
+          {
+            "label": "mortality_Z",
+            "rows": 360,
+            "maximum_absolute_value_difference": 2.63985237403119e-06,
+            "maximum_absolute_SE_difference": 6.91688092385734e-07
+          },
+          {
+            "label": "numbers_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 3.91141201858409,
+            "maximum_absolute_SE_difference": 0.247782413141977
+          },
+          {
+            "label": "proportion_mature_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 0,
+            "maximum_absolute_SE_difference": 0
+          },
+          {
+            "label": "spawning_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0107779439313163,
+            "maximum_absolute_SE_difference": 0.000388351859271552
+          },
+          {
+            "label": "sum_selectivity",
+            "rows": 360,
+            "maximum_absolute_value_difference": 9.10207067494895e-07,
+            "maximum_absolute_SE_difference": 2.11894292355408e-08
+          },
+          {
+            "label": "total_catch_numbers",
+            "rows": 30,
+            "maximum_absolute_value_difference": 0.191579460981302,
+            "maximum_absolute_SE_difference": 0.0163916901765333
+          },
+          {
+            "label": "total_catch_weight",
+            "rows": 30,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "unfished_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0152893252598005,
+            "maximum_absolute_SE_difference": 0.000621804014372174
+          },
+          {
+            "label": "unfished_numbers_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 0.700158513849601,
+            "maximum_absolute_SE_difference": 0.0284748585982015
+          },
+          {
+            "label": "unfished_spawning_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0071810009649198,
+            "maximum_absolute_SE_difference": 0.00029204527731963
+          }
+        ]
+      }
+    },
+    {
+      "trial": "warm-2",
+      "initialize_seconds": 18.3899999999999,
+      "fit_seconds": 771.73,
+      "optimization_including_initial_mode_seconds": 82.7709999084473,
+      "initial_curvature_preconditioner_seconds": 3.20099997520447,
+      "outer_preconditioner_enabled": true,
+      "fitted_mode_and_report_evaluation_seconds": 0.00999999046325684,
+      "uncertainty_joint_hessian_seconds": 2.17599987983704,
+      "uncertainty_marginal_hessian_seconds": 683.769000053406,
+      "covariance_assembly_seconds": 0.000999927520751953,
+      "report_standard_errors_seconds": 0.065000057220459,
+      "final_gradient_seconds": 2.37700009346008,
+      "nested_costs": {
+        "conditional_mode": {
+          "optimization": {
+            "calls": 8,
+            "seconds": 14.7530002593994
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 168.686000823975
+          }
+        },
+        "laplace_joint_hessian": {
+          "optimization": {
+            "calls": 11,
+            "seconds": 14.2699997425079
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 110.281999349594
+          }
+        },
+        "laplace_third_derivatives": {
+          "optimization": {
+            "calls": 11,
+            "seconds": 48.563000202179
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 390.903000593185
+          }
+        }
+      },
+      "extract_validate_seconds": 0.0199999999999818,
+      "profile_setup_seconds": 0.080000000000382,
+      "profile_finalize_seconds": 0.119999999999891,
+      "profile_snapshot_write_seconds": 15.0050008296967,
+      "profile_snapshot_count": 26,
+      "trial_wall_seconds": 790.36,
+      "cold_process_to_result_seconds": null,
+      "native_trial_wall_seconds": 187.67,
+      "trial_wall_ratio_to_native": 4.21143496563116,
+      "convergence": 0,
+      "optimizer": {
+        "convergence": 0,
+        "2": null,
+        "3": null,
+        "message": "converged"
+      },
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "marginal_objective": 3231.25994449968,
+      "joint_objective": 3164.83637094901,
+      "covariance_shape": [78, 78],
+      "covariance_cholesky_passed": true,
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "absolute_errors": {
+        "marginal_objective": 2.40015651797876e-09,
+        "joint_objective": 1.24230246001389e-06,
+        "maximum_estimate": 8.32792796323645e-06,
+        "maximum_parameter_SE": 2.11012385403775e-06,
+        "maximum_covariance": 1.12710314613407e-06,
+        "derived_by_family": [
+          {
+            "label": "agecomp_expected",
+            "rows": 720,
+            "maximum_absolute_value_difference": 6.10929661579718e-05,
+            "maximum_absolute_SE_difference": 9.50980549285774e-06
+          },
+          {
+            "label": "agecomp_proportion",
+            "rows": 720,
+            "maximum_absolute_value_difference": 3.0546483078403e-07,
+            "maximum_absolute_SE_difference": 4.75490274619295e-08
+          },
+          {
+            "label": "biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0245502468624181,
+            "maximum_absolute_SE_difference": 0.000785241853236585
+          },
+          {
+            "label": "catch_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "catch_numbers",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.191579460981302,
+            "maximum_absolute_SE_difference": 0.0163916901765333
+          },
+          {
+            "label": "catch_numbers_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.0883143658284098,
+            "maximum_absolute_SE_difference": 0.00839524482216802
+          },
+          {
+            "label": "catch_numbers_at_length",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 0.0554075190157164,
+            "maximum_absolute_SE_difference": 0.00500504182309669
+          },
+          {
+            "label": "catch_weight",
+            "rows": 60,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "catch_weight_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.00029365047612373,
+            "maximum_absolute_SE_difference": 2.47079653421522e-05
+          },
+          {
+            "label": "expected_recruitment",
+            "rows": 31,
+            "maximum_absolute_value_difference": 3.91141201858409,
+            "maximum_absolute_SE_difference": 0.210297581492341
+          },
+          {
+            "label": "index_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.0200192535630777,
+            "maximum_absolute_SE_difference": 0.000809644190894687
+          },
+          {
+            "label": "index_numbers",
+            "rows": 60,
+            "maximum_absolute_value_difference": 6.78539207181893,
+            "maximum_absolute_SE_difference": 0.230114382167812
+          },
+          {
+            "label": "index_numbers_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 2.04484728846001,
+            "maximum_absolute_SE_difference": 0.247788164546364
+          },
+          {
+            "label": "index_numbers_at_length",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 1.30562732345425,
+            "maximum_absolute_SE_difference": 0.063810059982643
+          },
+          {
+            "label": "index_weight",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.0200192535630777,
+            "maximum_absolute_SE_difference": 0.000809644190894687
+          },
+          {
+            "label": "index_weight_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.0107234259189681,
+            "maximum_absolute_SE_difference": 0.00238785896021909
+          },
+          {
+            "label": "lengthcomp_expected",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 1.00707452936888e-05,
+            "maximum_absolute_SE_difference": 6.69288807930712e-07
+          },
+          {
+            "label": "lengthcomp_proportion",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 5.03537264662235e-08,
+            "maximum_absolute_SE_difference": 3.34644404027806e-09
+          },
+          {
+            "label": "log_catch_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 5.44392148071893e-06,
+            "maximum_absolute_SE_difference": 6.48707492112433e-07
+          },
+          {
+            "label": "log_index_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 4.85782150683178e-06,
+            "maximum_absolute_SE_difference": 4.31029648056969e-07
+          },
+          {
+            "label": "mortality_F",
+            "rows": 360,
+            "maximum_absolute_value_difference": 2.6398523740867e-06,
+            "maximum_absolute_SE_difference": 6.91688092385734e-07
+          },
+          {
+            "label": "mortality_M",
+            "rows": 360,
+            "maximum_absolute_value_difference": 0,
+            "maximum_absolute_SE_difference": 0
+          },
+          {
+            "label": "mortality_Z",
+            "rows": 360,
+            "maximum_absolute_value_difference": 2.63985237403119e-06,
+            "maximum_absolute_SE_difference": 6.91688092385734e-07
+          },
+          {
+            "label": "numbers_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 3.91141201858409,
+            "maximum_absolute_SE_difference": 0.247782413141977
+          },
+          {
+            "label": "proportion_mature_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 0,
+            "maximum_absolute_SE_difference": 0
+          },
+          {
+            "label": "spawning_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0107779439313163,
+            "maximum_absolute_SE_difference": 0.000388351859271552
+          },
+          {
+            "label": "sum_selectivity",
+            "rows": 360,
+            "maximum_absolute_value_difference": 9.10207067494895e-07,
+            "maximum_absolute_SE_difference": 2.11894292355408e-08
+          },
+          {
+            "label": "total_catch_numbers",
+            "rows": 30,
+            "maximum_absolute_value_difference": 0.191579460981302,
+            "maximum_absolute_SE_difference": 0.0163916901765333
+          },
+          {
+            "label": "total_catch_weight",
+            "rows": 30,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "unfished_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0152893252598005,
+            "maximum_absolute_SE_difference": 0.000621804014372174
+          },
+          {
+            "label": "unfished_numbers_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 0.700158513849601,
+            "maximum_absolute_SE_difference": 0.0284748585982015
+          },
+          {
+            "label": "unfished_spawning_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0071810009649198,
+            "maximum_absolute_SE_difference": 0.00029204527731963
+          }
+        ]
+      }
+    },
+    {
+      "trial": "warm-3",
+      "initialize_seconds": 5.82999999999993,
+      "fit_seconds": 552.61,
+      "optimization_including_initial_mode_seconds": 33.9300000667572,
+      "initial_curvature_preconditioner_seconds": 1.06399989128113,
+      "outer_preconditioner_enabled": true,
+      "fitted_mode_and_report_evaluation_seconds": 0.00499987602233887,
+      "uncertainty_joint_hessian_seconds": 1.51600003242493,
+      "uncertainty_marginal_hessian_seconds": 512.02799987793,
+      "covariance_assembly_seconds": 0.00300002098083496,
+      "report_standard_errors_seconds": 0.115000009536743,
+      "final_gradient_seconds": 4.05699992179871,
+      "nested_costs": {
+        "conditional_mode": {
+          "optimization": {
+            "calls": 8,
+            "seconds": 4.81900000572205
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 125.672000169754
+          }
+        },
+        "laplace_joint_hessian": {
+          "optimization": {
+            "calls": 11,
+            "seconds": 5.92199945449829
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 86.41100025177
+          }
+        },
+        "laplace_third_derivatives": {
+          "optimization": {
+            "calls": 11,
+            "seconds": 21.8820004463196
+          },
+          "uncertainty_marginal_hessian": {
+            "calls": 98,
+            "seconds": 292.960999011993
+          }
+        }
+      },
+      "extract_validate_seconds": 0.0299999999997453,
+      "profile_setup_seconds": 0.0799999999999272,
+      "profile_finalize_seconds": 0.369999999999891,
+      "profile_snapshot_write_seconds": 7.00999999046326,
+      "profile_snapshot_count": 19,
+      "trial_wall_seconds": 558.92,
+      "cold_process_to_result_seconds": null,
+      "native_trial_wall_seconds": 184.42,
+      "trial_wall_ratio_to_native": 3.03069081444528,
+      "convergence": 0,
+      "optimizer": {
+        "convergence": 0,
+        "2": null,
+        "3": null,
+        "message": "converged"
+      },
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "marginal_objective": 3231.25994449968,
+      "joint_objective": 3164.83637094901,
+      "covariance_shape": [78, 78],
+      "covariance_cholesky_passed": true,
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "absolute_errors": {
+        "marginal_objective": 2.40015651797876e-09,
+        "joint_objective": 1.24230246001389e-06,
+        "maximum_estimate": 8.32792796323645e-06,
+        "maximum_parameter_SE": 2.11012385403775e-06,
+        "maximum_covariance": 1.12710314613407e-06,
+        "derived_by_family": [
+          {
+            "label": "agecomp_expected",
+            "rows": 720,
+            "maximum_absolute_value_difference": 6.10929661579718e-05,
+            "maximum_absolute_SE_difference": 9.50980549285774e-06
+          },
+          {
+            "label": "agecomp_proportion",
+            "rows": 720,
+            "maximum_absolute_value_difference": 3.0546483078403e-07,
+            "maximum_absolute_SE_difference": 4.75490274619295e-08
+          },
+          {
+            "label": "biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0245502468624181,
+            "maximum_absolute_SE_difference": 0.000785241853236585
+          },
+          {
+            "label": "catch_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "catch_numbers",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.191579460981302,
+            "maximum_absolute_SE_difference": 0.0163916901765333
+          },
+          {
+            "label": "catch_numbers_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.0883143658284098,
+            "maximum_absolute_SE_difference": 0.00839524482216802
+          },
+          {
+            "label": "catch_numbers_at_length",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 0.0554075190157164,
+            "maximum_absolute_SE_difference": 0.00500504182309669
+          },
+          {
+            "label": "catch_weight",
+            "rows": 60,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "catch_weight_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.00029365047612373,
+            "maximum_absolute_SE_difference": 2.47079653421522e-05
+          },
+          {
+            "label": "expected_recruitment",
+            "rows": 31,
+            "maximum_absolute_value_difference": 3.91141201858409,
+            "maximum_absolute_SE_difference": 0.210297581492341
+          },
+          {
+            "label": "index_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.0200192535630777,
+            "maximum_absolute_SE_difference": 0.000809644190894687
+          },
+          {
+            "label": "index_numbers",
+            "rows": 60,
+            "maximum_absolute_value_difference": 6.78539207181893,
+            "maximum_absolute_SE_difference": 0.230114382167812
+          },
+          {
+            "label": "index_numbers_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 2.04484728846001,
+            "maximum_absolute_SE_difference": 0.247788164546364
+          },
+          {
+            "label": "index_numbers_at_length",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 1.30562732345425,
+            "maximum_absolute_SE_difference": 0.063810059982643
+          },
+          {
+            "label": "index_weight",
+            "rows": 60,
+            "maximum_absolute_value_difference": 0.0200192535630777,
+            "maximum_absolute_SE_difference": 0.000809644190894687
+          },
+          {
+            "label": "index_weight_at_age",
+            "rows": 720,
+            "maximum_absolute_value_difference": 0.0107234259189681,
+            "maximum_absolute_SE_difference": 0.00238785896021909
+          },
+          {
+            "label": "lengthcomp_expected",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 1.00707452936888e-05,
+            "maximum_absolute_SE_difference": 6.69288807930712e-07
+          },
+          {
+            "label": "lengthcomp_proportion",
+            "rows": 1380,
+            "maximum_absolute_value_difference": 5.03537264662235e-08,
+            "maximum_absolute_SE_difference": 3.34644404027806e-09
+          },
+          {
+            "label": "log_catch_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 5.44392148071893e-06,
+            "maximum_absolute_SE_difference": 6.48707492112433e-07
+          },
+          {
+            "label": "log_index_expected",
+            "rows": 60,
+            "maximum_absolute_value_difference": 4.85782150683178e-06,
+            "maximum_absolute_SE_difference": 4.31029648056969e-07
+          },
+          {
+            "label": "mortality_F",
+            "rows": 360,
+            "maximum_absolute_value_difference": 2.6398523740867e-06,
+            "maximum_absolute_SE_difference": 6.91688092385734e-07
+          },
+          {
+            "label": "mortality_M",
+            "rows": 360,
+            "maximum_absolute_value_difference": 0,
+            "maximum_absolute_SE_difference": 0
+          },
+          {
+            "label": "mortality_Z",
+            "rows": 360,
+            "maximum_absolute_value_difference": 2.63985237403119e-06,
+            "maximum_absolute_SE_difference": 6.91688092385734e-07
+          },
+          {
+            "label": "numbers_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 3.91141201858409,
+            "maximum_absolute_SE_difference": 0.247782413141977
+          },
+          {
+            "label": "proportion_mature_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 0,
+            "maximum_absolute_SE_difference": 0
+          },
+          {
+            "label": "spawning_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0107779439313163,
+            "maximum_absolute_SE_difference": 0.000388351859271552
+          },
+          {
+            "label": "sum_selectivity",
+            "rows": 360,
+            "maximum_absolute_value_difference": 9.10207067494895e-07,
+            "maximum_absolute_SE_difference": 2.11894292355408e-08
+          },
+          {
+            "label": "total_catch_numbers",
+            "rows": 30,
+            "maximum_absolute_value_difference": 0.191579460981302,
+            "maximum_absolute_SE_difference": 0.0163916901765333
+          },
+          {
+            "label": "total_catch_weight",
+            "rows": 30,
+            "maximum_absolute_value_difference": 2.54507258432568e-05,
+            "maximum_absolute_SE_difference": 6.43786588483408e-07
+          },
+          {
+            "label": "unfished_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0152893252598005,
+            "maximum_absolute_SE_difference": 0.000621804014372174
+          },
+          {
+            "label": "unfished_numbers_at_age",
+            "rows": 372,
+            "maximum_absolute_value_difference": 0.700158513849601,
+            "maximum_absolute_SE_difference": 0.0284748585982015
+          },
+          {
+            "label": "unfished_spawning_biomass",
+            "rows": 31,
+            "maximum_absolute_value_difference": 0.0071810009649198,
+            "maximum_absolute_SE_difference": 0.00029204527731963
+          }
+        ]
+      }
+    }
+  ],
+  "warm_trial_wall_seconds": {
+    "values": [995.91, 790.36, 558.92],
+    "mean": 781.73,
+    "median": 790.36,
+    "minimum": 558.92,
+    "maximum": 995.91,
+    "standard_deviation": 218.622786323841,
+    "native_median": 187.67,
+    "median_ratio_to_native": 4.21143496563116
+  },
+  "validation": {
+    "completed_trials_converged": true,
+    "fixed_gradients_below_1e_3": true,
+    "complete_78_by_78_covariance_finite_and_positive_definite": true,
+    "all_32_required_derived_SE_families_finite": true,
+    "completed_trials_match_native_at_existing_tolerances": true,
+    "full_precision_starts_identical_between_trials": true,
+    "warm_numerical_outputs_match_cold_at_existing_tolerances": true,
+    "serialized_artifacts_pointer_free": true,
+    "live_Julia_snapshots_observed_during_run": true
+  },
+  "raw_local_session_artifact": "p3-julia-full-03",
+  "performance_parity_established": false,
+  "phase_timestamp_format": "LF-normalized portable copies; timestamps unchanged.",
+  "artifact_md5": {
+    "input.rds": "ad075166d27afabb8dbe224aa73b84c6",
+    "julia/cold/result.rds": "755173445ec8e330e974ccdeff193c89",
+    "julia/warm-1/result.rds": "6af09ced73bd34313150e822c082cf88",
+    "julia/warm-2/result.rds": "cd796437794652e9f9630e186ef33723",
+    "julia/warm-3/result.rds": "4642506a32ed8c0c35ee96faee496b8d",
+    "julia/progress.tsv": "2f089e1c00f21dba12724b19d8520aa6",
+    "julia/cold/optimizer.progress": "970617029e517e03ea0b21a019aae438",
+    "julia/warm-1/optimizer.progress": "5111010f60707d88e33b9b2d21f10300",
+    "julia/warm-2/optimizer.progress": "024efac9edd5c6bc89e1b546bea277c7",
+    "julia/warm-3/optimizer.progress": "02eb1fc693397a339093932676dbf157",
+    "julia/cold/julia-profile/snapshots.tsv": "79f7fd1f421f91664017bdbcbb3e6cd5",
+    "julia/warm-1/julia-profile/snapshots.tsv": "26e9aa1a1a2e34901ca4ce3047bb29f7",
+    "julia/warm-2/julia-profile/snapshots.tsv": "5dd87344a92ecbf11e31ab9cf1dcc786",
+    "julia/warm-3/julia-profile/snapshots.tsv": "48c12c36bef00b25a2003dd5c21a7eeb"
+  }
+}

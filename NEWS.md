@@ -44,6 +44,9 @@
   Coupled fits precondition outer search directions with positive-definite
   profiled joint curvature at the initial conditional mode; exact Laplace
   derivatives and inferential covariance calculations are unchanged.
+  Fresh matched cold and three warm full fits pass the native numerical
+  gates. Julia's warm median is 790.36 seconds versus native's 187.67;
+  the complete-fit performance requirement is not yet met.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
