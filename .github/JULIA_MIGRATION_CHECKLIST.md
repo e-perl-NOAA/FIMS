@@ -436,6 +436,17 @@ fit is not acceptance evidence.
   preserves all eight results, unchanged starts/controls/uncertainty outputs,
   source hashes and timing distributions. Native sources/DLL still match P2.
 
+  **Rejected follow-up:** `ef809dd1` kept constant parameter components outside
+  nested AD. Although all 281 candidate assertions, 216 real configurations and
+  complete numerical pairs passed, shared-process first-use elapsed regressed
+  325.91 to 352.26 seconds and compilation 122.20 to 136.73. Three warm pairs
+  gave a modest median 6.8% reduction, with one regression. The experiment was
+  reverted; production source/tests exactly match accepted `8f8d46fe`.
+  [All rejected measurements](../data-raw/benchmarks/constant-components-2026-11-24/comparison.json)
+  are retained. Next isolate first-use compilation/report/profiler costs and
+  evaluate precompilation or a larger derivative redesign; neither is
+  implemented or accepted yet. Do not relax the cold threshold.
+
   **Not passed:** 2026-11-24, measured candidate `569e01ef` (includes P4/P5).
   The existing full `--backend both` protocol completed one cold and three
   original-input warm fits per backend in separate processes on the same

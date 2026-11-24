@@ -759,6 +759,45 @@ above also identify substantial compilation cost. Further work must reduce
 first-use compilation and differentiated computation rather than exempt
 startup or move unreported work outside the timer.
 
+### Rejected constant-component experiment: 2026-11-24
+
+Candidate `ef809dd1` preserved inactive parameter components outside nested
+AD using typed parameter readers, kept constant population weights/maturity
+in their original numeric types, and supported mixed numeric recruitment/
+selectivity inputs. It passed 281 backend assertions, 216 fresh real
+configuration comparisons and every complete-fit numerical comparison.
+Nevertheless it was **reverted**, not retained as a cold-start fix.
+The [rejected experiment record](benchmarks/constant-components-2026-11-24/comparison.json)
+preserves all eight full-precision fits, phase/snapshot indices, fingerprints
+and compilation/GC/allocation costs against immutable `8f8d46fe`.
+
+| Warm pair order | Prepared baseline (s) | Experiment (s) | Experiment/baseline |
+| --- | ---: | ---: | ---: |
+| AB | 179.5743 | 181.3128 | 1.009682 |
+| BA | 184.7227 | 166.9131 | 0.903587 |
+| AB | 177.5042 | 165.4516 | 0.932100 |
+
+The median paired warm reduction was 6.8%, with one regression. Cumulative
+allocations fell about 7.2%, from 314.09 to 291.50 GB per warm fit.
+However shared-process first-use elapsed increased from **325.91 to 352.26
+seconds**, and measured compilation from **122.20 to 136.73 seconds**.
+These are not independent cold-process measurements, but provide no evidence
+that this additional complexity addresses the outstanding cold-start gap.
+All timings include live profiling; no work or slower trials were excluded.
+Raw local artifact `p6-constant-pairs-01` retains full profiles/logs and the
+active Project/Manifest. All six baseline source blobs matched Git.
+
+Production backend source and tests were restored byte-for-byte to accepted
+`8f8d46fe`, whose separate-process acceptance record above remains applicable.
+Its 271 backend assertions and 216 real configuration comparisons remain the
+retained implementation's results; the discarded candidate's additional
+assertions are not counted as production coverage. **P6 is still open.**
+The next investigation should isolate first-use compilation and report/
+profiler startup costs before choosing a package-level precompilation or
+larger derivative redesign. Do not repeat this rejected experiment, claim
+precompilation is implemented, add dependencies without discussion, or hide
+preparation costs to obtain a passing cold result.
+
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
 **This earlier attempt did not complete P3.** The cold Julia fit passed the full native numerical

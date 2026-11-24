@@ -60,41 +60,11 @@ function _named_component_array(x, parameter_layout)
   ComponentArray(NamedTuple{Tuple(parameter_layout)}(Tuple(x)))
 end
 
-function _parameter_component_reader(component, indices, active)
-  if !active
-    constant = copy(component)
-    return parameters -> constant
-  elseif component isa Number
-    index = first(indices)
-    return parameters -> parameters[index]
-  end
-  dimensions = size(component)
-  parameters -> reshape(view(parameters, indices), dimensions)
-end
-
-_prepared_parameter_reader(layout, active_indices) =
-  parameters -> _named_component_array(parameters, layout)
-
-function _prepared_parameter_reader(layout::ComponentArray, active_indices)
-  active = isnothing(active_indices) ? trues(length(layout)) : falses(length(layout))
-  isnothing(active_indices) || (active[active_indices] .= true)
-  names = Tuple(propertynames(layout))
-  offset = 0
-  readers = map(names) do name
-    component = getproperty(layout, name)
-    indices = (offset + 1):(offset + length(component))
-    offset += length(component)
-    _parameter_component_reader(component, indices, any(view(active, indices)))
-  end
-  parameters -> NamedTuple{names}(map(reader -> reader(parameters), readers))
-end
-
-function _prepared_joint_objective(parameter_layout, data_dict, config, active_indices = nothing)
+function _prepared_joint_objective(parameter_layout, data_dict, config)
   prepared_data = _prepare_model_input(data_dict)
   prepared_config = _prepare_model_input(config)
-  read_parameters = _prepared_parameter_reader(parameter_layout, active_indices)
-  parameters -> _evaluate_model_parameters(
-    read_parameters(parameters),
+  parameters -> _evaluate_model(
+    _named_component_array(parameters, parameter_layout),
     prepared_data, prepared_config, Val(false),
   )
 end
@@ -373,9 +343,7 @@ function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, 
   derivative_order in (0, 1, 2, 3) ||
     throw(ArgumentError("derivative_order must be 0, 1, 2, or 3 (report)."))
   options = _optimizer_options(objective_config)
-  joint_objective = _prepared_joint_objective(
-    parameter_layout, data_dict, objective_config, vcat(fixed_indices, random_indices),
-  )
+  joint_objective = _prepared_joint_objective(parameter_layout, data_dict, objective_config)
   objective = fixed -> begin
     result = _conditional_mode(
       x0, fixed_indices, fixed, random_indices, joint_objective, options,
@@ -558,9 +526,7 @@ function fit_model(init_params, data_dict, config = Dict())
   random_indices = findall(random_mask)
   active_indices = findall(fixed_mask .| random_mask)
   fixed_start = x0[fixed_indices]
-  joint_objective = _prepared_joint_objective(
-    parameter_layout, data_dict, objective_config, active_indices,
-  )
+  joint_objective = _prepared_joint_objective(parameter_layout, data_dict, objective_config)
 
   function conditional_mode(fixed_values, initial_parameters = x0; preconditioner = nothing)
     _optimizer_checkpoint(diagnostic_file, "conditional_mode:start")

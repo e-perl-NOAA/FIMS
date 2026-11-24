@@ -1,0 +1,10 @@
+epoch_seconds	stage
+1795542633.397722	cold-1-baseline
+1795542970.414320	cold-2-candidate
+1795543323.816276	warm-3-baseline
+1795543504.683187	warm-4-candidate
+1795543687.238366	warm-5-candidate
+1795543855.334692	warm-6-baseline
+1795544041.182498	warm-7-baseline
+1795544219.970408	warm-8-candidate
+1795544386.861349	complete

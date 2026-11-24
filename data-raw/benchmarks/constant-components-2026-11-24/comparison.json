@@ -1,0 +1,380 @@
+{
+  "schema": 1,
+  "checklist_item": "P6 recovery",
+  "status": "rejected_cold_regression",
+  "performance_acceptance_established": false,
+  "date": "2026-11-24",
+  "baseline_revision": "8f8d46fe",
+  "candidate_revision": "ef809dd1d3228ae1db561289a406e4553c90f7dc",
+  "input_md5": "ad075166d27afabb8dbe224aa73b84c6",
+  "process_timeout_seconds": 7200,
+  "candidate_source_md5": {
+    "R/FIMS-package.R": "66d8d4ca69920506fb513dace3184bc3",
+    "R/augment-fims.R": "9f4dc0595b42c199a6a9c896be91333c",
+    "R/check_convergence.R": "62115dea9869d7f8d6752a116dd28bff",
+    "R/data_big.R": "9244e733bd756def26b8f1c42210a782",
+    "R/distribution_families.R": "4ff36327b895d5ae8fea70525e80fb62",
+    "R/fims_distributions.R": "963b356cf0b697d01dc38dfb4588d278",
+    "R/fims_input_types.R": "31f1b1689d265b6fa1850097faef6fd1",
+    "R/fims_likelihood.R": "0f3a25af5f5455660e4d76eb7379dbed",
+    "R/fims_retro.R": "ef97e4aec04e89acb6ffe339625f30fa",
+    "R/fimsfit.R": "2e7c10772cd71e69e3c056b8cff1e883",
+    "R/fimsframe.R": "0add5dda7266f5b37dedd1227b741c70",
+    "R/initialize_modules.R": "813741b245aa85b76ff849c41b21acad",
+    "R/is_fims_verbose.R": "03d98c153f3978a631ceb23eaa20d64a",
+    "R/julia_backend.R": "0fb09141cf587acbabfee6478463db8e",
+    "R/mohns_rho.R": "914a41acb16eabd3e31b8a79bca1de35",
+    "R/parse_data_distribution.R": "5527d0f5aba8ef03c1ba5343cfd40da8",
+    "R/plot_likelihood.R": "ff24ab3ff81ed07aba55f1b89c7e02aa",
+    "R/run_modified_fims.R": "04c021ff7d01446b95f4163747a65b08",
+    "R/setup_default_parameters.R": "42ee2651bc3bec2ec2e0806064b51438",
+    "R/setup_julia.R": "2aed38975029c26111e78bd280d958ed",
+    "R/simulate_julia.R": "0e50c84d5b70f7ff300834e2d81f3628",
+    "R/tidy-glance-fims.R": "0f848153d7b433561d5227c7cd3f2c48",
+    "R/use-testthat-template.R": "9d72c3ced04e0077d936282d0f2f8211",
+    "R/utils.R": "159d216dc57ca2d936005a66fdcf3e91",
+    "R/zzz.R": "435298f94386f2fe9b4c23bd6efc0a9c",
+    "inst/julia/FIMSBackend/Project.toml": "e770dc45f78e53dfb8a6038ddd74eb8b",
+    "inst/julia/FIMSBackend/src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+    "inst/julia/FIMSBackend/src/modules/population.jl": "c89e23e831dbaec4a9ead90165afc203",
+    "inst/julia/FIMSBackend/src/modules/recruitment.jl": "0532aa9b557e80e09cc8ac746cea9015",
+    "inst/julia/FIMSBackend/src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+    "inst/julia/FIMSBackend/src/objective.jl": "8551407a2bc96e3deec4892265ad8647",
+    "inst/julia/FIMSBackend/src/optimizer.jl": "6e1fc370ba9ed2d5e57eb3d9979826b3",
+    "inst/julia/FIMSBackend/test/runtests.jl": "fb5ce41575d39467f15af62999983a81",
+    "inst/julia/setup.jl": "870e7eb2c3d367164d1420c25f2f297c"
+  },
+  "baseline_source_md5": {
+    "src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+    "src/modules/population.jl": "c89e23e831dbaec4a9ead90165afc203",
+    "src/modules/recruitment.jl": "aa7798fb92987f38c9375213cfba1107",
+    "src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+    "src/objective.jl": "57ef1e3eb6b790a0754980ac92257f80",
+    "src/optimizer.jl": "509a49cd2c9ab4f217ec588926878f4f"
+  },
+  "driver_md5": {
+    "benchmark_uncertainty_preconditioner.R": "d49f9116699b1ec016ba546c503b3419",
+    "benchmark_uncertainty_preconditioner.jl": "a44f1d7ea46417d4ab0e504a0d3ca20e",
+    "benchmark_profile.jl": "50f5fa46397894180e9c3c5a12b356d3"
+  },
+  "environment": {
+    "R": "R version 4.6.2 (2026-10-29 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "revision": "ef809dd1d3228ae1db561289a406e4553c90f7dc",
+    "threads": {
+      "JULIA_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    },
+    "julia_version": "1.10.10",
+    "julia_blas": "LBTConfig([ILP64] libopenblas64_.dll)",
+    "julia_blas_threads": 1
+  },
+  "Julia_package_versions": {
+    "Optim": "1.13.3",
+    "ForwardDiff": "0.10.39",
+    "ComponentArrays": "0.15.50",
+    "Functors": "0.5.5",
+    "StatsBase": "0.34.14"
+  },
+  "active_Julia_manifest_md5": "8719f3f74dbb7628b87fd8f8c80a88b1",
+  "implementation": "Preserve inactive parameter components outside nested AD in a typed NamedTuple; preserve constant weight/maturity element types and mixed recruitment and selectivity scalar types. All exact derivatives and uncertainty/report work retained. Rejected for the cold-start objective: shared-process first-use elapsed and compilation increased despite a modest warm improvement. Do not retain as a P6 fix.",
+  "boundaries": "Entire Julia fit_model call, including JIT, GC, optimization and all uncertainty/report work. Excludes high-level R initialization/adapters/extraction and between-trial GC symmetrically. Both modules share one process; the two first-use trials are not independent cold-process measurements. Three original-start AB/BA/AB warm pairs. Live phase/profiler costs included without subtraction. Shared interactive workstation, not an isolated native/Julia acceptance experiment.",
+  "trials": [
+    {
+      "compilation_seconds": 122.2036097,
+      "backend": "baseline",
+      "recompilation_seconds": 0.0707341,
+      "gc_seconds": 12.2314511,
+      "seconds": 325.9099573,
+      "allocated_bytes": 319577024736,
+      "warmup": true,
+      "trial": "cold-1-baseline",
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "optimization_seconds": 122.530999898911,
+      "marginal_hessian_seconds": 140.868000030518,
+      "conditional": {
+        "calls": 98,
+        "seconds": 16.7119996547699
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 32.5240015983582
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 88.8889997005463
+      },
+      "snapshot_count": 11,
+      "snapshot_write_seconds": 46.6030004024506
+    },
+    {
+      "compilation_seconds": 136.7276514,
+      "backend": "candidate",
+      "recompilation_seconds": 0,
+      "gc_seconds": 13.524198,
+      "seconds": 352.2635429,
+      "allocated_bytes": 295879665576,
+      "warmup": true,
+      "trial": "cold-2-candidate",
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "optimization_seconds": 144.651000022888,
+      "marginal_hessian_seconds": 141.608000040054,
+      "conditional": {
+        "calls": 98,
+        "seconds": 17.7530000209808
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 31.0500011444092
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 90.2380013465881
+      },
+      "snapshot_count": 11,
+      "snapshot_write_seconds": 53.583000421524
+    },
+    {
+      "compilation_seconds": 0,
+      "backend": "baseline",
+      "recompilation_seconds": 0,
+      "gc_seconds": 9.0116798,
+      "seconds": 179.5742634,
+      "allocated_bytes": 314091160040,
+      "warmup": false,
+      "trial": "warm-3-baseline",
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "optimization_seconds": 20.7360000610352,
+      "marginal_hessian_seconds": 155.72000002861,
+      "conditional": {
+        "calls": 98,
+        "seconds": 19.1910014152527
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 35.7519996166229
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 99.0640008449554
+      },
+      "snapshot_count": 7,
+      "snapshot_write_seconds": 1.48400020599365
+    },
+    {
+      "compilation_seconds": 0,
+      "backend": "candidate",
+      "recompilation_seconds": 0,
+      "gc_seconds": 9.4533976,
+      "seconds": 181.3128361,
+      "allocated_bytes": 291499517384,
+      "warmup": false,
+      "trial": "warm-4-candidate",
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "optimization_seconds": 18.6129999160767,
+      "marginal_hessian_seconds": 160.039999961853,
+      "conditional": {
+        "calls": 98,
+        "seconds": 20.3139977455139
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 36.1240010261536
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 101.68399977684
+      },
+      "snapshot_count": 7,
+      "snapshot_write_seconds": 1.52900075912476
+    },
+    {
+      "compilation_seconds": 0,
+      "backend": "candidate",
+      "recompilation_seconds": 0,
+      "gc_seconds": 8.6231073,
+      "seconds": 166.9131214,
+      "allocated_bytes": 291499037864,
+      "warmup": false,
+      "trial": "warm-5-candidate",
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "optimization_seconds": 18.8710000514984,
+      "marginal_hessian_seconds": 145.324000120163,
+      "conditional": {
+        "calls": 98,
+        "seconds": 17.7210009098053
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 32.5169999599457
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 93.3229978084564
+      },
+      "snapshot_count": 7,
+      "snapshot_write_seconds": 1.41400003433228
+    },
+    {
+      "compilation_seconds": 0,
+      "backend": "baseline",
+      "recompilation_seconds": 0,
+      "gc_seconds": 8.8552398,
+      "seconds": 184.7227125,
+      "allocated_bytes": 314094511528,
+      "warmup": false,
+      "trial": "warm-6-baseline",
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "optimization_seconds": 21.010999917984,
+      "marginal_hessian_seconds": 161.37700009346,
+      "conditional": {
+        "calls": 98,
+        "seconds": 19.7960000038147
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 37.6559989452362
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 102.161999464035
+      },
+      "snapshot_count": 8,
+      "snapshot_write_seconds": 1.47700023651123
+    },
+    {
+      "compilation_seconds": 0,
+      "backend": "baseline",
+      "recompilation_seconds": 0,
+      "gc_seconds": 8.4073792,
+      "seconds": 177.5041806,
+      "allocated_bytes": 314091572904,
+      "warmup": false,
+      "trial": "warm-7-baseline",
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "optimization_seconds": 11.5999999046326,
+      "marginal_hessian_seconds": 163.208999872208,
+      "conditional": {
+        "calls": 98,
+        "seconds": 20.4289982318878
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 37.7819991111755
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 103.104998350143
+      },
+      "snapshot_count": 7,
+      "snapshot_write_seconds": 1.58499979972839
+    },
+    {
+      "compilation_seconds": 0,
+      "backend": "candidate",
+      "recompilation_seconds": 0,
+      "gc_seconds": 8.1725703,
+      "seconds": 165.4516014,
+      "allocated_bytes": 291499227264,
+      "warmup": false,
+      "trial": "warm-8-candidate",
+      "max_absolute_fixed_gradient": 9.70785316717349e-10,
+      "optimization_seconds": 18.9179999828339,
+      "marginal_hessian_seconds": 143.769999980927,
+      "conditional": {
+        "calls": 98,
+        "seconds": 17.6060009002686
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 32.069000005722
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 92.2899978160858
+      },
+      "snapshot_count": 7,
+      "snapshot_write_seconds": 1.45499968528748
+    }
+  ],
+  "warm_pairs": [
+    {
+      "baseline": "warm-3-baseline",
+      "candidate": "warm-4-candidate",
+      "complete_fit_ratio": 1.00968163626058,
+      "allocation_ratio": 0.928072975205278
+    },
+    {
+      "baseline": "warm-6-baseline",
+      "candidate": "warm-5-candidate",
+      "complete_fit_ratio": 0.903587431892004,
+      "allocation_ratio": 0.92806154569821
+    },
+    {
+      "baseline": "warm-7-baseline",
+      "candidate": "warm-8-candidate",
+      "complete_fit_ratio": 0.932099744584832,
+      "allocation_ratio": 0.928070831601378
+    }
+  ],
+  "warm_complete_fit_ratio": {
+    "values": [1.00968163626058, 0.903587431892004, 0.932099744584832],
+    "median": 0.932099744584832,
+    "mean": 0.948456270912471,
+    "minimum": 0.903587431892004,
+    "maximum": 1.00968163626058,
+    "standard_deviation": 0.0549058012898476
+  },
+  "warm_complete_fit_seconds": {
+    "baseline": {
+      "values": [179.5742634, 184.7227125, 177.5041806],
+      "median": 179.5742634,
+      "mean": 180.6003855,
+      "minimum": 177.5041806,
+      "maximum": 184.7227125,
+      "standard_deviation": 3.71705469705662
+    },
+    "candidate": {
+      "values": [181.3128361, 166.9131214, 165.4516014],
+      "median": 166.9131214,
+      "mean": 171.225852966667,
+      "minimum": 165.4516014,
+      "maximum": 181.3128361,
+      "standard_deviation": 8.76609558051436
+    }
+  },
+  "validation": {
+    "eight_fits_converged": true,
+    "active_covariance_PD": true,
+    "complete_pair_objectives_estimates_covariance_hessians_parameter_and_report_SEs_match": true,
+    "uncertainty_98_solves_and_exact_gradients_per_fit": true,
+    "warm_compilation_zero": true,
+    "backend_assertions_passed": 281,
+    "fresh_real_configuration_comparisons_passed": 216,
+    "baseline_six_source_blobs_verified_against_Git": true,
+    "pointer_free_portable_artifacts": true
+  },
+  "raw_local_session_artifact": "p6-constant-pairs-01",
+  "artifact_md5": {
+    "cold-1-baseline/julia-profile/snapshots.tsv": "dc1ed8527e5c33da88c4c4afc1a1c00f",
+    "cold-1-baseline/optimizer.progress": "cc8b4b63af4a01c0b551fd32dadf4aa5",
+    "cold-2-candidate/julia-profile/snapshots.tsv": "b324172964c4d8cbb5edceb2f73c5994",
+    "cold-2-candidate/optimizer.progress": "421ddef8c7f06f69aa6048d124cc5a68",
+    "progress.tsv": "ff47a2d65e61e9adcff30aff8809f8fb",
+    "results.rds": "1972433f1540d9fbe1b5d88d9a2055a4",
+    "warm-3-baseline/julia-profile/snapshots.tsv": "92897eca6e420cf32fbe2001cf9cbc31",
+    "warm-3-baseline/optimizer.progress": "79f785f79b402e6c83a93c3f95370161",
+    "warm-4-candidate/julia-profile/snapshots.tsv": "592184e3b8927a18b23e0929665c76c9",
+    "warm-4-candidate/optimizer.progress": "dc746f13d8b7b2b9cb0852078c37ca19",
+    "warm-5-candidate/julia-profile/snapshots.tsv": "cdb2c76e44941f18bd89e46a62557a13",
+    "warm-5-candidate/optimizer.progress": "3b7b4cdb85dfef09e167a77888a568b2",
+    "warm-6-baseline/julia-profile/snapshots.tsv": "77a64108d6667fa8ef8224f8ab761aed",
+    "warm-6-baseline/optimizer.progress": "d43608c3b50d1cb4c90223a24bdc1d03",
+    "warm-7-baseline/julia-profile/snapshots.tsv": "f3b257640387a344c331e70c75bb50ce",
+    "warm-7-baseline/optimizer.progress": "bd085697f8924ef955b934af1b12508b",
+    "warm-8-candidate/julia-profile/snapshots.tsv": "35e74935b2154eeed93a1fb0e1e4b9a1",
+    "warm-8-candidate/optimizer.progress": "b403df0f050fd3de42688cf07855a6a6"
+  }
+}

@@ -536,37 +536,13 @@ end
   prepared_q = values -> prepared_joint(
     collect(ComponentArray(merge(parameter_values, (log_q = values,)))),
   )
-  index_layout = ComponentArray(collect(1:length(parameters)), FIMSBackend.getaxes(parameters))
-  q_indices = collect(index_layout.log_q)
-  constant_joint = FIMSBackend._prepared_joint_objective(parameters, data, config, q_indices)
-  constant_q = values -> constant_joint(
-    collect(ComponentArray(merge(parameter_values, (log_q = values,)))),
-  )
   for values in (copy(parameters.log_q), parameters.log_q .+ [0.03, -0.02])
     @test prepared_q(values) ≈ reference_q(values) atol = 1e-10
     @test FIMSBackend.gradient(prepared_q, values) ≈
           FIMSBackend.gradient(reference_q, values) atol = 1e-10
     @test FIMSBackend.hessian(prepared_q, values) ≈
           FIMSBackend.hessian(reference_q, values) atol = 1e-10
-    @test constant_q(values) ≈ reference_q(values) atol = 1e-10
-    @test FIMSBackend.gradient(constant_q, values) ≈
-          FIMSBackend.gradient(reference_q, values) atol = 1e-10
-    @test FIMSBackend.hessian(constant_q, values) ≈
-          FIMSBackend.hessian(reference_q, values) atol = 1e-10
   end
-  read_parameters = FIMSBackend._prepared_parameter_reader(parameters, q_indices)
-  FIMSBackend.gradient(parameters.log_q) do values
-    components = read_parameters(collect(ComponentArray(merge(parameter_values, (log_q = values,)))))
-    @test eltype(components.log_M) == Float64
-    @test eltype(components.log_q) <: FIMSBackend.ForwardDiff.Dual
-    sum(components.log_q)
-  end
-  shifted_parameters = copy(parameters)
-  shifted_parameters.log_M .+= 0.02
-  shifted_joint = FIMSBackend._prepared_joint_objective(shifted_parameters, data, config, q_indices)
-  @test shifted_joint(collect(shifted_parameters)) ≈
-        evaluate_nll(shifted_parameters, data, config) atol = 1e-10
-  @test shifted_joint(collect(shifted_parameters)) != constant_joint(collect(parameters))
   changed_config = merge(config, Dict(:catch_sigma => 0.2))
   changed_joint = FIMSBackend._prepared_joint_objective(parameters, data, changed_config)
   @test changed_joint(collect(parameters)) ≈ evaluate_nll(parameters, data, changed_config) atol = 1e-10
