@@ -801,12 +801,118 @@ Production backend source and tests were restored byte-for-byte to accepted
 `8f8d46fe`, whose separate-process acceptance record above remains applicable.
 Its 271 backend assertions and 216 real configuration comparisons remain the
 retained implementation's results; the discarded candidate's additional
-assertions are not counted as production coverage. **P6 is still open.**
-The next investigation should isolate first-use compilation and report/
-profiler startup costs before choosing a package-level precompilation or
-larger derivative redesign. Do not repeat this rejected experiment, claim
-precompilation is implemented, add dependencies without discussion, or hide
-preparation costs to obtain a passing cold result.
+assertions are not counted as production coverage. **P6 was still open at
+this stage.** The next investigation isolated first-use compilation and report/
+profiler startup costs before choosing the precompilation recovery below.
+The rejected experiment remains discarded; preparation costs must not be hidden.
+
+## P6 completed: precompiled full-fit gate, 2026-11-24
+
+Measured implementation **`be1af3e5`** passes the specified prepared-dependency
+cold-process and warm-median gates, retaining complete native numerical parity.
+This closes **P6**, not the overall migration or all-platform performance.
+
+### Attribution and implementation
+
+The [preceding attribution record](benchmarks/cold-attribution-2026-11-24/comparison.json)
+uses the unchanged accepted prepared-objective backend (`8f8d46fe`) in one
+fresh R process, with a cold and original-start warm full fit. Both pass the
+independent native numerical comparison. Cold process-to-result was 448.10
+seconds; trial walls were 423.12 cold and 182.22 warm. Measured compilation
+was **154.96 seconds cold / zero warm**, and snapshot writing 60.45/1.39 seconds.
+Compilation, GC, observer writing and phase elapsed overlap; this is not a
+disjoint attribution or a fresh native performance comparison.
+
+The recovery adds PrecompileTools 1.2.1 to cache representative exact derivative
+workloads in ordinary Julia package images. Training uses synthetic 17-year/
+four-age and three-year/three-age inputs, not the measured full assessment's
+30 years, 12 ages and 23 length bins. It exercises conditional solves, joint
+Hessians, exact Laplace trace chunk widths, report Jacobians and a bounded fit.
+No fitted values, native outputs, uncertainty results or benchmark-specific
+production branches are cached.
+
+Private scalar/report function barriers keep layout-specific closure types
+out of nested ForwardDiff tags, and the numerical kernel receives named
+parameter fields without dimension-specific ComponentArray axes. Unused
+optimizer metadata is removed only from the prepared numerical context.
+Logistic/DoubleLogistic selectivity is reused across years; year-specific
+AgeSpecific evaluation is retained. Fishing-rate exponentials are reused
+across ages, and supplied spawning biomass per recruit avoids eager duplicate
+calculation. Parameters, conditional modes, exact derivatives and all
+uncertainty/report work remain live.
+
+The standard Julia `Pkg.test()` run passed **275 assertions**, including
+independent coupled/permuted-order derivative oracles and context independence
+across dimensions. The existing real R-to-Julia joint-configuration test
+passed **216 comparisons**, including parametric growth and priors. These are
+real numerical checks, not mocked bridge evidence.
+
+### Complete final protocol and result
+
+The final command was the unchanged full `--backend both --warm-runs 3
+--restarts 3` command above, with a new output directory. Input checksum
+`ad075166d27afabb8dbe224aa73b84c6`, controls 10000/10000, 49 fixed/29 random
+effects, single-thread settings, tolerances, full covariance/report SEs,
+live profiling and the 7,200-second worker cap were unchanged. Native sources
+and DLL still match the independent P2 oracle. No startup or uncertainty
+exemption was applied.
+
+The [passing acceptance record](benchmarks/precompiled-full-2026-11-24/comparison.json)
+retains all eight full-precision results, input, host samples, phase records,
+snapshot indices, compilation counters, preparation costs and checksums.
+All eight fits converged with maximum absolute fixed gradient below `1e-3`,
+positive-definite 78-by-78 covariance and all 32 required report-SE families
+(13,091 rows). All four native/Julia comparisons and cold/warm repetitions
+passed; original full-precision starts were identical.
+
+| Complete elapsed measure, seconds | Native | Julia |
+| --- | ---: | ---: |
+| Cold process launch to validated result | 448.54 | 260.60 |
+| Cold trial wall | 418.92 | 210.64 |
+| Warm-1 wall | 435.84 | 172.89 |
+| Warm-2 wall | 387.78 | 108.18 |
+| Warm-3 wall | 387.34 | 92.08 |
+| Warm median | 387.78 | 108.18 |
+| Warm mean | 403.65 | 124.38 |
+| Warm sample standard deviation | 27.88 | 42.77 |
+
+Both measured ratios are at most one: cold **0.580989**, warm median
+**0.278973**. Julia cold compilation was **28.61 seconds**, with zero
+compilation/recompilation in all three warm fits. Each fit still performed
+all **98** uncertainty conditional solves/exact marginal gradients.
+Marginal-Hessian elapsed was 134.91 seconds cold and
+139.64/78.00/74.93 warm; included snapshot writing was
+17.99 seconds cold and 5.49/2.19/1.32 warm. No observer costs were subtracted.
+
+### Preparation cost and interpretation
+
+`julia/package-preparation.toml` preserves the actual preceding standalone
+preparation, not just the later cached prepare wrapper: **738.66 seconds**
+total, comprising dependency resolution **8.90**, precompilation **717.19**
+and backend loading **12.57** seconds. Existing dependencies were reused;
+this is not a clean-depot install timing. A separate bounds-checking Julia
+test environment also spent about 866 seconds preparing its own image.
+An unprepared first fit pays preparation; `setup_julia()` makes that work
+explicit before analysis. Backend updates can invalidate the cache.
+
+These are **qualified shared-host measurements**, not an isolated causal
+72% warm speedup or a guarantee for other workloads/platforms. Native ran
+first; host load varied substantially, some CPU samples were unavailable,
+and native elapsed times were slower than earlier attempts. Native warm
+CPU medians were approximately 66%; Julia observations were variable and
+incomplete. Missing samples and every slower trial are retained, not imputed
+or discarded. No concurrent agent builds/tests/model fits were launched and
+no unrelated host processes/settings were changed. A reserved/interleaved
+study would provide stronger causal attribution, but no such claim is made.
+
+The actual source hashes, covariance Cholesky decompositions, starts,
+numerical comparisons, profile-write sums, monotonically increasing counters
+and portable artifact checksums were independently rechecked. Raw local
+artifact `p6-precompiled-full-01` retains full sampling windows, logs and
+the active bridge Project/Manifest. Windows x64, R 4.6.2, Julia 1.10.10,
+Optim 1.13.3, ForwardDiff 0.10.39, ComponentArrays 0.15.50,
+Functors 0.5.5, StatsBase 0.34.14 and PrecompileTools 1.2.1.
+The next ready checklist item is **N1**.
 
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 

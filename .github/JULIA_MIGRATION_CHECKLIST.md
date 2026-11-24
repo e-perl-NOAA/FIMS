@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **P6**.
+   Name that item before starting. The default next item is **N1**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -400,7 +400,7 @@ fit is not acceptance evidence.
   profiles, logs and active dependency Project/Manifest. Windows x64,
   R 4.6.2, Julia 1.10.10, single Julia/BLAS thread.
 
-- [ ] **P6 - Pass the final matched full-fit performance gate.**
+- [x] **P6 - Pass the final matched full-fit performance gate.**
   **Depends on:** P2, P3 and any necessary performance fixes.
   **Done when:** repeat the matched protocol on the candidate containing the
   accepted fixes. Numerical gates still pass and Julia meets the user's
@@ -409,6 +409,49 @@ fit is not acceptance evidence.
   the best run. Any exception for startup or uncertainty needs explicit user
   agreement. If it is slower, this stays unchecked and further bounded,
   evidence-based performance work is required.
+
+  **Completed:** 2026-11-24, measured implementation `be1af3e5`. Representative
+  PrecompileTools workloads cache derivative code across model dimensions;
+  private function barriers keep model-layout types out of nested AD tags.
+  Year-invariant selectivity and fishing-rate exponentials are evaluated once
+  per applicable age or year/fleet, rather than repeatedly inside population
+  loops. All parameter-dependent values, exact derivatives, conditional modes,
+  covariance and report SEs remain live. The 275 backend assertions and 216
+  fresh real R-to-Julia configuration comparisons passed.
+
+  **Complete acceptance:** the unchanged one-cold/three-warm full protocol
+  passed all eight numerical fits and all four independent comparisons,
+  including original starts, joint/marginal objectives, 78 estimates/SEs,
+  positive-definite 78-by-78 covariance and all 32 required report-SE families.
+  Native source/DLL identity still matches P2. Controls 10000/10000, three
+  restarts, single-thread settings, tolerances, profiling and the 7,200-second
+  worker cap are unchanged. No startup or uncertainty exemption was applied.
+  Cold process-to-result was **448.54 seconds native / 260.60 Julia**; warm
+  walls were native **435.84/387.78/387.34** and Julia
+  **172.89/108.18/92.08** seconds. Both measured thresholds passed:
+  cold ratio **0.580989**, warm-median ratio **0.278973**.
+
+  **Preparation and limitations:** standalone package preparation took
+  **738.66 seconds**, including **717.19 seconds** precompilation with existing
+  dependencies. An unprepared first fit pays this cost; it is retained
+  separately under the original protocol, not treated as zero. Full-model
+  compilation was **28.61 seconds cold / zero in every warm trial**.
+  These sequential native-then-Julia batches used a shared Windows host:
+  load varied substantially, some CPU samples were unavailable, and native
+  timings were slower than earlier attempts. All observations are retained;
+  the ratios are measured gate results, not isolated causal speedups or
+  guarantees for other machines/configurations. Overall migration is still
+  incomplete. Next ready item: **N1**.
+
+  **Evidence:** [complete passing record, eight full-precision results and host telemetry](../data-raw/benchmarks/precompiled-full-2026-11-24/comparison.json),
+  [preceding cold-cost attribution](../data-raw/benchmarks/cold-attribution-2026-11-24/comparison.json)
+  and [commands, preparation and full timing boundaries](../data-raw/BACKEND_BENCHMARK.md#p6-completed-precompiled-full-fit-gate-2026-11-24).
+  Runtime hashes, portable artifacts/checksums, all comparisons, covariance
+  Cholesky decompositions, 98 uncertainty solves per fit, profile-write sums
+  and cumulative compilation counters were independently verified. Local
+  artifact `p6-precompiled-full-01` retains full profiles/logs and the active
+  Julia Project/Manifest. Windows x64, R 4.6.2, Julia 1.10.10,
+  PrecompileTools 1.2.1. Earlier failed attempts below remain historical evidence.
 
   **Verified recovery, not acceptance:** candidate `8f8d46fe` prepares typed
   objective data/configuration once and avoids input type erasure and a
@@ -443,9 +486,10 @@ fit is not acceptance evidence.
   gave a modest median 6.8% reduction, with one regression. The experiment was
   reverted; production source/tests exactly match accepted `8f8d46fe`.
   [All rejected measurements](../data-raw/benchmarks/constant-components-2026-11-24/comparison.json)
-  are retained. Next isolate first-use compilation/report/profiler costs and
-  evaluate precompilation or a larger derivative redesign; neither is
-  implemented or accepted yet. Do not relax the cold threshold.
+  are retained. At that point, first-use compilation/report/profiler costs
+  still needed isolation and no precompilation recovery had been accepted.
+  The completed record above supersedes that status without relaxing the
+  cold threshold.
 
   **Not passed:** 2026-11-24, measured candidate `569e01ef` (includes P4/P5).
   The existing full `--backend both` protocol completed one cold and three

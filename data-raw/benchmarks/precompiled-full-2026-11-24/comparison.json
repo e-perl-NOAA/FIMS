@@ -1,0 +1,680 @@
+{
+  "schema": 1,
+  "checklist_item": "P6",
+  "status": "measured_thresholds_met_shared_host",
+  "numerical_gate": "passed",
+  "performance_gate_passed": true,
+  "date": "2026-11-24",
+  "candidate_revision": "be1af3e5f4fda81ddfb511cf3714f03f303cec6a",
+  "native_declared_revision": "1e5a64a8",
+  "native_sources_and_DLL_identical_to_P2": true,
+  "protocol": {
+    "case": "full",
+    "counts": {
+      "fixed_effects": 49,
+      "random_effects": 29
+    },
+    "priors": null,
+    "control": {
+      "iter.max": 10000,
+      "eval.max": 10000,
+      "trace": 0
+    },
+    "restarts": 3,
+    "input_md5": "ad075166d27afabb8dbe224aa73b84c6",
+    "required_derived": [
+      "agecomp_expected",
+      "agecomp_proportion",
+      "biomass",
+      "catch_expected",
+      "catch_numbers",
+      "catch_numbers_at_age",
+      "catch_numbers_at_length",
+      "catch_weight",
+      "catch_weight_at_age",
+      "expected_recruitment",
+      "index_expected",
+      "index_numbers",
+      "index_numbers_at_age",
+      "index_numbers_at_length",
+      "index_weight",
+      "index_weight_at_age",
+      "lengthcomp_expected",
+      "lengthcomp_proportion",
+      "log_catch_expected",
+      "log_index_expected",
+      "mortality_F",
+      "mortality_M",
+      "mortality_Z",
+      "numbers_at_age",
+      "proportion_mature_at_age",
+      "spawning_biomass",
+      "sum_selectivity",
+      "total_catch_numbers",
+      "total_catch_weight",
+      "unfished_biomass",
+      "unfished_numbers_at_age",
+      "unfished_spawning_biomass"
+    ],
+    "harness_md5": {
+      "benchmark_backends.R": "8dae707ddd9fa280206c29257fa155db",
+      "benchmark_profile.jl": "e89195fe799e760e7a8fd257ab5d5052"
+    }
+  },
+  "process_timeout_seconds": 7200,
+  "environment": {
+    "native": {
+      "R": "R version 4.6.2 (2026-10-29 ucrt)",
+      "platform": "x86_64-w64-mingw32",
+      "revision": null,
+      "source_md5": {
+        "R/FIMS-package.R": "a3ff6e3b330c340ac787cf74d88e3113",
+        "R/Rcpp_exports.R": "cc5df56f21bd187e134365adde4e5bfb",
+        "R/augment-fims.R": "9f4dc0595b42c199a6a9c896be91333c",
+        "R/check_convergence.R": "81be1eb22ff30b094b0affd37921e7ed",
+        "R/check_fims.R": "736c92b106582f8427dbdbf264656717",
+        "R/data_big.R": "9244e733bd756def26b8f1c42210a782",
+        "R/distribution_formulas.R": "4deb6515602b04ec2fb9fe139258f940",
+        "R/fims_distributions.R": "963b356cf0b697d01dc38dfb4588d278",
+        "R/fims_input_types.R": "31f1b1689d265b6fa1850097faef6fd1",
+        "R/fims_likelihood.R": "18f0da0a6d6f52f21f642c033cef5a27",
+        "R/fims_retro.R": "b37e988e771104e636fc1a09ab1d0bfe",
+        "R/fimsfit.R": "fb8fabb9626dfe9a7dc3051209eb5c1f",
+        "R/fimsframe.R": "a7d514a298aeed43a926d84896afdeb1",
+        "R/initialize_modules.R": "324dd4e4a332f41a3cc7e012c340c44a",
+        "R/is_fims_verbose.R": "03d98c153f3978a631ceb23eaa20d64a",
+        "R/julia_backend.R": "9bb5cd03ce4ae8d73734fb2e054b7487",
+        "R/mohns_rho.R": "914a41acb16eabd3e31b8a79bca1de35",
+        "R/parse_data_distribution.R": "5527d0f5aba8ef03c1ba5343cfd40da8",
+        "R/plot_likelihood.R": "85894f07984984656f2f03298b42ce15",
+        "R/reshape_output.R": "37f5ffe93bf6f81d706230b7611ef6d3",
+        "R/run_modified_fims.R": "b2c428b8d05def8e2a94990ad7fb8d46",
+        "R/setup_default_parameters.R": "25f62ac84f384318b98820dcb3cd4da0",
+        "R/tidy-glance-fims.R": "af94324f2977a3baeb75a193b745272f",
+        "R/use-google-benchmark-template.R": "590925bffb1ba7c3c78fe90c5a1681cb",
+        "R/use-gtest-template.R": "a5e88c06416b858bbb2f53d1bb4f14fa",
+        "R/use-testthat-template.R": "9d72c3ced04e0077d936282d0f2f8211",
+        "R/utils.R": "159d216dc57ca2d936005a66fdcf3e91",
+        "R/zzz.R": "a29918a197a56e3f27268113a689424e",
+        "inst/julia/FIMSBackend/Project.toml": "f64c7a16d2a99d2ee1882f8d2d5e3c30",
+        "inst/julia/FIMSBackend/src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+        "inst/julia/FIMSBackend/src/modules/population.jl": "e03aab4f68a3324f08e240f64c9a70da",
+        "inst/julia/FIMSBackend/src/modules/recruitment.jl": "41fc044fa7593d8402a78dc22d73c7f1",
+        "inst/julia/FIMSBackend/src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+        "inst/julia/FIMSBackend/src/objective.jl": "54f453c02a70da64626a17ee04eb8618",
+        "inst/julia/FIMSBackend/src/optimizer.jl": "07d54acd6f26f11c0d7799c2857bfa09",
+        "inst/julia/FIMSBackend/test/runtests.jl": "c2942423d825b05488954abd5e2ce5c4"
+      },
+      "package_version": "0.11.0.9000",
+      "threads": {
+        "JULIA_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1"
+      },
+      "native_dll_md5": "7791104ab1295dcec1725062eb5f1f0a",
+      "load_setup_seconds": 27.98
+    },
+    "julia": {
+      "R": "R version 4.6.2 (2026-10-29 ucrt)",
+      "platform": "x86_64-w64-mingw32",
+      "revision": "be1af3e5f4fda81ddfb511cf3714f03f303cec6a",
+      "source_md5": {
+        "R/FIMS-package.R": "66d8d4ca69920506fb513dace3184bc3",
+        "R/augment-fims.R": "9f4dc0595b42c199a6a9c896be91333c",
+        "R/check_convergence.R": "62115dea9869d7f8d6752a116dd28bff",
+        "R/data_big.R": "9244e733bd756def26b8f1c42210a782",
+        "R/distribution_families.R": "4ff36327b895d5ae8fea70525e80fb62",
+        "R/fims_distributions.R": "963b356cf0b697d01dc38dfb4588d278",
+        "R/fims_input_types.R": "31f1b1689d265b6fa1850097faef6fd1",
+        "R/fims_likelihood.R": "0f3a25af5f5455660e4d76eb7379dbed",
+        "R/fims_retro.R": "ef97e4aec04e89acb6ffe339625f30fa",
+        "R/fimsfit.R": "2e7c10772cd71e69e3c056b8cff1e883",
+        "R/fimsframe.R": "0add5dda7266f5b37dedd1227b741c70",
+        "R/initialize_modules.R": "813741b245aa85b76ff849c41b21acad",
+        "R/is_fims_verbose.R": "03d98c153f3978a631ceb23eaa20d64a",
+        "R/julia_backend.R": "0fb09141cf587acbabfee6478463db8e",
+        "R/mohns_rho.R": "914a41acb16eabd3e31b8a79bca1de35",
+        "R/parse_data_distribution.R": "5527d0f5aba8ef03c1ba5343cfd40da8",
+        "R/plot_likelihood.R": "ff24ab3ff81ed07aba55f1b89c7e02aa",
+        "R/run_modified_fims.R": "04c021ff7d01446b95f4163747a65b08",
+        "R/setup_default_parameters.R": "42ee2651bc3bec2ec2e0806064b51438",
+        "R/setup_julia.R": "2aed38975029c26111e78bd280d958ed",
+        "R/simulate_julia.R": "0e50c84d5b70f7ff300834e2d81f3628",
+        "R/tidy-glance-fims.R": "0f848153d7b433561d5227c7cd3f2c48",
+        "R/use-testthat-template.R": "9d72c3ced04e0077d936282d0f2f8211",
+        "R/utils.R": "159d216dc57ca2d936005a66fdcf3e91",
+        "R/zzz.R": "435298f94386f2fe9b4c23bd6efc0a9c",
+        "inst/julia/FIMSBackend/Project.toml": "0ef1ed84a9450204c06d9892606f44f6",
+        "inst/julia/FIMSBackend/src/FIMSBackend.jl": "7ae8aed964b94ea665a8bc7da741883c",
+        "inst/julia/FIMSBackend/src/modules/population.jl": "91c82685e2806acf1d3a1a24952736bd",
+        "inst/julia/FIMSBackend/src/modules/recruitment.jl": "aa7798fb92987f38c9375213cfba1107",
+        "inst/julia/FIMSBackend/src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+        "inst/julia/FIMSBackend/src/objective.jl": "f14fee73e74c0e6d46bcd09755d4aee2",
+        "inst/julia/FIMSBackend/src/optimizer.jl": "2e252d3213df22e631252213918c138c",
+        "inst/julia/FIMSBackend/src/precompile.jl": "91c3a3a03b44491b5e92409501f3ef22",
+        "inst/julia/FIMSBackend/test/runtests.jl": "2686f382ab83b43d8efbf23522d14c76",
+        "inst/julia/setup.jl": "2548c60acfa005d499b957cb9839dce2"
+      },
+      "package_version": "0.11.0.9000",
+      "threads": {
+        "JULIA_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1"
+      },
+      "julia_version": "1.10.10",
+      "julia_blas": "LBTConfig([ILP64] libopenblas64_.dll)",
+      "julia_blas_threads": 1,
+      "load_setup_seconds": 49.24
+    }
+  },
+  "Julia_package_versions": {
+    "Optim": "1.13.3",
+    "ForwardDiff": "0.10.39",
+    "ComponentArrays": "0.15.50",
+    "Functors": "0.5.5",
+    "StatsBase": "0.34.14",
+    "PrecompileTools": "1.2.1"
+  },
+  "active_Julia_manifest_md5": "5fbc13e5e46b99337366f974ae67dbb8",
+  "host_preflight": {
+    "no_other_agent_builds_tests_or_model_fits": true,
+    "power_scheme": "Balanced",
+    "observed_at": "2026-11-24T15:04:47.9196066-05:00",
+    "exclusive_host": false,
+    "cpu": {
+      "Name": "13th Gen Intel(R) Core(TM) i7-1365U",
+      "NumberOfCores": 10,
+      "NumberOfLogicalProcessors": 12,
+      "LoadPercentage": 77
+    },
+    "os": {
+      "Caption": "Microsoft Windows 11 Enterprise",
+      "Version": "10.0.26200",
+      "BuildNumber": "26200",
+      "TotalVisibleMemorySize": 16092824,
+      "FreePhysicalMemory": 5267388
+    },
+    "condition": "Same-day sequential native then Julia batches, not interleaved or isolated; aggregate host telemetry retained."
+  },
+  "methodology": "Same-day separate native and Julia processes, sequential full batches (native first), one cold and three fresh-original-start warm full fits each. Same data, controls/restarts, outputs and single-thread settings; preparation recorded separately. All elapsed timings include initialization, fitting/uncertainty, extraction/validation and profiling, without subtraction. Cold includes process startup/JIT. Continuous aggregate host telemetry is retained. Host is shared, not isolated; runs are not interleaved. No competing agent builds, tests or model fits launched. Do not equate observed ratios with isolated causal performance or grant an unrequested startup exception.",
+  "preparation": [
+    {
+      "status": "prepared",
+      "seconds": 28.69,
+      "native_build": "preexisting DLL; build time not measured"
+    },
+    {
+      "status": "prepared",
+      "seconds": 9.42,
+      "native_build": null
+    }
+  ],
+  "last_successful_Julia_package_preparation": {
+    "dependency_resolution_seconds": 8.90400004386902,
+    "precompile_seconds": 717.1859998703,
+    "load_seconds": 12.5720000267029,
+    "total_seconds": 738.661999940872
+  },
+  "attribution_note": "Compilation, its recompilation subset, GC and profile writing overlap. Do not sum or subtract them from complete elapsed acceptance timings. Package preparation is retained separately, including the original workload compilation, not just the later cached setup wrapper.",
+  "trials": [
+    {
+      "trial": "cold",
+      "numerical_comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "native": {
+        "initialize_seconds": 41.5,
+        "fit_seconds": 364.79,
+        "extract_seconds": 12.56,
+        "wall_seconds": 418.92,
+        "cold_process_to_result_seconds": 448.53900718689,
+        "profile_setup_seconds": 0.0199999999999996,
+        "profile_finalize_seconds": 0.0299999999999727,
+        "max_absolute_gradient": 0.000359420286652812,
+        "host": {
+          "samples": 13,
+          "cpu_load_percent": {
+            "values": [29, 83, 83, 65, 53, 68, 80, 60, 62, 70, 60, 13, 73],
+            "median": 65,
+            "mean": 61.4615384615385,
+            "minimum": 13,
+            "maximum": 83,
+            "standard_deviation": 20.4353263762183
+          },
+          "free_physical_memory_KiB": {
+            "values": [4528384, 4373308, 4325936, 4314756, 4191732, 4354604, 4113860, 4314340, 4347636, 4239560, 4196640, 4279072, 4303288],
+            "median": 4314340,
+            "mean": 4298701.23076923,
+            "minimum": 4113860,
+            "maximum": 4528384,
+            "standard_deviation": 102067.525522857
+          }
+        },
+        "optimization": {
+          "calls": 4,
+          "seconds": 18.0581407546997
+        },
+        "uncertainty": {
+          "calls": 1,
+          "seconds": 342.794676065445
+        }
+      },
+      "julia": {
+        "initialize_seconds": 13.25,
+        "fit_seconds": 191.1,
+        "extract_seconds": 0.139999999999986,
+        "wall_seconds": 210.64,
+        "cold_process_to_result_seconds": 260.596369981766,
+        "profile_setup_seconds": 5.03,
+        "profile_finalize_seconds": 1.11000000000001,
+        "max_absolute_gradient": 9.70785316717349e-10,
+        "host": {
+          "samples": 7,
+          "cpu_load_percent": {
+            "values": [18, null, 10, 19, 1, 20, 3],
+            "median": null,
+            "mean": null,
+            "minimum": null,
+            "maximum": null,
+            "standard_deviation": null
+          },
+          "free_physical_memory_KiB": {
+            "values": [4070980, 4327132, 3994112, 3910976, 3973108, 3921856, 3903520],
+            "median": 3973108,
+            "mean": 4014526.28571429,
+            "minimum": 3903520,
+            "maximum": 4327132,
+            "standard_deviation": 149819.007977086
+          }
+        },
+        "optimization_seconds": 42,
+        "marginal_hessian_seconds": 134.906000137329,
+        "conditional": {
+          "calls": 98,
+          "seconds": 16.8440001010895
+        },
+        "cross_curvature": {
+          "calls": 98,
+          "seconds": 29.0060005187988
+        },
+        "third_derivatives": {
+          "calls": 98,
+          "seconds": 82.1180007457733
+        },
+        "report_SE_seconds": 2.5460000038147,
+        "snapshot_count": 8,
+        "snapshot_write_seconds": 17.9940001964569,
+        "cumulative_counters": {
+          "compilation_seconds": 28.6071804,
+          "recompilation_seconds": 2.1146291,
+          "gc_seconds": 8.0155331
+        }
+      },
+      "trial_wall_ratio": 0.502816766924473
+    },
+    {
+      "trial": "warm-1",
+      "numerical_comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "native": {
+        "initialize_seconds": 35.6,
+        "fit_seconds": 388.06,
+        "extract_seconds": 12.14,
+        "wall_seconds": 435.84,
+        "cold_process_to_result_seconds": null,
+        "profile_setup_seconds": 0.00999999999999091,
+        "profile_finalize_seconds": 0.00999999999999091,
+        "max_absolute_gradient": 0.000359420286652812,
+        "host": {
+          "samples": 14,
+          "cpu_load_percent": {
+            "values": [73, 73, 15, 62, 73, 56, 11, 71, 77, 62, 18, 82, 76, 31],
+            "median": 66.5,
+            "mean": 55.7142857142857,
+            "minimum": 11,
+            "maximum": 82,
+            "standard_deviation": 25.5024239313369
+          },
+          "free_physical_memory_KiB": {
+            "values": [4405788, 4205132, 4259372, 4164216, 4171368, 4238264, 4172720, 4167592, 4179112, 4255748, 4247512, 4238388, 4222712, 4163764],
+            "median": 4213922,
+            "mean": 4220834.85714286,
+            "minimum": 4163764,
+            "maximum": 4405788,
+            "standard_deviation": 64620.6390926866
+          }
+        },
+        "optimization": {
+          "calls": 4,
+          "seconds": 18.5811791419983
+        },
+        "uncertainty": {
+          "calls": 1,
+          "seconds": 364.300101041794
+        }
+      },
+      "julia": {
+        "initialize_seconds": 10.24,
+        "fit_seconds": 161.81,
+        "extract_seconds": 0.0299999999999727,
+        "wall_seconds": 172.89,
+        "cold_process_to_result_seconds": null,
+        "profile_setup_seconds": 0.110000000000014,
+        "profile_finalize_seconds": 0.699999999999989,
+        "max_absolute_gradient": 9.70785316717349e-10,
+        "host": {
+          "samples": 6,
+          "cpu_load_percent": {
+            "values": [7, 0, 17, 8, 12, 34],
+            "median": 10,
+            "mean": 13,
+            "minimum": 0,
+            "maximum": 34,
+            "standard_deviation": 11.7303026388921
+          },
+          "free_physical_memory_KiB": {
+            "values": [3891008, 3825348, 4247240, 4227872, 4337996, 4317868],
+            "median": 4237556,
+            "mean": 4141222,
+            "minimum": 3825348,
+            "maximum": 4337996,
+            "standard_deviation": 224078.238518603
+          }
+        },
+        "optimization_seconds": 17.933000087738,
+        "marginal_hessian_seconds": 139.644000053406,
+        "conditional": {
+          "calls": 98,
+          "seconds": 16.9449992179871
+        },
+        "cross_curvature": {
+          "calls": 98,
+          "seconds": 31.0859999656677
+        },
+        "third_derivatives": {
+          "calls": 98,
+          "seconds": 85.8729996681213
+        },
+        "report_SE_seconds": 0.0699999332427979,
+        "snapshot_count": 7,
+        "snapshot_write_seconds": 5.48900032043457,
+        "cumulative_counters": {
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 7.8741321
+        }
+      },
+      "trial_wall_ratio": 0.396682268722467
+    },
+    {
+      "trial": "warm-2",
+      "numerical_comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "native": {
+        "initialize_seconds": 32.89,
+        "fit_seconds": 344.39,
+        "extract_seconds": 10.4300000000001,
+        "wall_seconds": 387.78,
+        "cold_process_to_result_seconds": null,
+        "profile_setup_seconds": 0.0299999999999727,
+        "profile_finalize_seconds": 0.0199999999999818,
+        "max_absolute_gradient": 0.000359420286652812,
+        "host": {
+          "samples": 12,
+          "cpu_load_percent": {
+            "values": [70, 83, 65, 19, 68, 73, 68, 32, 67, 62, 65, 31],
+            "median": 66,
+            "mean": 58.5833333333333,
+            "minimum": 19,
+            "maximum": 83,
+            "standard_deviation": 19.7965025989824
+          },
+          "free_physical_memory_KiB": {
+            "values": [4274956, 4159748, 4114636, 4071180, 4513492, 4496472, 4460100, 4458184, 4399020, 4125064, 4265064, 4213480],
+            "median": 4270010,
+            "mean": 4295949.66666667,
+            "minimum": 4071180,
+            "maximum": 4513492,
+            "standard_deviation": 162583.526961225
+          }
+        },
+        "optimization": {
+          "calls": 4,
+          "seconds": 17.3639872074127
+        },
+        "uncertainty": {
+          "calls": 1,
+          "seconds": 323.62687587738
+        }
+      },
+      "julia": {
+        "initialize_seconds": 9.83999999999997,
+        "fit_seconds": 97.85,
+        "extract_seconds": 0.00999999999999091,
+        "wall_seconds": 108.18,
+        "cold_process_to_result_seconds": null,
+        "profile_setup_seconds": 0.100000000000023,
+        "profile_finalize_seconds": 0.379999999999995,
+        "max_absolute_gradient": 9.70785316717349e-10,
+        "host": {
+          "samples": 3,
+          "cpu_load_percent": {
+            "values": [27, 62, 63],
+            "median": 62,
+            "mean": 50.6666666666667,
+            "minimum": 27,
+            "maximum": 63,
+            "standard_deviation": 20.5020324195757
+          },
+          "free_physical_memory_KiB": {
+            "values": [4258136, 4004800, 3968248],
+            "median": 4004800,
+            "mean": 4077061.33333333,
+            "minimum": 3968248,
+            "maximum": 4258136,
+            "standard_deviation": 157876.655517316
+          }
+        },
+        "optimization_seconds": 17.4639999866486,
+        "marginal_hessian_seconds": 78,
+        "conditional": {
+          "calls": 98,
+          "seconds": 9.58899974822998
+        },
+        "cross_curvature": {
+          "calls": 98,
+          "seconds": 17.2199995517731
+        },
+        "third_derivatives": {
+          "calls": 98,
+          "seconds": 48.8620002269745
+        },
+        "report_SE_seconds": 0.0469999313354492,
+        "snapshot_count": 5,
+        "snapshot_write_seconds": 2.19400024414062,
+        "cumulative_counters": {
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 5.0606191
+        }
+      },
+      "trial_wall_ratio": 0.278972613337459
+    },
+    {
+      "trial": "warm-3",
+      "numerical_comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "native": {
+        "initialize_seconds": 31.2,
+        "fit_seconds": 344.61,
+        "extract_seconds": 11.5,
+        "wall_seconds": 387.34,
+        "cold_process_to_result_seconds": null,
+        "profile_setup_seconds": 0.00999999999999091,
+        "profile_finalize_seconds": 0.0199999999999818,
+        "max_absolute_gradient": 0.000359420286652812,
+        "host": {
+          "samples": 12,
+          "cpu_load_percent": {
+            "values": [62, 71, 13, 68, 85, 62, 28, 68, 79, 71, 20, 65],
+            "median": 66.5,
+            "mean": 57.6666666666667,
+            "minimum": 13,
+            "maximum": 85,
+            "standard_deviation": 23.6579155822522
+          },
+          "free_physical_memory_KiB": {
+            "values": [4247480, 4099324, 4397112, 4349936, 4399084, 4109792, 4159916, 4172144, 4349480, 4331116, 4358020, 4450560],
+            "median": 4340298,
+            "mean": 4285330.33333333,
+            "minimum": 4099324,
+            "maximum": 4450560,
+            "standard_deviation": 122024.467942319
+          }
+        },
+        "optimization": {
+          "calls": 4,
+          "seconds": 16.291671037674
+        },
+        "uncertainty": {
+          "calls": 1,
+          "seconds": 324.698099136353
+        }
+      },
+      "julia": {
+        "initialize_seconds": 4.84000000000003,
+        "fit_seconds": 86.71,
+        "extract_seconds": 0.00999999999999091,
+        "wall_seconds": 92.0799999999999,
+        "cold_process_to_result_seconds": null,
+        "profile_setup_seconds": 0.0799999999999272,
+        "profile_finalize_seconds": 0.439999999999941,
+        "max_absolute_gradient": 9.70785316717349e-10,
+        "host": {
+          "samples": 3,
+          "cpu_load_percent": {
+            "values": [null, 50, 90],
+            "median": null,
+            "mean": null,
+            "minimum": null,
+            "maximum": null,
+            "standard_deviation": null
+          },
+          "free_physical_memory_KiB": {
+            "values": [3993548, 4066952, 4104312],
+            "median": 4066952,
+            "mean": 4054937.33333333,
+            "minimum": 3993548,
+            "maximum": 4104312,
+            "standard_deviation": 56350.9546088913
+          }
+        },
+        "optimization_seconds": 9.83799982070923,
+        "marginal_hessian_seconds": 74.930999994278,
+        "conditional": {
+          "calls": 98,
+          "seconds": 9.49400043487549
+        },
+        "cross_curvature": {
+          "calls": 98,
+          "seconds": 17.0869987010956
+        },
+        "third_derivatives": {
+          "calls": 98,
+          "seconds": 46.9319994449615
+        },
+        "report_SE_seconds": 0.0320000648498535,
+        "snapshot_count": 4,
+        "snapshot_write_seconds": 1.31600022315979,
+        "cumulative_counters": {
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 4.5413553
+        }
+      },
+      "trial_wall_ratio": 0.23772396344297
+    }
+  ],
+  "warm_trial_wall_seconds": {
+    "native": {
+      "values": [435.84, 387.78, 387.34],
+      "median": 387.78,
+      "mean": 403.653333333333,
+      "minimum": 387.34,
+      "maximum": 435.84,
+      "standard_deviation": 27.8753391608664
+    },
+    "julia": {
+      "values": [172.89, 108.18, 92.0799999999999],
+      "median": 108.18,
+      "mean": 124.383333333333,
+      "minimum": 92.0799999999999,
+      "maximum": 172.89,
+      "standard_deviation": 42.7723629617693
+    },
+    "median_ratio_julia_to_native": 0.278972613337459,
+    "ordinal_trial_ratios_not_interleaved_pairs": [0.396682268722467, 0.278972613337459, 0.23772396344297]
+  },
+  "cold_process_to_result_ratio_julia_to_native": 0.580989313763708,
+  "acceptance": {
+    "warm_median_no_slower": true,
+    "cold_process_no_slower": true,
+    "startup_or_uncertainty_exemption_granted": false,
+    "interpretation": "Measured cold and warm thresholds met; shared-host qualification retained."
+  },
+  "validation": {
+    "eight_fits_converged": true,
+    "gradients_below_1e_3": true,
+    "all_full_covariance_PD": true,
+    "all_32_derived_SE_families": true,
+    "identical_full_precision_starts": true,
+    "native_Julia_all_four_comparisons_passed": true,
+    "warm_numerical_repetitions_match_cold": true,
+    "pointer_free_portable_artifacts": true
+  },
+  "raw_local_session_artifact": "p6-precompiled-full-01",
+  "artifact_md5": {
+    "host.tsv": "1438bb180f23fe85d6012e0800b7e660",
+    "input.rds": "ad075166d27afabb8dbe224aa73b84c6",
+    "julia/cold/julia-profile/compilation.tsv": "3620909a34a1c1480e60b8a7ec8b34ef",
+    "julia/cold/julia-profile/snapshots.tsv": "f14ad263001822a01643a29ee23c3ac1",
+    "julia/cold/optimizer.progress": "26ae546b603813937b578bc692f5d4dd",
+    "julia/cold/result.rds": "f80b7dc22b271e060fdda396bd0c5ff2",
+    "julia/package-preparation.toml": "1d8eb73c01ec643d4d1d1d8532977f6f",
+    "julia/progress.tsv": "945d9b1c9a53a1d71317d31c82c15833",
+    "julia/warm-1/julia-profile/compilation.tsv": "0139d5d103e9e07096066a4ab5ba3d76",
+    "julia/warm-1/julia-profile/snapshots.tsv": "782d33cde3c0a2c9fae543d07d4a3917",
+    "julia/warm-1/optimizer.progress": "3368e616aefd2f25dc65ccc207a495c5",
+    "julia/warm-1/result.rds": "a3cdb8436f7118162eaa15628c2a4de5",
+    "julia/warm-2/julia-profile/compilation.tsv": "ef53a19c53fa585488b8304d1c64a2f3",
+    "julia/warm-2/julia-profile/snapshots.tsv": "260e200b3265a8d79e78955777a680a9",
+    "julia/warm-2/optimizer.progress": "cd81f8ccbdcbc21f2c6b1e528620e72b",
+    "julia/warm-2/result.rds": "153281556025a00bcca645037d766a7d",
+    "julia/warm-3/julia-profile/compilation.tsv": "3215d19b17e3a52cd675ee8a8b7de335",
+    "julia/warm-3/julia-profile/snapshots.tsv": "93edf2c9ee2cbba1eb80193ef8450a7b",
+    "julia/warm-3/optimizer.progress": "a579b387a2fe0a647b425c9615e6d542",
+    "julia/warm-3/result.rds": "5735da490350558ad5b46ff39a853c21",
+    "native/cold/result.rds": "766941b251a0cd8e56b365b3fd284c88",
+    "native/progress.tsv": "a9773479121983a57cf571699da32ccc",
+    "native/warm-1/result.rds": "9c8e7ba10025ac2ef4871301b8ed2b93",
+    "native/warm-2/result.rds": "2743a3fa7af9516cf4dfedfdcab95e7d",
+    "native/warm-3/result.rds": "b925df3be7ed14f8243441a686d76097"
+  }
+}

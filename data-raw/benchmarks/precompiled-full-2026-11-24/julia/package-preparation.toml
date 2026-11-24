@@ -1,0 +1,6 @@
+julia_version = "1.10.10"
+total_seconds = 738.6619999408722
+dependency_resolution_seconds = 8.904000043869019
+load_seconds = 12.57200002670288
+prepared_epoch_seconds = 1.795550410208e9
+precompile_seconds = 717.1859998703003

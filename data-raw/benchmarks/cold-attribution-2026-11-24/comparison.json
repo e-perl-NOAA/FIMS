@@ -1,0 +1,288 @@
+{
+  "schema": 1,
+  "checklist_item": "P6 cold attribution",
+  "status": "attributed_not_performance_acceptance",
+  "date": "2026-11-24",
+  "candidate_revision": "1769e827292a04126358eed7c7ce07c7925512a6",
+  "runtime_identical_to": "8f8d46fe",
+  "source_md5": {
+    "R/FIMS-package.R": "66d8d4ca69920506fb513dace3184bc3",
+    "R/augment-fims.R": "9f4dc0595b42c199a6a9c896be91333c",
+    "R/check_convergence.R": "62115dea9869d7f8d6752a116dd28bff",
+    "R/data_big.R": "9244e733bd756def26b8f1c42210a782",
+    "R/distribution_families.R": "4ff36327b895d5ae8fea70525e80fb62",
+    "R/fims_distributions.R": "963b356cf0b697d01dc38dfb4588d278",
+    "R/fims_input_types.R": "31f1b1689d265b6fa1850097faef6fd1",
+    "R/fims_likelihood.R": "0f3a25af5f5455660e4d76eb7379dbed",
+    "R/fims_retro.R": "ef97e4aec04e89acb6ffe339625f30fa",
+    "R/fimsfit.R": "2e7c10772cd71e69e3c056b8cff1e883",
+    "R/fimsframe.R": "0add5dda7266f5b37dedd1227b741c70",
+    "R/initialize_modules.R": "813741b245aa85b76ff849c41b21acad",
+    "R/is_fims_verbose.R": "03d98c153f3978a631ceb23eaa20d64a",
+    "R/julia_backend.R": "0fb09141cf587acbabfee6478463db8e",
+    "R/mohns_rho.R": "914a41acb16eabd3e31b8a79bca1de35",
+    "R/parse_data_distribution.R": "5527d0f5aba8ef03c1ba5343cfd40da8",
+    "R/plot_likelihood.R": "ff24ab3ff81ed07aba55f1b89c7e02aa",
+    "R/run_modified_fims.R": "04c021ff7d01446b95f4163747a65b08",
+    "R/setup_default_parameters.R": "42ee2651bc3bec2ec2e0806064b51438",
+    "R/setup_julia.R": "2aed38975029c26111e78bd280d958ed",
+    "R/simulate_julia.R": "0e50c84d5b70f7ff300834e2d81f3628",
+    "R/tidy-glance-fims.R": "0f848153d7b433561d5227c7cd3f2c48",
+    "R/use-testthat-template.R": "9d72c3ced04e0077d936282d0f2f8211",
+    "R/utils.R": "159d216dc57ca2d936005a66fdcf3e91",
+    "R/zzz.R": "435298f94386f2fe9b4c23bd6efc0a9c",
+    "inst/julia/FIMSBackend/Project.toml": "e770dc45f78e53dfb8a6038ddd74eb8b",
+    "inst/julia/FIMSBackend/src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+    "inst/julia/FIMSBackend/src/modules/population.jl": "c89e23e831dbaec4a9ead90165afc203",
+    "inst/julia/FIMSBackend/src/modules/recruitment.jl": "aa7798fb92987f38c9375213cfba1107",
+    "inst/julia/FIMSBackend/src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+    "inst/julia/FIMSBackend/src/objective.jl": "57ef1e3eb6b790a0754980ac92257f80",
+    "inst/julia/FIMSBackend/src/optimizer.jl": "509a49cd2c9ab4f217ec588926878f4f",
+    "inst/julia/FIMSBackend/test/runtests.jl": "894dbddddff00cf7cfca7db8685b5071",
+    "inst/julia/setup.jl": "870e7eb2c3d367164d1420c25f2f297c"
+  },
+  "protocol": {
+    "case": "full",
+    "counts": {
+      "fixed_effects": 49,
+      "random_effects": 29
+    },
+    "priors": null,
+    "control": {
+      "iter.max": 10000,
+      "eval.max": 10000,
+      "trace": 0
+    },
+    "restarts": 3,
+    "input_md5": "ad075166d27afabb8dbe224aa73b84c6",
+    "required_derived": [
+      "agecomp_expected",
+      "agecomp_proportion",
+      "biomass",
+      "catch_expected",
+      "catch_numbers",
+      "catch_numbers_at_age",
+      "catch_numbers_at_length",
+      "catch_weight",
+      "catch_weight_at_age",
+      "expected_recruitment",
+      "index_expected",
+      "index_numbers",
+      "index_numbers_at_age",
+      "index_numbers_at_length",
+      "index_weight",
+      "index_weight_at_age",
+      "lengthcomp_expected",
+      "lengthcomp_proportion",
+      "log_catch_expected",
+      "log_index_expected",
+      "mortality_F",
+      "mortality_M",
+      "mortality_Z",
+      "numbers_at_age",
+      "proportion_mature_at_age",
+      "spawning_biomass",
+      "sum_selectivity",
+      "total_catch_numbers",
+      "total_catch_weight",
+      "unfished_biomass",
+      "unfished_numbers_at_age",
+      "unfished_spawning_biomass"
+    ],
+    "harness_md5": {
+      "benchmark_backends.R": "021f47b8af1b422a2110867e2372bdba",
+      "benchmark_profile.jl": "e89195fe799e760e7a8fd257ab5d5052"
+    }
+  },
+  "process_timeout_seconds": 7200,
+  "environment": {
+    "R": "R version 4.6.2 (2026-10-29 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "threads": {
+      "JULIA_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    },
+    "julia_version": "1.10.10",
+    "julia_blas": "LBTConfig([ILP64] libopenblas64_.dll)",
+    "julia_blas_threads": 1
+  },
+  "records": [
+    {
+      "trial": "cold",
+      "timing": {
+        "initialize_seconds": 16.28,
+        "fit_seconds": 399.28,
+        "extract_seconds": 0.379999999999995,
+        "profile_setup_seconds": 4.39,
+        "profile_finalize_seconds": 2.79000000000002,
+        "trial_wall_seconds": 423.12,
+        "cold_process_to_result_seconds": 448.104923963547,
+        "profile": {
+          "snapshots": 12,
+          "snapshot_write_seconds": 60.4460000991821
+        },
+        "input_md5": "ad075166d27afabb8dbe224aa73b84c6"
+      },
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "cumulative_phase_metrics": [
+        {
+          "epoch_seconds": 1795545013.482,
+          "stage": "profile:start",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 0
+        },
+        {
+          "epoch_seconds": 1795545036.329,
+          "stage": "fit:start",
+          "compilation_seconds": 11.0322523,
+          "recompilation_seconds": 0,
+          "gc_seconds": 0.8914248
+        },
+        {
+          "epoch_seconds": 1795545184.939,
+          "stage": "outer_optimization:complete",
+          "compilation_seconds": 103.7094176,
+          "recompilation_seconds": 0,
+          "gc_seconds": 6.1766234
+        },
+        {
+          "epoch_seconds": 1795545218.887,
+          "stage": "uncertainty_joint_hessian:complete",
+          "compilation_seconds": 136.1063489,
+          "recompilation_seconds": 0,
+          "gc_seconds": 7.1015256
+        },
+        {
+          "epoch_seconds": 1795545399.352,
+          "stage": "uncertainty_marginal_hessian:complete",
+          "compilation_seconds": 137.1801442,
+          "recompilation_seconds": 0,
+          "gc_seconds": 16.0291688
+        },
+        {
+          "epoch_seconds": 1795545414.96,
+          "stage": "report_standard_errors:complete",
+          "compilation_seconds": 152.6446632,
+          "recompilation_seconds": 0,
+          "gc_seconds": 16.4124063
+        },
+        {
+          "epoch_seconds": 1795545425.7,
+          "stage": "fit:complete",
+          "compilation_seconds": 152.6883645,
+          "recompilation_seconds": 0,
+          "gc_seconds": 16.5445722
+        },
+        {
+          "epoch_seconds": 1795545429.689,
+          "stage": "profile:complete",
+          "compilation_seconds": 154.9566384,
+          "recompilation_seconds": 0,
+          "gc_seconds": 16.5445722
+        }
+      ]
+    },
+    {
+      "trial": "warm-1",
+      "timing": {
+        "initialize_seconds": 9.62,
+        "fit_seconds": 172.25,
+        "extract_seconds": 0.0299999999999727,
+        "profile_setup_seconds": 0.0999999999999659,
+        "profile_finalize_seconds": 0.220000000000027,
+        "trial_wall_seconds": 182.22,
+        "profile": {
+          "snapshots": 7,
+          "snapshot_write_seconds": 1.38699960708618
+        },
+        "input_md5": "ad075166d27afabb8dbe224aa73b84c6"
+      },
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "cumulative_phase_metrics": [
+        {
+          "epoch_seconds": 1795545432.714,
+          "stage": "profile:start",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 0
+        },
+        {
+          "epoch_seconds": 1795545442.456,
+          "stage": "fit:start",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 0
+        },
+        {
+          "epoch_seconds": 1795545460.942,
+          "stage": "outer_optimization:complete",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 1.0712271
+        },
+        {
+          "epoch_seconds": 1795545462.267,
+          "stage": "uncertainty_joint_hessian:complete",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 1.1248802
+        },
+        {
+          "epoch_seconds": 1795545611.292,
+          "stage": "uncertainty_marginal_hessian:complete",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 9.0869886
+        },
+        {
+          "epoch_seconds": 1795545611.387,
+          "stage": "report_standard_errors:complete",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 9.0901617
+        },
+        {
+          "epoch_seconds": 1795545613.041,
+          "stage": "fit:complete",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 9.1736894
+        },
+        {
+          "epoch_seconds": 1795545614.674,
+          "stage": "profile:complete",
+          "compilation_seconds": 0,
+          "recompilation_seconds": 0,
+          "gc_seconds": 9.1736894
+        }
+      ]
+    }
+  ],
+  "interpretation": "One fresh R process with cold and original-start warm full fits. Both preserve independent native numerical parity. Cumulative compilation and GC are recorded at every synchronous optimizer checkpoint; recompilation is a subset of compilation. Compilation, GC, phase elapsed and profile writing overlap; do not sum them as disjoint costs. Profiler and metric writes remain inside wall timings. Historical native is a numerical reference only, not a contemporaneous performance comparator. Shared host, no concurrent agent builds/tests/model fits. No acceptance claim; startup/uncertainty exemptions absent.",
+  "raw_local_session_artifact": "p6-cold-attribution-01",
+  "artifact_md5": {
+    "cold/julia-profile/compilation.tsv": "734492d931ab8dd1d24040c4953aec44",
+    "cold/julia-profile/snapshots.tsv": "8aac5c5d288130bdb10150797a37be91",
+    "cold/optimizer.progress": "ff4efbadd4bdbfa0dc0721cb1528c254",
+    "cold/result.rds": "eaaa6fead85591e11bdd1a1cb8e7d092",
+    "input.rds": "ad075166d27afabb8dbe224aa73b84c6",
+    "progress.tsv": "08b5033dc3d47163a4910e849c78cd4a",
+    "warm-1/julia-profile/compilation.tsv": "f37b7929b8c7614be36893ac4cdf1e70",
+    "warm-1/julia-profile/snapshots.tsv": "7702e3a087e74b4904f84c6d45d53576",
+    "warm-1/optimizer.progress": "2117e14154b88201142d7afa664ecfff",
+    "warm-1/result.rds": "647874d19b28bd92c17cc9295f5bf220"
+  }
+}

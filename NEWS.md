@@ -54,7 +54,8 @@
   Three paired warm complete fits improved 11%-15%, with full numerical
   comparisons passing. Four fresh real R full fits also pass the native
   gates; P4 warm median was 225.86 seconds against the historical native
-  187.67 seconds. Complete-fit performance acceptance remains outstanding.
+  187.67 seconds. This intermediate result did not establish complete-fit
+  performance acceptance.
 * Exact Laplace trace differentiation uses a bounded chunk cap of 16;
   cross-curvature and other derivative calculations retain their cap of 4.
   The directional trace contraction and conditional-mode sensitivity are
@@ -62,8 +63,8 @@
   Eight warm pairs show a median 33% trace-time reduction and 26% complete
   Laplace-gradient reduction, with identical gradients and 12% fewer
   allocations. Fresh full R fits preserve native numerical parity;
-  complete-fit performance acceptance remains open.
-* The P6 same-day full benchmark preserves numerical parity but does not
+  these gradient measurements alone did not establish complete-fit acceptance.
+* An initial P6 same-day full benchmark preserved numerical parity but did not
   pass performance acceptance: Julia/native warm medians were
   329.44/111.39 seconds and cold process-to-result 408.97/251.86 seconds.
   Runs used sequential batches on a shared workstation with continuous
@@ -76,8 +77,18 @@
   Complete paired Julia fits improved by a median 49.1%. A fresh full
   native/Julia run met the warm-median threshold (170.82/179.63 seconds),
   but cold process-to-result remained slower (372.03/192.89 seconds).
-  P6 remains open; a subsequent cold-regressing constant-component
+  P6 stayed open after that attempt; a subsequent cold-regressing constant-component
   experiment was reverted and its measurements retained.
+* Representative derivative precompilation reuses Julia package images across
+  model dimensions; population evaluation also avoids repeated invariant
+  selectivity and fishing-rate exponentials. The unchanged fresh full P6
+  protocol now passes numerical, cold and warm-median gates: Julia/native
+  cold process-to-result was 260.60/448.54 seconds and warm medians
+  108.18/387.78 seconds. All trials and shared-host load variation are retained;
+  these sequential measurements do not establish an isolated speedup.
+  Package preparation cost 738.66 seconds with existing dependencies, including
+  717.19 seconds precompilation, recorded separately rather than hidden.
+  The overall migration remains incomplete.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
