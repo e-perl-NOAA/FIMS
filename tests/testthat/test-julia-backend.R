@@ -2184,6 +2184,55 @@ test_that("real Julia fits retain the saved optimized native comparisons", {
   }
 })
 
+test_that("native random-prior reference includes the prior before Laplace integration", {
+  oracle <- readRDS(testthat::test_path("fixtures", "native-random-prior-oracle.rds"))
+  for (case in oracle[["cases"]]) {
+    priors <- case[["priors"]]
+    random <- which(case[["parameters_table"]][["estimation_type"]] == "random_effects")
+    fixed <- setdiff(seq_len(nrow(case[["parameters_table"]])), random)
+    random_priors <- which(case[["prior_coordinates"]] %in% random)
+    expected_curvature <- diag(0, length(random))
+    diag(expected_curvature)[match(case[["prior_coordinates"]][random_priors], random)] <-
+      1 / priors[["sd"]][random_priors]^2
+    prior_nll <- function(parameters) {
+      values <- parameters[case[["prior_coordinates"]]]
+      normal <- priors[["distribution"]] == "dnorm"
+      -sum(stats::dnorm(values[normal], priors[["mean"]][normal],
+        priors[["sd"]][normal], log = TRUE)) -
+        sum(stats::dlnorm(values[!normal], priors[["mean"]][!normal],
+          priors[["sd"]][!normal], log = TRUE))
+    }
+    for (point in c(case[["points"]], list(case[["conditional"]]))) {
+      parameters <- point[["parameters"]]
+      expect_equal(point[["joint"]] - point[["native_joint"]],
+        prior_nll(parameters), tolerance = 1e-12)
+      expect_equal(point[["random_hessian"]] - point[["native_random_hessian"]],
+        expected_curvature, tolerance = 1e-12)
+      expect_equal(point[["marginal"]] - point[["joint"]],
+        as.numeric(determinant(point[["random_hessian"]], logarithm = TRUE)[["modulus"]]) / 2 -
+          length(random) * log(2 * pi) / 2, tolerance = 1e-12)
+      prior_score <- purrr::map_dbl(random, function(index) {
+        upper <- lower <- parameters
+        upper[[index]] <- upper[[index]] + 1e-5
+        lower[[index]] <- lower[[index]] - 1e-5
+        (prior_nll(upper) - prior_nll(lower)) / 2e-5
+      })
+      expect_lt(max(abs(point[["native_gradient"]][random] + prior_score)), 1e-6)
+    }
+    covariance <- case[["covariance"]]
+    sensitivity <- case[["random_fixed_sensitivity"]]
+    expect_equal(covariance[fixed, fixed], solve(case[["fixed_hessian"]]), tolerance = 1e-10)
+    expect_equal(covariance[random, random] -
+      sensitivity %*% covariance[fixed, fixed] %*% t(sensitivity),
+      solve(case[["conditional"]][["random_hessian"]]), tolerance = 1e-10)
+  }
+  control <- oracle[["cases"]][["EWAA-fixed-prior-control"]][["points"]][[1]]
+  augmented <- oracle[["cases"]][["EWAA-random-priors"]][["points"]][[1]]
+  expect_gt(max(abs(control[["parameters"]] - augmented[["parameters"]])), 0.01)
+  expect_gt(abs(oracle[["post_marginal_counterexample"]][["incorrect_marginal"]] -
+    augmented[["marginal"]]), 1e-3)
+})
+
 test_that("real Julia joint configurations retain native gradients and uncertainty", {
   skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
     "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
