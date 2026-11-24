@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **P5**.
+   Name that item before starting. The default next item is **P6**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -339,13 +339,66 @@ fit is not acceptance evidence.
   The remaining third-derivative trace takes about 133 seconds per warm
   full fit and is the next P5 target.
 
-- [ ] **P5 - Remove a measured third-derivative trace bottleneck.**
+- [x] **P5 - Remove a measured third-derivative trace bottleneck.**
   **Depends on:** P3; conditional on its profiling showing this work is needed.
   **Done when:** one focused improvement reduces the measured exact
   Laplace-gradient trace cost and improves paired warm full-gradient timings.
   Preserve mode sensitivity, analytic/coupled-effect oracles, and existing
   numerical tolerances. Record compilation, allocations, and execution costs;
   do not replace exact derivatives with an undisclosed approximation.
+
+  **Completed:** 2026-11-24; implementation/measured candidate `834eca70`,
+  independently exported P4 baseline `7ed8e41d`. Increase only the exact
+  trace gradient's bounded differentiation cap from 4 to 16. For 49 fixed
+  parameters, ForwardDiff balances to width 13, requiring four rather than
+  13 model traversals per random direction. Cross-curvature retains cap 4.
+  Exact directional contractions, mode sensitivity, convergence controls,
+  perturbations and tolerances are unchanged; no new dependencies.
+
+  **Paired result:** eight alternating-order warm full-gradient pairs at
+  the fitted point and three uncertainty perturbations passed all 49
+  components with maximum absolute difference zero. All eight trace
+  timings improved; median paired trace reduction 33.3%, with median trace
+  time 1.1725 to 0.7830 seconds. Complete Laplace gradients, including
+  cross-curvature and sensitivity, improved by a median paired 25.7%;
+  seven of eight pairs were faster. The slower pair is retained, including
+  its higher GC time. Median full-gradient time was 1.5406 to 1.1564 seconds,
+  and allocations fell from 4,690,159,680 to 4,144,413,120 bytes (11.6%).
+
+  **Compilation:** first-use baseline/candidate gradients took 23.45/16.07
+  seconds including measured compilation of 13.51/14.76 seconds. First-use
+  trace timings were 9.06/10.48 seconds; larger chunks do not promise cheaper
+  compilation. These are shared-process first-use calls, not independent
+  cold processes. All warm compilation/recompilation deltas were zero;
+  elapsed times include profiling and GC without subtraction.
+
+  **Verification:** all 263 backend assertions passed, including analytic
+  coupled/permuted-order checks and a mode-sensitivity oracle exceeding
+  the new trace cap, plus 216 fresh real R-to-Julia configuration comparisons.
+  Four fresh full R fits passed independent native joint/marginal objectives,
+  all 78 estimates/parameter SEs, complete positive-definite 78-by-78
+  covariance and all 32 required report-SE families (13,091 rows).
+  Maximum fixed gradient was `9.70785316717349e-10`; original P2 starts,
+  controls 10000/10000, three restarts and 7,200-second worker cap were retained.
+
+  **Full-fit timing caveat:** cold process-to-result was 966.02 seconds;
+  warm trial walls were 638.78/618.55/641.87 seconds. These slower actual
+  timings are retained, not omitted or represented as a full-fit speedup.
+  The shared workstation developed memory pressure: a during-run observation
+  recorded 386,684 KiB free memory and 74% CPU load. No concurrent agent
+  builds/tests/model fits were launched. P4/P5 full runs were not interleaved
+  or isolated; these absolute differences do not isolate this code change.
+  The paired gradient evidence above establishes P5's narrower improvement.
+  **P6 remains unchecked**, requiring a controlled final complete-fit
+  comparison rather than extrapolation from gradients.
+
+  **Evidence:** [full-precision pairs, first-use costs and fresh full R results](../data-raw/benchmarks/laplace-trace-2026-11-24/comparison.json)
+  and [commands/timing boundaries](../data-raw/BACKEND_BENCHMARK.md#p5-completed-exact-trace-improvement-2026-11-24).
+  All six immutable baseline sources were checked against Git; candidate
+  runtime hashes, portable archives and checksums were independently verified.
+  Local artifacts `p5-gradients-01` and `p5-julia-full-01` retain full live
+  profiles, logs and active dependency Project/Manifest. Windows x64,
+  R 4.6.2, Julia 1.10.10, single Julia/BLAS thread.
 
 - [ ] **P6 - Pass the final matched full-fit performance gate.**
   **Depends on:** P2, P3 and any necessary performance fixes.

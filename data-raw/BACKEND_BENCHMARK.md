@@ -491,6 +491,85 @@ model traversals from 13 to four per random direction. Exact derivatives,
 directions, starts, mode sensitivity and numerical tolerances are unchanged.
 Cross-curvature retains its original chunk cap.
 
+### P5 completed exact-trace improvement: 2026-11-24
+
+Measured candidate `834eca70` against the immutable P4 export `7ed8e41d`.
+All six exported Julia source files matched their Git blobs. The
+[portable evidence record](benchmarks/laplace-trace-2026-11-24/comparison.json)
+preserves full-precision gradient pairs/modes/Hessians, four fresh real R
+full-fit results, source/driver/dependency fingerprints, phase timestamps,
+snapshot indices and verified archive checksums. Local `p5-gradients-01`
+and `p5-julia-full-01` retain complete profiles, logs and dependency files.
+
+All eight warm pairs matched every gradient component exactly (required
+maximum absolute difference below `1e-6`), with identical conditional modes
+and random Hessians. Trace time improved in all eight pairs: median paired
+ratio **0.666584**, a **33.3% reduction**; median trace time was
+1.1725 to 0.7830 seconds. Complete-gradient time includes cross-curvature
+and implicit-mode sensitivity, not only the improved trace:
+
+| Warm pair | Baseline full gradient (s) | Candidate full gradient (s) | Candidate/baseline |
+| --- | ---: | ---: | ---: |
+| 1 | 1.650859 | 1.151837 | 0.697720 |
+| 2 | 1.503440 | 1.174563 | 0.781250 |
+| 3 | 1.522917 | 1.180440 | 0.775118 |
+| 4 | 1.550039 | 1.157714 | 0.746893 |
+| 5 | 1.564808 | 1.155167 | 0.738217 |
+| 6 | 1.582405 | 1.130984 | 0.714725 |
+| 7 | 1.522488 | 1.642696 | 1.078955 |
+| 8 | 1.531160 | 1.119603 | 0.731212 |
+
+Median paired full-gradient reduction was **25.7%**; seven of eight pairs
+were faster. Pair 7 is retained without exclusion: candidate GC took
+0.542 seconds versus baseline 0.099 seconds. Median full-gradient elapsed
+time was 1.5406 to 1.1564 seconds. Every warm call allocated baseline
+4,690,159,680 versus candidate 4,144,413,120 bytes, **11.6% less** cumulative
+allocation, not a resident-memory estimate.
+
+First-use baseline/candidate gradients took 23.4547/16.0717 seconds and
+allocated 6.120/5.570 GB; measured cumulative compilation deltas were
+13.5109/14.7566 seconds, recompilation 0.0252/0 seconds. First-use trace
+timings were 9.058/10.482 seconds: the larger trace chunks do not promise
+less compilation. First-use calls share a process and are not separate
+cold-process comparisons. Warm compilation/recompilation deltas were zero.
+All timings include profiling/GC without subtraction; trace intervals are
+nested within the complete gradient and must not be added to it.
+
+All 263 backend assertions and 216 fresh real configuration comparisons
+passed, including coupled/permuted-order analytic modes/gradients and a
+mode-sensitivity oracle with 18 fixed effects, exceeding the new cap.
+The unchanged full R command against P2 also completed one cold and three
+fresh original-input warm fits with controls 10000/10000, three restarts,
+single-thread settings and the 7,200-second run-worker cap. All four passed
+native objectives, 78 estimates/parameter SEs, complete positive-definite
+78-by-78 covariance and all 32 report-SE families (13,091 rows).
+Maximum absolute fixed gradient was `9.70785316717349e-10`.
+
+**These full-fit measurements do not establish a speedup or close P6.**
+Preparation took 2.72 seconds separately. Cold process-to-result was
+966.02 seconds, cold trial wall 954.17 seconds; warm trial walls were
+638.78/618.55/641.87 seconds (median 638.78). They are substantially slower
+than P4's historical timings and are retained honestly. During this run,
+the shared interactive workstation developed memory pressure: free
+physical memory was observed at 386,684 KiB with 74% CPU load; a later
+observation recorded 1,297,624 KiB and 60% CPU load. Preflight had recorded
+3,411,664 KiB and 18% CPU load. No competing agent builds, tests or model
+fits were launched. These are observations, not proof attributing the
+entire slowdown to host load; the noninterleaved P4/P5 full runs cannot
+isolate a causal code-performance difference.
+
+Warm marginal-Hessian phases took 524.55/510.54/532.87 seconds, including
+trace phases of 302.14/299.19/312.21 seconds. Warm profile writes took
+11.74-12.96 seconds, cold writes 149.97 seconds, included without subtraction.
+Keep P6 open for a final controlled complete-fit gate; do not extrapolate
+native-speed acceptance from the paired gradient improvement.
+
+Environment: Windows 11 x64, R 4.6.2, Julia 1.10.10, Intel i7-1365U,
+Balanced power, one Julia/BLAS thread. Actual dependencies remained Optim
+1.13.3, ForwardDiff 0.10.39, ComponentArrays 0.15.50, Functors 0.5.5 and
+StatsBase 0.34.14. P5 is complete at its measured exact-gradient scope;
+the migration and complete-fit performance gate are not complete.
+
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
 **This earlier attempt did not complete P3.** The cold Julia fit passed the full native numerical

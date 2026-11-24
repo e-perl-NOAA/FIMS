@@ -53,12 +53,16 @@
   unchanged. Nonconverged preconditioned uncertainty solves fail explicitly.
   Three paired warm complete fits improved 11%-15%, with full numerical
   comparisons passing. Four fresh real R full fits also pass the native
-  gates; warm median is now 225.86 seconds against the historical native
+  gates; P4 warm median was 225.86 seconds against the historical native
   187.67 seconds. Complete-fit performance acceptance remains outstanding.
 * Exact Laplace trace differentiation uses a bounded chunk cap of 16;
   cross-curvature and other derivative calculations retain their cap of 4.
   The directional trace contraction and conditional-mode sensitivity are
   unchanged; this does not approximate third derivatives.
+  Eight warm pairs show a median 33% trace-time reduction and 26% complete
+  Laplace-gradient reduction, with identical gradients and 12% fewer
+  allocations. Fresh full R fits preserve native numerical parity;
+  complete-fit performance acceptance remains open.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

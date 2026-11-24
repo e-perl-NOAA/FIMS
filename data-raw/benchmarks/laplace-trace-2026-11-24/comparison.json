@@ -1,0 +1,558 @@
+{
+  "schema": 1,
+  "checklist_item": "P5",
+  "status": "passed",
+  "date": "2026-11-24",
+  "candidate_revision": "834eca70ab192ebd1159ef46af0db7907ed50272",
+  "baseline_revision": "7ed8e41d",
+  "input_md5": "ad075166d27afabb8dbe224aa73b84c6",
+  "process_timeout_seconds": 7200,
+  "candidate_source_md5": {
+    "R/FIMS-package.R": "66d8d4ca69920506fb513dace3184bc3",
+    "R/augment-fims.R": "9f4dc0595b42c199a6a9c896be91333c",
+    "R/check_convergence.R": "62115dea9869d7f8d6752a116dd28bff",
+    "R/data_big.R": "9244e733bd756def26b8f1c42210a782",
+    "R/distribution_families.R": "4ff36327b895d5ae8fea70525e80fb62",
+    "R/fims_distributions.R": "963b356cf0b697d01dc38dfb4588d278",
+    "R/fims_input_types.R": "31f1b1689d265b6fa1850097faef6fd1",
+    "R/fims_likelihood.R": "0f3a25af5f5455660e4d76eb7379dbed",
+    "R/fims_retro.R": "ef97e4aec04e89acb6ffe339625f30fa",
+    "R/fimsfit.R": "2e7c10772cd71e69e3c056b8cff1e883",
+    "R/fimsframe.R": "0add5dda7266f5b37dedd1227b741c70",
+    "R/initialize_modules.R": "813741b245aa85b76ff849c41b21acad",
+    "R/is_fims_verbose.R": "03d98c153f3978a631ceb23eaa20d64a",
+    "R/julia_backend.R": "0fb09141cf587acbabfee6478463db8e",
+    "R/mohns_rho.R": "914a41acb16eabd3e31b8a79bca1de35",
+    "R/parse_data_distribution.R": "5527d0f5aba8ef03c1ba5343cfd40da8",
+    "R/plot_likelihood.R": "ff24ab3ff81ed07aba55f1b89c7e02aa",
+    "R/run_modified_fims.R": "04c021ff7d01446b95f4163747a65b08",
+    "R/setup_default_parameters.R": "42ee2651bc3bec2ec2e0806064b51438",
+    "R/setup_julia.R": "2aed38975029c26111e78bd280d958ed",
+    "R/simulate_julia.R": "0e50c84d5b70f7ff300834e2d81f3628",
+    "R/tidy-glance-fims.R": "0f848153d7b433561d5227c7cd3f2c48",
+    "R/use-testthat-template.R": "9d72c3ced04e0077d936282d0f2f8211",
+    "R/utils.R": "159d216dc57ca2d936005a66fdcf3e91",
+    "R/zzz.R": "435298f94386f2fe9b4c23bd6efc0a9c",
+    "inst/julia/FIMSBackend/Project.toml": "e770dc45f78e53dfb8a6038ddd74eb8b",
+    "inst/julia/FIMSBackend/src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+    "inst/julia/FIMSBackend/src/modules/population.jl": "e03aab4f68a3324f08e240f64c9a70da",
+    "inst/julia/FIMSBackend/src/modules/recruitment.jl": "aa7798fb92987f38c9375213cfba1107",
+    "inst/julia/FIMSBackend/src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+    "inst/julia/FIMSBackend/src/objective.jl": "cdfb21455516325cd6b9dbf60a534bf1",
+    "inst/julia/FIMSBackend/src/optimizer.jl": "f9625dbb3d2f06e8c89e87aa3114372e",
+    "inst/julia/FIMSBackend/test/runtests.jl": "b728ce46c2ad32190662395327eeadc3",
+    "inst/julia/setup.jl": "870e7eb2c3d367164d1420c25f2f297c"
+  },
+  "baseline_source_md5": {
+    "src/FIMSBackend.jl": "373904b6faec66178b8552bc1dee1c5f",
+    "src/modules/population.jl": "e03aab4f68a3324f08e240f64c9a70da",
+    "src/modules/recruitment.jl": "aa7798fb92987f38c9375213cfba1107",
+    "src/modules/selectivity.jl": "9767686a379fad879bf48c40b2252b8d",
+    "src/objective.jl": "cdfb21455516325cd6b9dbf60a534bf1",
+    "src/optimizer.jl": "b1aaef11f6ac6fc4edd8c7a353bd757f"
+  },
+  "driver_md5": {
+    "benchmark_uncertainty_preconditioner.R": "d49f9116699b1ec016ba546c503b3419",
+    "benchmark_uncertainty_preconditioner.jl": "76cd0c63cee0d7b8a2f8007f16e6a901",
+    "benchmark_profile.jl": "50f5fa46397894180e9c3c5a12b356d3"
+  },
+  "environment": {
+    "R": "R version 4.6.2 (2026-10-29 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "revision": "834eca70ab192ebd1159ef46af0db7907ed50272",
+    "threads": {
+      "JULIA_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    },
+    "julia_version": "1.10.10",
+    "julia_blas": "LBTConfig([ILP64] libopenblas64_.dll)",
+    "julia_blas_threads": 1
+  },
+  "Julia_package_versions": {
+    "Optim": "1.13.3",
+    "ForwardDiff": "0.10.39",
+    "ComponentArrays": "0.15.50",
+    "Functors": "0.5.5",
+    "StatsBase": "0.34.14"
+  },
+  "active_Julia_manifest_md5": "8719f3f74dbb7628b87fd8f8c80a88b1",
+  "host_preflight": {
+    "os": {
+      "Caption": "Microsoft Windows 11 Enterprise",
+      "Version": "10.0.26200",
+      "BuildNumber": "26200",
+      "TotalVisibleMemorySize": 16092824,
+      "FreePhysicalMemory": 3411664
+    },
+    "cpu": {
+      "Name": "13th Gen Intel(R) Core(TM) i7-1365U",
+      "NumberOfCores": 10,
+      "NumberOfLogicalProcessors": 12,
+      "LoadPercentage": 18
+    },
+    "power_scheme": "Balanced",
+    "exclusive_host": false,
+    "observed_at": "2026-11-24T09:16:28.5966673-05:00"
+  },
+  "host_during_full_fit": {
+    "os": {
+      "FreePhysicalMemory": 1297624
+    },
+    "cpu": {
+      "LoadPercentage": 60
+    },
+    "observed_at": "2026-11-24T09:49:56.9159356-05:00",
+    "note": "During real full fit; no concurrent agent tests, builds or other model fits."
+  },
+  "additional_host_observation": {
+    "observed_at": "2026-11-24T09:39:22.3106105-05:00",
+    "CPU_load_percent": 74,
+    "free_physical_memory_KiB": 386684,
+    "source": "Read-only host inspection during warm-1; retained in session tool output."
+  },
+  "implementation": "Change only exact trace fixed-gradient chunk cap from 4 to 16; for 49 fixed parameters actual width 13 reduces repeated model traversals from 13 to four per random direction. Exact directional contraction and implicit mode sensitivity unchanged.",
+  "boundaries": "Paired timers include the entire exact Laplace gradient, cross-curvature and trace; identical modes/Hessians are prepared outside each timer. First-use measurements retain JIT; cumulative Julia compilation/recompilation timer deltas recorded separately, not subtracted from elapsed. Warm results exclude one first-use call per implementation, not selected slow trials. All elapsed and phase times include live profiling without subtraction. R full-fit timers use P1 boundaries; native P2 timing is historical, not interleaved. The shared host developed severe memory pressure during full fits; absolute timings are preserved, not compared as an isolated P4/P5 or native performance experiment.",
+  "first_use": {
+    "pair": 1,
+    "warmup": true,
+    "coordinate": 0,
+    "direction": 0,
+    "order": ["baseline", "candidate"],
+    "baseline": {
+      "seconds": 23.4546863,
+      "allocated_bytes": 6119593772,
+      "gc_seconds": 0.7750459,
+      "compilation_seconds": 13.5108512,
+      "recompilation_seconds": 0.0251859,
+      "trace_seconds": 9.05800008773804,
+      "cross_curvature_seconds": 5.10199999809265
+    },
+    "candidate": {
+      "seconds": 16.0717419,
+      "allocated_bytes": 5569586736,
+      "gc_seconds": 0.8193322,
+      "compilation_seconds": 14.7566294,
+      "recompilation_seconds": 0,
+      "trace_seconds": 10.481999874115,
+      "cross_curvature_seconds": 5.10899996757507
+    },
+    "full_gradient_ratio": 0.685225191010122,
+    "trace_ratio": 1.15720907182421,
+    "max_absolute_gradient_difference": 0
+  },
+  "warm_gradient_pairs": [
+    {
+      "pair": 2,
+      "warmup": false,
+      "coordinate": 0,
+      "direction": 0,
+      "order": ["candidate", "baseline"],
+      "baseline": {
+        "seconds": 1.6508585,
+        "allocated_bytes": 4690159680,
+        "gc_seconds": 0.106839,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 1.2960000038147,
+        "cross_curvature_seconds": 0.351999998092651
+      },
+      "candidate": {
+        "seconds": 1.1518367,
+        "allocated_bytes": 4144413120,
+        "gc_seconds": 0.0647037,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 0.781000137329102,
+        "cross_curvature_seconds": 0.36899995803833
+      },
+      "full_gradient_ratio": 0.697719822746771,
+      "trace_ratio": 0.602623560980151,
+      "max_absolute_gradient_difference": 0
+    },
+    {
+      "pair": 3,
+      "warmup": false,
+      "coordinate": 1,
+      "direction": 1,
+      "order": ["baseline", "candidate"],
+      "baseline": {
+        "seconds": 1.50344,
+        "allocated_bytes": 4690159680,
+        "gc_seconds": 0.102096,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 1.1470000743866,
+        "cross_curvature_seconds": 0.354000091552734
+      },
+      "candidate": {
+        "seconds": 1.174563,
+        "allocated_bytes": 4144413120,
+        "gc_seconds": 0.0662185,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 0.821000099182129,
+        "cross_curvature_seconds": 0.352999925613403
+      },
+      "full_gradient_ratio": 0.781250332570638,
+      "trace_ratio": 0.715780336475733,
+      "max_absolute_gradient_difference": 0
+    },
+    {
+      "pair": 4,
+      "warmup": false,
+      "coordinate": 25,
+      "direction": -1,
+      "order": ["candidate", "baseline"],
+      "baseline": {
+        "seconds": 1.5229169,
+        "allocated_bytes": 4690159680,
+        "gc_seconds": 0.1006854,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 1.16700005531311,
+        "cross_curvature_seconds": 0.353999853134155
+      },
+      "candidate": {
+        "seconds": 1.18044,
+        "allocated_bytes": 4144413120,
+        "gc_seconds": 0.0646419,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 0.802000045776367,
+        "cross_curvature_seconds": 0.378000020980835
+      },
+      "full_gradient_ratio": 0.775117801897136,
+      "trace_ratio": 0.687232226018351,
+      "max_absolute_gradient_difference": 0
+    },
+    {
+      "pair": 5,
+      "warmup": false,
+      "coordinate": 49,
+      "direction": 1,
+      "order": ["baseline", "candidate"],
+      "baseline": {
+        "seconds": 1.5500389,
+        "allocated_bytes": 4690159680,
+        "gc_seconds": 0.1004442,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 1.19700002670288,
+        "cross_curvature_seconds": 0.351999998092651
+      },
+      "candidate": {
+        "seconds": 1.1577135,
+        "allocated_bytes": 4144413120,
+        "gc_seconds": 0.0603364,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 0.79200005531311,
+        "cross_curvature_seconds": 0.363000154495239
+      },
+      "full_gradient_ratio": 0.746893190874113,
+      "trace_ratio": 0.661654166787835,
+      "max_absolute_gradient_difference": 0
+    },
+    {
+      "pair": 6,
+      "warmup": false,
+      "coordinate": 0,
+      "direction": 0,
+      "order": ["candidate", "baseline"],
+      "baseline": {
+        "seconds": 1.5648078,
+        "allocated_bytes": 4690159680,
+        "gc_seconds": 0.1021904,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 1.16900014877319,
+        "cross_curvature_seconds": 0.394000053405762
+      },
+      "candidate": {
+        "seconds": 1.1551669,
+        "allocated_bytes": 4144413120,
+        "gc_seconds": 0.063223,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 0.785000085830688,
+        "cross_curvature_seconds": 0.368000030517578
+      },
+      "full_gradient_ratio": 0.738216476170428,
+      "trace_ratio": 0.671514102589727,
+      "max_absolute_gradient_difference": 0
+    },
+    {
+      "pair": 7,
+      "warmup": false,
+      "coordinate": 1,
+      "direction": 1,
+      "order": ["baseline", "candidate"],
+      "baseline": {
+        "seconds": 1.5824051,
+        "allocated_bytes": 4690159680,
+        "gc_seconds": 0.1012624,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 1.18599987030029,
+        "cross_curvature_seconds": 0.393999814987183
+      },
+      "candidate": {
+        "seconds": 1.130984,
+        "allocated_bytes": 4144413120,
+        "gc_seconds": 0.0614349,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 0.770999908447266,
+        "cross_curvature_seconds": 0.358000040054321
+      },
+      "full_gradient_ratio": 0.714724693442912,
+      "trace_ratio": 0.650084310930025,
+      "max_absolute_gradient_difference": 0
+    },
+    {
+      "pair": 8,
+      "warmup": false,
+      "coordinate": 25,
+      "direction": -1,
+      "order": ["candidate", "baseline"],
+      "baseline": {
+        "seconds": 1.5224882,
+        "allocated_bytes": 4690159680,
+        "gc_seconds": 0.0985127,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 1.15599989891052,
+        "cross_curvature_seconds": 0.365000009536743
+      },
+      "candidate": {
+        "seconds": 1.6426955,
+        "allocated_bytes": 4144413120,
+        "gc_seconds": 0.5416833,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 0.776999950408936,
+        "cross_curvature_seconds": 0.863999843597412
+      },
+      "full_gradient_ratio": 1.07895450355543,
+      "trace_ratio": 0.672145344598406,
+      "max_absolute_gradient_difference": 0
+    },
+    {
+      "pair": 9,
+      "warmup": false,
+      "coordinate": 49,
+      "direction": 1,
+      "order": ["baseline", "candidate"],
+      "baseline": {
+        "seconds": 1.5311602,
+        "allocated_bytes": 4690159680,
+        "gc_seconds": 0.096934,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 1.17600011825562,
+        "cross_curvature_seconds": 0.352999925613403
+      },
+      "candidate": {
+        "seconds": 1.1196035,
+        "allocated_bytes": 4144413120,
+        "gc_seconds": 0.0674794,
+        "compilation_seconds": 0,
+        "recompilation_seconds": 0,
+        "trace_seconds": 0.733999967575073,
+        "cross_curvature_seconds": 0.381999969482422
+      },
+      "full_gradient_ratio": 0.731212514536363,
+      "trace_ratio": 0.624149569528811,
+      "max_absolute_gradient_difference": 0
+    }
+  ],
+  "warm_full_gradient_ratio": {
+    "values": [0.697719822746771, 0.781250332570638, 0.775117801897136, 0.746893190874113, 0.738216476170428, 0.714724693442912, 1.07895450355543, 0.731212514536363],
+    "median": 0.74255483352227,
+    "mean": 0.783011166974224,
+    "minimum": 0.697719822746771,
+    "maximum": 1.07895450355543,
+    "standard_deviation": 0.122812105615784
+  },
+  "warm_trace_ratio": {
+    "values": [0.602623560980151, 0.715780336475733, 0.687232226018351, 0.661654166787835, 0.671514102589727, 0.650084310930025, 0.672145344598406, 0.624149569528811],
+    "median": 0.666584134688781,
+    "mean": 0.66064795223863,
+    "minimum": 0.602623560980151,
+    "maximum": 0.715780336475733,
+    "standard_deviation": 0.0354725881398085
+  },
+  "faster_warm_pairs": 7,
+  "maximum_absolute_gradient_difference": 0,
+  "gradient_profiles": {
+    "count": 4,
+    "write_seconds": 12.7120001316071
+  },
+  "fresh_R_full_fits": [
+    {
+      "trial": "cold",
+      "wall_seconds": 954.17,
+      "cold_process_to_result_seconds": 966.015312194824,
+      "gradient_max": 9.70785316717349e-10,
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "optimization_seconds": 266.061999797821,
+      "marginal_hessian_seconds": 507.148000001907,
+      "conditional": {
+        "calls": 98,
+        "seconds": 60.4460000991821
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 141.210000514984
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 289.749001502991
+      },
+      "profiles": {
+        "count": 25,
+        "write_seconds": 149.965000391006
+      }
+    },
+    {
+      "trial": "warm-1",
+      "wall_seconds": 638.78,
+      "cold_process_to_result_seconds": null,
+      "gradient_max": 9.70785316717349e-10,
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "optimization_seconds": 71.5820000171661,
+      "marginal_hessian_seconds": 524.548000097275,
+      "conditional": {
+        "calls": 98,
+        "seconds": 63.5190000534058
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 147.201000452042
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 302.135999917984
+      },
+      "profiles": {
+        "count": 22,
+        "write_seconds": 12.859001159668
+      }
+    },
+    {
+      "trial": "warm-2",
+      "wall_seconds": 618.55,
+      "cold_process_to_result_seconds": null,
+      "gradient_max": 9.70785316717349e-10,
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "optimization_seconds": 70.7649998664856,
+      "marginal_hessian_seconds": 510.539000034332,
+      "conditional": {
+        "calls": 98,
+        "seconds": 62.0439991950989
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 138.906999349594
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 299.190000295639
+      },
+      "profiles": {
+        "count": 21,
+        "write_seconds": 11.7430002689362
+      }
+    },
+    {
+      "trial": "warm-3",
+      "wall_seconds": 641.87,
+      "cold_process_to_result_seconds": null,
+      "gradient_max": 9.70785316717349e-10,
+      "comparison": {
+        "status": "passed",
+        "parameters": 78,
+        "derived_families": 32,
+        "derived_rows": 13091
+      },
+      "optimization_seconds": 73.2030000686646,
+      "marginal_hessian_seconds": 532.869999885559,
+      "conditional": {
+        "calls": 98,
+        "seconds": 63.0549991130829
+      },
+      "cross_curvature": {
+        "calls": 98,
+        "seconds": 146.136998653412
+      },
+      "third_derivatives": {
+        "calls": 98,
+        "seconds": 312.209000349045
+      },
+      "profiles": {
+        "count": 22,
+        "write_seconds": 12.9579999446869
+      }
+    }
+  ],
+  "fresh_R_warm_wall_seconds": {
+    "values": [638.78, 618.55, 641.87],
+    "median": 638.78,
+    "mean": 633.066666666667,
+    "minimum": 618.55,
+    "maximum": 641.87,
+    "standard_deviation": 12.6663820143453
+  },
+  "native_P2_warm_median_seconds": 187.67,
+  "fresh_R_warm_median_ratio_to_P2_native": 3.40374060851495,
+  "raw_local_artifacts": ["p5-gradients-01", "p5-julia-full-01"],
+  "validation": {
+    "backend_assertions": 263,
+    "real_configuration_comparisons": 216,
+    "coupled_permuted_order_and_more_than_16_fixed_analytic_oracles": true,
+    "paired_gradients_below_1e_6": true,
+    "all_four_R_full_fits_match_native": true,
+    "complete_78_by_78_covariance_PD": true,
+    "all_32_native_report_SE_families": true,
+    "original_starts_and_tolerances_preserved": true,
+    "pointer_free_portable_artifacts": true
+  },
+  "performance_parity_established": false,
+  "artifact_md5": {
+    "gradients/julia-profile/snapshots.tsv": "4e1e8f468b8fe6fe1a9b2aee28a54400",
+    "gradients/optimizer.progress": "bdfdd221b1d79144ed74946965f02bf9",
+    "gradients/progress.tsv": "b70b1c40c537fb3e1be9e6ffed6d4c17",
+    "gradients/results.rds": "733b3b1fdd4e7f62b3a172a3cb38d80a",
+    "input.rds": "ad075166d27afabb8dbe224aa73b84c6",
+    "julia/cold/julia-profile/snapshots.tsv": "3f5cb6e9ceb9e2d50462d363a244e447",
+    "julia/cold/optimizer.progress": "4cb3dc5da75dfdeba68329b22cb33e2a",
+    "julia/cold/result.rds": "0aa6da9c32a2f2fcd87ef6a0b4aa045f",
+    "julia/progress.tsv": "8c6267977d356aa93b21922838ae1a10",
+    "julia/warm-1/julia-profile/snapshots.tsv": "6b54ef879de842d99e53f9d7e94adfbb",
+    "julia/warm-1/optimizer.progress": "d24c85c406518e2f1d9813e214eb77f4",
+    "julia/warm-1/result.rds": "ef3aadda60578e805a93cd333988bd79",
+    "julia/warm-2/julia-profile/snapshots.tsv": "05915ae8d21cefd298b8fbe67579fb95",
+    "julia/warm-2/optimizer.progress": "e2b55b292ad5b8432c63c54b14269dba",
+    "julia/warm-2/result.rds": "0e8823660a9b4ab38e037ba032953cf0",
+    "julia/warm-3/julia-profile/snapshots.tsv": "04bb2f5e19ab9aa72a6edef4c7181e9d",
+    "julia/warm-3/optimizer.progress": "b1a14d5eb28b7cfcd93d23e91063f0c9",
+    "julia/warm-3/result.rds": "1ab6c11333caf97f035cfee629da9241"
+  }
+}
