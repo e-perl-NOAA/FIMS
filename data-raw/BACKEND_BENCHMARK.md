@@ -458,6 +458,39 @@ uncertainty Hessian: 18.19 in conditional solves, 39.86 in cross-curvature
 and 133.09 in exact third-derivative traces (nested timings, not extra
 costs to add to the parent). P5 targets that remaining trace bottleneck.
 
+## P5 paired exact Laplace-gradient benchmark
+
+The `gradients` mode of the same developer driver measures complete exact
+Laplace gradients against an immutable P4 export. Each pair uses identical
+conditional modes and random Hessians. Timers include cross-curvature,
+mode sensitivity and the exact third-derivative trace, but exclude the
+conditional solve symmetrically. Phase timestamps separate cross-curvature
+from trace cost; live profiling remains enabled.
+
+```powershell
+git archive --format=zip --output=C:\benchmarks\p5-baseline.zip 7ed8e41d inst\julia\FIMSBackend
+Expand-Archive -LiteralPath C:\benchmarks\p5-baseline.zip -DestinationPath C:\benchmarks\p5-baseline
+$Baseline = 'C:\benchmarks\p5-baseline\inst\julia\FIMSBackend'
+$env:JULIA_HOME = Split-Path $Julia
+$env:JULIA_BINDIR = $env:JULIA_HOME
+& $Rscript --vanilla data-raw\benchmark_uncertainty_preconditioner.R gradients $Baseline C:\benchmarks\p5-gradients-new
+```
+
+One first-use call per implementation is recorded separately, including
+Julia's cumulative compilation/recompilation timer deltas, elapsed time,
+allocations and GC. Eight subsequent alternating-order warm pairs repeat
+the fitted point and centered-step perturbations at fixed coordinates 1,
+25 and 49. All 49 gradient components must agree within `1e-6`; actual
+modes and Hessians must be identical within `1e-12`. Both implementations
+run in one process under the unchanged 7,200-second cap. Larger directional
+Hessian batches were investigated but did not show a reliable warm benefit;
+the candidate changes only the trace gradient's differentiation chunk cap
+from 4 to 16. ForwardDiff chooses a balanced actual chunk no larger than
+the cap (49 fixed effects use width 13 instead of 4), reducing repeated
+model traversals from 13 to four per random direction. Exact derivatives,
+directions, starts, mode sensitivity and numerical tolerances are unchanged.
+Cross-curvature retains its original chunk cap.
+
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
 **This earlier attempt did not complete P3.** The cold Julia fit passed the full native numerical

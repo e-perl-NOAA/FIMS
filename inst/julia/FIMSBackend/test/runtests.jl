@@ -189,32 +189,36 @@ end
     random_hessian = ones(1, 1),
   )
 
-  # Exceed the differentiation chunk width and retain mode sensitivity.
-  wide_fixed = collect(range(-0.2, 0.3; length = 6))
-  wide_parameters = vcat(wide_fixed, wide_fixed .^ 2)
-  wide_objective = values -> sum(
-    0.5 * values[index]^2 +
-    exp(values[index]) * (
-      exp(values[index + 6] - values[index]^2) -
-      (values[index + 6] - values[index]^2)
+  # Exceed both curvature and trace chunk widths and retain mode sensitivity.
+  for fixed_count in (6, 18)
+    wide_fixed = collect(range(-0.2, 0.3; length = fixed_count))
+    wide_parameters = vcat(wide_fixed, wide_fixed .^ 2)
+    wide_objective = values -> sum(
+      0.5 * values[index]^2 +
+      exp(values[index]) * (
+        exp(values[index + fixed_count] - values[index]^2) -
+        (values[index + fixed_count] - values[index]^2)
+      )
+      for index in 1:fixed_count
     )
-    for index in 1:6
-  )
-  mktempdir() do directory
-    diagnostic_file = joinpath(directory, "progress.log")
-    actual = FIMSBackend._laplace_gradient(
-      wide_objective, wide_parameters, collect(1:6), collect(7:12);
-      diagnostic_file = diagnostic_file,
-    )
-    @test actual ≈ wide_fixed .+ exp.(wide_fixed) .+ 0.5 atol = 1e-10
-    @test map(line -> split(line)[2], readlines(diagnostic_file)) == [
-      "laplace_joint_hessian:start", "laplace_joint_hessian:complete",
-      "laplace_third_derivatives:start", "laplace_third_derivatives:complete",
-    ]
-    @test FIMSBackend._laplace_gradient(
-      wide_objective, wide_parameters, collect(1:6), collect(7:12);
-      random_hessian = Matrix(Diagonal(exp.(wide_fixed))),
-    ) ≈ actual atol = 1e-10
+    fixed_order = collect(1:fixed_count)
+    random_order = collect((fixed_count + 1):(2 * fixed_count))
+    mktempdir() do directory
+      diagnostic_file = joinpath(directory, "progress.log")
+      actual = FIMSBackend._laplace_gradient(
+        wide_objective, wide_parameters, fixed_order, random_order;
+        diagnostic_file = diagnostic_file,
+      )
+      @test actual ≈ wide_fixed .+ exp.(wide_fixed) .+ 0.5 atol = 1e-10
+      @test map(line -> split(line)[2], readlines(diagnostic_file)) == [
+        "laplace_joint_hessian:start", "laplace_joint_hessian:complete",
+        "laplace_third_derivatives:start", "laplace_third_derivatives:complete",
+      ]
+      @test FIMSBackend._laplace_gradient(
+        wide_objective, wide_parameters, fixed_order, random_order;
+        random_hessian = Matrix(Diagonal(exp.(wide_fixed))),
+      ) ≈ actual atol = 1e-10
+    end
   end
 end
 

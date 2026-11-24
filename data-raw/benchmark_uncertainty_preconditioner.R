@@ -5,7 +5,7 @@ worker <- length(arguments) == 4L && identical(arguments[[4]], "--worker")
 mode <- arguments[[1]]
 baseline <- normalizePath(arguments[[2]], mustWork = TRUE)
 output <- arguments[[3]]
-stopifnot(mode %in% c("probe", "fits"))
+stopifnot(mode %in% c("probe", "fits", "gradients"))
 script <- normalizePath(sub("^--file=", "",
   commandArgs()[startsWith(commandArgs(), "--file=")]))
 root <- normalizePath(file.path(dirname(script), ".."))
@@ -82,7 +82,9 @@ benchmark_json(list(
   input_md5 = unname(tools::md5sum(file.path(root, "data-raw", "benchmarks",
     "native-full-2026-11-17", "input.rds"))),
   timeout_seconds = 7200L,
-  scope = if (mode == "probe") "Paired complete-model conditional solves and perturbed gradients." else
+  scope = if (mode == "gradients")
+    "Paired complete exact Laplace gradients at identical complete-model modes/Hessians; conditional optimization excluded from both timers." else if (mode == "probe")
+    "Paired complete-model conditional solves and perturbed gradients." else
     "Paired complete Julia fit_model calls, including optimization and all uncertainty/report work; R initialization/adapters excluded on both sides.",
   cold_trials_excluded_from_warm_comparison = TRUE
 ), file.path(output, "protocol.json"))
@@ -101,7 +103,32 @@ assert_close <- function(first, second, tolerance, label) {
     check.attributes = FALSE)), paste("P4 comparison failed:", label))
 }
 results <- list()
-if (mode == "probe") {
+if (mode == "gradients") {
+  run_profiled(output, function() {
+    JuliaCall::julia_call("FIMSUncertaintyBenchmark.prepare_probe", file.path(output, "optimizer.progress"))
+    points <- rep(list(c(0L, 0L), c(1L, 1L), c(25L, -1L), c(49L, 1L)), 2L)
+    points <- c(list(c(0L, 0L)), points)
+    for (index in seq_along(points)) {
+      point <- points[[index]]
+      order <- if (index %% 2L) c("baseline", "candidate") else c("candidate", "baseline")
+      pair <- list(warmup = index == 1L)
+      for (backend in order) {
+        checkpoint(paste("gradient", index, backend, sep = ":"))
+        pair[[backend]] <- JuliaCall::julia_call("FIMSUncertaintyBenchmark.gradient_probe",
+          backend, point[[1]], point[[2]])
+      }
+      results[[index]] <- pair
+      saveRDS(results, file.path(output, "results.rds"), version = 3)
+      assert_close(pair[["baseline"]][["parameters"]], pair[["candidate"]][["parameters"]],
+        1e-12, "identical conditional mode")
+      assert_close(pair[["baseline"]][["random_hessian"]], pair[["candidate"]][["random_hessian"]],
+        1e-12, "identical random curvature")
+      difference <- max(abs(pair[["baseline"]][["gradient"]] - pair[["candidate"]][["gradient"]]))
+      benchmark_require(is.finite(difference) && difference < 1e-6,
+        paste("Complete Laplace gradients differ:", difference))
+    }
+  })
+} else if (mode == "probe") {
   run_profiled(output, function() {
     prepared <- JuliaCall::julia_call("FIMSUncertaintyBenchmark.prepare_probe", file.path(output, "optimizer.progress"))
     assert_close(prepared[["marginal"]], reference[["marginal"]], 1e-8, "fitted reference point")
@@ -159,6 +186,7 @@ if (mode == "probe") {
     JuliaCall::julia_command("GC.gc()")
   }
 }
-benchmark_json(list(status = "complete", mode = mode, pairs = if (mode == "probe") 98L else 3L),
+benchmark_json(list(status = "complete", mode = mode,
+  pairs = switch(mode, probe = 98L, fits = 3L, gradients = 8L)),
   file.path(output, "summary.json"))
 checkpoint("complete")

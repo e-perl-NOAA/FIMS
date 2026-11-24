@@ -90,6 +90,35 @@ function probe(backend, index, direction; compute_gradient = true)
   )
 end
 
+function gradient_probe(backend, index, direction)
+  current = problem[]
+  fixed_values = copy(current.mode.parameters[current.fixed])
+  if index != 0
+    step = cbrt(eps(Float64)) * max(abs(fixed_values[index]), 1.0)
+    fixed_values[index] += direction * step
+  end
+  mode = candidate_mode(current, fixed_values)
+  mode.converged || error("Gradient probe conditional mode did not converge.")
+  evaluate = backend == "baseline" ? Baseline.FIMSBackend._laplace_gradient :
+    backend == "candidate" ? FIMSBackend._laplace_gradient : error("Unknown backend.")
+  path = current.config[:diagnostic_file]
+  FIMSBackend._optimizer_checkpoint(path, "gradient:$backend:$index:$direction:start")
+  Base.cumulative_compile_timing(true)
+  compile_start = Base.cumulative_compile_time_ns()
+  measured = @timed evaluate(current.joint, mode.parameters, current.fixed, current.random;
+    random_hessian = mode.random_hessian, diagnostic_file = path)
+  compile_end = Base.cumulative_compile_time_ns()
+  FIMSBackend._optimizer_checkpoint(path, "gradient:$backend:$index:$direction:complete")
+  Dict(
+    "backend" => backend, "index" => index, "direction" => direction,
+    "seconds" => measured.time, "allocated_bytes" => Float64(measured.bytes),
+    "gc_seconds" => measured.gctime, "gradient" => measured.value,
+    "compilation_seconds" => (compile_end[1] - compile_start[1]) / 1e9,
+    "recompilation_seconds" => (compile_end[2] - compile_start[2]) / 1e9,
+    "parameters" => mode.parameters, "random_hessian" => mode.random_hessian,
+  )
+end
+
 probe_modes(backend, index, direction) =
   probe(backend, index, direction; compute_gradient = false)
 

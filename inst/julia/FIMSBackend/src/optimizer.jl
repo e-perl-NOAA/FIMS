@@ -196,7 +196,10 @@ function _laplace_gradient(
     result
   end
   _optimizer_checkpoint(diagnostic_file, "laplace_third_derivatives:start")
-  marginal_gradient = _bounded_gradient(linearized_marginal, fixed_start)
+  trace_config = ForwardDiff.GradientConfig(
+    linearized_marginal, fixed_start, ForwardDiff.Chunk(fixed_start, 16),
+  )
+  marginal_gradient = gradient(linearized_marginal, fixed_start, trace_config)
   _optimizer_checkpoint(diagnostic_file, "laplace_third_derivatives:complete")
   marginal_gradient
 end
