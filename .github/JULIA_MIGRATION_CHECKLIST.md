@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N1**.
+   Name that item before starting. The default next item is **N2**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -552,7 +552,7 @@ These are gaps in **integrated independent numerical evidence**, not claims
 that all the listed features are missing implementations. Existing tests
 remain useful and must be reused.
 
-- [ ] **N1 - Capture an independent random-effect-prior reference.**
+- [x] **N1 - Capture an independent random-effect-prior reference.**
   **Depends on:** none; requires the preserved native oracle environment.
   **Done when:** a bounded model with multiple coupled random effects has
   an independent reference incorporating a prior inside the joint objective,
@@ -560,6 +560,43 @@ remain useful and must be reused.
   Store nonoptimal points, optimized results, and uncertainty with a
   reproducible generator/provenance. Adding a prior only after native
   marginalization is invalid for this item.
+
+  **Completed:** 2026-11-24, implementation/reference commit `0c6787b1`.
+  The five-year/two-fleet EWAA reference estimates
+  six fixed and four coupled recruitment random effects. Two cases preserve
+  all six existing fixed-effect priors; one additionally targets `log_devs`
+  in years 2 and 4 with identity-scale normal priors. Independent R densities,
+  scores and curvature augment the historical native **joint** TMB tape
+  before solving modes or calculating the Laplace adjustment.
+
+  **Verification:** both cases retain two nonoptimal fixed points, conditional
+  modes/scores, native/prior random Hessians, joint/marginal objectives,
+  gradients/reports and optimized uncertainty. Complete 10-by-10 covariance is
+  positive definite, with 32 report-SE families (2,216 rows). Fixed gradients
+  are below `1e-3`; random-mode residuals are below `6e-13` at the optima.
+  Native-curvature marginal scores agree with independently re-solved
+  marginal-value differences to less than `9e-10`; halved derivative steps
+  change Hessian entries by less than `1.3e-8`. The fixed-prior control also
+  reproduces the existing native configuration reference. Adding the prior
+  only after marginalization is explicitly disproved by a 4.3015342 objective
+  discrepancy and a 0.180096 mode shift.
+
+  **Reproduction and provenance:** two fresh native-only R processes generated
+  byte-identical pointer-free fixtures, MD5 `d4d40b794b74d47a3eed6bfb948a8bbe`.
+  The loaded historical DLL matches `7791104ab1295dcec1725062eb5f1f0a`;
+  declared revision `1e5a64a8`, native R-source hashes, input/generator hashes,
+  R 4.6.2, TMB 1.9.21 and optimizer controls are stored. The existing R backend
+  regression file passes, including the 30 new R-only reference consistency
+  assertions. Real-Julia tests were deliberately skipped: **N2 remains open**.
+  No production backend changes, native compilation or Julia-generated
+  expectations were introduced.
+
+  **Evidence:** [reproducible generator](../data-raw/generate_native_random_prior_oracle.R),
+  `tests/testthat/fixtures/native-random-prior-oracle.rds`,
+  [method and regeneration commands](../tests/testthat/fixtures/native-backend-oracle.md#independent-random-effect-prior-reference-n1),
+  and the fixture-consistency test in `tests/testthat/test-julia-backend.R`.
+  Local logs `n1-generate-final.log`, `n1-reproduce.log` and
+  `n1-r-backend-tests.log` retain execution details. The next ready item is **N2**.
 
 - [ ] **N2 - Pass the real-Julia random-effect-prior gate.**
   **Depends on:** N1.

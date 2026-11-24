@@ -89,6 +89,12 @@
   Package preparation cost 738.66 seconds with existing dependencies, including
   717.19 seconds precompilation, recorded separately rather than hidden.
   The overall migration remains incomplete.
+* The N1 reference now captures priors on coupled recruitment random effects
+  inside an independent native joint objective, before conditional modes and
+  Laplace integration. It preserves fixed priors, nonoptimal evaluations,
+  optimized estimates, full covariance and native report SEs, with a
+  reproducible generator and pointer-free fixture. This supplies expectations
+  for N2; real-Julia random-prior parity is not yet established.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
