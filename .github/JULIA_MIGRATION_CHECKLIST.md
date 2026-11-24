@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N2**.
+   Name that item before starting. The default next item is **N3**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -40,7 +40,7 @@ for a continuation.
 | Backend cutover | Julia is the default/sole backend; FIMS native sources, headers, registration, and direct Rcpp/TMB build dependencies have been removed. Third-party dependencies such as JuliaCall still contain compiled code. |
 | Examples | Bundled fitted examples have been regenerated using real Julia execution, including the complete 49-fixed/29-random example. |
 | Full-model numerical reference | Saved full-model estimates, complete covariance, and 32 derived-report SE families pass independent native comparisons. This is not a fresh full-fit benchmark. |
-| Fresh configuration fits | Three bounded two-fleet configurations pass 216 real-Julia comparisons, including joint growth/selectivity/catchability/recruitment, four random effects, and normal/lognormal fixed-effect priors. |
+| Fresh configuration fits | Five bounded two-fleet reference cases pass 419 real-Julia comparisons, including joint growth/selectivity/catchability/recruitment, four random effects, and fixed priors plus priors on coupled recruitment random effects. |
 | R compatibility | Live objectives/gradients/Hessians/reports, uncertainty adapters, conditional observation simulation, extraction, and small projection checks exist. |
 | Parallel diagnostics | Small single-fixed-effect profiles and retrospectives match between sequential and two-worker execution; current installed worker-package provenance was verified. |
 | Windows installation/check | A complete compiler-disabled Windows package check, default vignettes, and PDF manual have passed. A final-candidate recheck is still required below. |
@@ -587,7 +587,8 @@ remain useful and must be reused.
   declared revision `1e5a64a8`, native R-source hashes, input/generator hashes,
   R 4.6.2, TMB 1.9.21 and optimizer controls are stored. The existing R backend
   regression file passes, including the 30 new R-only reference consistency
-  assertions. Real-Julia tests were deliberately skipped: **N2 remains open**.
+  assertions. N1 deliberately skipped real-Julia tests; N2 below supplies that
+  separate comparison.
   No production backend changes, native compilation or Julia-generated
   expectations were introduced.
 
@@ -596,15 +597,50 @@ remain useful and must be reused.
   [method and regeneration commands](../tests/testthat/fixtures/native-backend-oracle.md#independent-random-effect-prior-reference-n1),
   and the fixture-consistency test in `tests/testthat/test-julia-backend.R`.
   Local logs `n1-generate-final.log`, `n1-reproduce.log` and
-  `n1-r-backend-tests.log` retain execution details. The next ready item is **N2**.
+  `n1-r-backend-tests.log` retain execution details. N1 supplied the expectations
+  for N2 below.
 
-- [ ] **N2 - Pass the real-Julia random-effect-prior gate.**
+- [x] **N2 - Pass the real-Julia random-effect-prior gate.**
   **Depends on:** N1.
   **Done when:** a committed real-bridge regression passes the configuration
   gate against N1, including changed conditional modes and covariance.
   Verify prior targeting/scales and preserve any applicable fixed-effect
   priors. The existing uncoupled Gaussian and fixed-effect-prior checks alone
   do not close this item.
+
+  **Completed:** 2026-11-24, regression/documentation commit `8a6cefed`.
+  The existing real configuration test now compares N1's fixed-prior control
+  and random-prior assessment alongside the three earlier reference cases.
+  Both new cases estimate six fixed and four coupled recruitment random
+  effects; all six fixed priors are preserved, and random priors target years
+  2 and 4 on the identity log-deviation scale.
+
+  **Verification:** a fresh R 4.6.2 process with explicitly selected Julia
+  1.10.10, single-thread settings and `FIMS_RUN_JULIA_INTEGRATION=true`
+  passed **419 assertions across five optimized fits and ten nonoptimal
+  fixed points**, without failures, errors or skips. Comparisons include
+  prior targeting/distributions/scales, independent joint scores,
+  conditional modes, prior contributions, joint/marginal objectives and
+  curvature, convergence, estimates, complete covariance and 32 derived-SE
+  families. Removing only the random priors at the same augmented mode
+  recovers native random curvature; paired cases match the native changes
+  in modes, curvature and optimized covariance.
+
+  **Integrity:** native fixture MD5 remains
+  `d4d40b794b74d47a3eed6bfb948a8bbe`; no expectations were regenerated,
+  tolerances relaxed, or production backend/performance controls changed.
+  The full R backend regression file also passes separately with its five
+  opt-in bridge tests skipped; those mocked/R-only checks are not counted as
+  real numerical evidence. The existing real-integration CI paths include
+  the expanded gate; no remote CI was monitored.
+
+  **Evidence:** the test `real Julia joint configurations retain native
+  gradients and uncertainty` in `tests/testthat/test-julia-backend.R`,
+  the immutable N1 fixture, and
+  [comparison details and local command](../tests/testthat/fixtures/native-backend-oracle.md#real-julia-comparison-n2).
+  Local `n2-real-gate.R`, `n2-real-gate.log`,
+  `n2-real-gate-results.rds` and `n2-r-backend-tests.log` retain the selected
+  real run and separate R regression details. The next ready item is **N3**.
 
 - [ ] **N3 - Pass a jointly estimated DoubleLogistic selectivity gate.**
   **Depends on:** none.
