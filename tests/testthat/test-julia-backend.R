@@ -2237,8 +2237,11 @@ test_that("real Julia joint configurations retain native gradients and uncertain
   skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
     "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
   oracle <- readRDS(testthat::test_path("fixtures", "native-configuration-oracle.rds"))
+  random_prior_oracle <- readRDS(testthat::test_path("fixtures", "native-random-prior-oracle.rds"))
+  cases <- c(oracle[["cases"]], random_prior_oracle[["cases"]])
+  random_prior_results <- list()
   keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
-  for (case in oracle[["cases"]]) {
+  for (case in cases) {
     name <- case[["name"]]
     input <- initialize_fims(
       case[["parameters"]], FIMSFrame(case[["data"]]), priors = case[["priors"]]
@@ -2270,7 +2273,8 @@ test_that("real Julia joint configurations retain native gradients and uncertain
     expect_equal(unname(matched[["uncertainty_julia"]]),
       unname(matched[["uncertainty_native"]]), tolerance = 1e-4, info = name)
     objective <- get_obj(fit)
-    covariance <- environment(objective[["fn"]])[["fit_result"]][["covariance"]]
+    fit_result <- environment(objective[["fn"]])[["fit_result"]]
+    covariance <- fit_result[["covariance"]]
     indices <- matched[["parameter_id"]]
     expect_equal(unname(covariance[indices, indices]), case[["covariance"]],
       tolerance = 1e-4, info = name)
@@ -2292,6 +2296,48 @@ test_that("real Julia joint configurations retain native gradients and uncertain
     fixed_ids <- which(config[["fixed_parameter_mask"]])
     fixed_order <- match(fixed_rows[["parameter_id"]], fixed_ids)
     expect_setequal(fixed_order, seq_along(objective[["par"]]))
+    if (!is.null(case[["conditional"]])) {
+      config <- environment(objective[["fn"]])[["model_config"]]
+      julia_input <- attr(input, "julia_input")
+      prior_indices <- c(1L, 1L, 2L, 2L, 2L, 1L)
+      deviation_priors <- case[["priors"]] |>
+        dplyr::filter(.data$label == "log_devs")
+      deviation_years <- case[["parameters"]] |>
+        dplyr::filter(.data$module_name == "Recruitment", .data$label == "log_devs") |>
+        dplyr::arrange(.data$timing) |>
+        dplyr::pull(.data$timing)
+      prior_indices <- c(prior_indices, match(deviation_priors[["timing"]], deviation_years))
+      expect_equal(config[["parameter_prior_components"]], case[["priors"]][["label"]])
+      expect_equal(config[["parameter_prior_indices"]], prior_indices)
+      expect_equal(config[["parameter_prior_transforms"]],
+        rep("identity", nrow(case[["priors"]])))
+      expect_equal(config[["parameter_prior_distributions"]], case[["priors"]][["distribution"]])
+      expect_equal(unname(config[["parameter_prior_means"]]), unname(case[["priors"]][["mean"]]))
+      expect_equal(config[["parameter_prior_sds"]], case[["priors"]][["sd"]])
+      expect_equal(as.matrix(fit_result[["hessian"]])[indices, indices],
+        case[["joint_hessian"]], tolerance = 1e-4, info = name)
+      expect_equal(objective[["he"]](objective[["par"]])[fixed_order, fixed_order],
+        case[["fixed_hessian"]], tolerance = 1e-4, info = name)
+      prior_count <- nrow(case[["priors"]])
+      expect_equal(as.numeric(fit_result[["report"]][["nll_components"]])[seq_len(prior_count)],
+        case[["prior_nll_components"]], tolerance = 1e-4, info = name)
+      joint_config <- config
+      joint_config[["fixed_parameter_mask"]] <-
+        config[["fixed_parameter_mask"]] | config[["random_parameter_mask"]]
+      joint_config[["random_parameter_mask"]] <- rep(FALSE, length(config[["random_parameter_mask"]]))
+      active_ids <- which(joint_config[["fixed_parameter_mask"]])
+      joint_order <- match(indices, active_ids)
+      random_order <- which(reference[["estimation_type"]] == "random_effects")
+      fixed_only_config <- joint_config
+      fixed_priors <- config[["parameter_prior_components"]] != "log_devs"
+      for (field in c(
+        "parameter_prior_components", "parameter_prior_indices", "parameter_prior_transforms",
+        "parameter_prior_distributions", "parameter_prior_means", "parameter_prior_sds"
+      )) {
+        fixed_only_config[[field]] <- config[[field]][fixed_priors]
+      }
+      point_modes <- point_curvature <- list()
+    }
     for (point in case[["points"]]) {
       values <- objective[["par"]]
       values[fixed_order] <- point[["fixed"]]
@@ -2299,6 +2345,54 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         tolerance = 1e-8, info = name)
       expect_equal(unname(objective[["gr"]](values)[fixed_order]),
         point[["gradient"]], tolerance = 1e-6, info = name)
+      if (!is.null(case[["conditional"]])) {
+        evaluated <- FIMS:::evaluate_julia_fixed_objective(julia_input, config, values, 3L)
+        parameter_vector <- purrr::flatten_dbl(evaluated[["estimates"]][names(julia_input[["parameters"]])])
+        expect_equal(parameter_vector[indices], point[["parameters"]],
+          tolerance = 1e-8, info = name)
+        expect_equal(evaluated[["nll"]], point[["joint"]], tolerance = 1e-8, info = name)
+        expect_equal(as.numeric(evaluated[["report"]][["nll_components"]])[seq_len(prior_count)],
+          point[["prior_nll_components"]], tolerance = 1e-8, info = name)
+        joint_values <- parameter_vector[active_ids]
+        joint_hessian <- FIMS:::evaluate_julia_fixed_objective(
+          julia_input, joint_config, joint_values, 2L
+        )
+        joint_hessian <- as.matrix(joint_hessian)[joint_order, joint_order]
+        expect_equal(joint_hessian, point[["joint_hessian"]], tolerance = 1e-6, info = name)
+        random_hessian <- joint_hessian[random_order, random_order]
+        expect_equal(objective[["fn"]](values) - evaluated[["nll"]],
+          as.numeric(determinant(random_hessian, logarithm = TRUE)[["modulus"]]) / 2 -
+            length(random_order) * log(2 * pi) / 2, tolerance = 1e-8, info = name)
+        score <- FIMS:::evaluate_julia_fixed_objective(julia_input, joint_config, joint_values, 1L)
+        prior_coordinates <- case[["prior_coordinates"]]
+        prior_score <- purrr::pmap_dbl(list(
+          value = point[["parameters"]][prior_coordinates],
+          distribution = case[["priors"]][["distribution"]],
+          mean = case[["priors"]][["mean"]],
+          sd = case[["priors"]][["sd"]]
+        ), function(value, distribution, mean, sd) {
+          switch(distribution,
+            dnorm = (value - mean) / sd^2,
+            dlnorm = (1 + (log(value) - mean) / sd^2) / value,
+            stop("Unsupported independent prior-score family.")
+          )
+        })
+        expected_score <- point[["native_gradient"]]
+        expected_score[prior_coordinates] <- expected_score[prior_coordinates] + prior_score
+        expect_equal(as.numeric(score)[joint_order], expected_score, tolerance = 1e-6, info = name)
+        expect_lt(max(abs(as.numeric(score)[joint_order][random_order])), 1e-6,
+          label = paste(name, "conditional random score"))
+        baseline_hessian <- FIMS:::evaluate_julia_fixed_objective(
+          julia_input, fixed_only_config, joint_values, 2L
+        )
+        baseline_hessian <- as.matrix(baseline_hessian)[joint_order, joint_order]
+        expect_equal(random_hessian - baseline_hessian[random_order, random_order],
+          point[["prior_random_hessian"]], tolerance = 1e-8, info = name)
+        expect_equal(baseline_hessian[random_order, random_order],
+          point[["native_random_hessian"]], tolerance = 1e-6, info = name)
+        point_modes[[length(point_modes) + 1L]] <- parameter_vector[indices][random_order]
+        point_curvature[[length(point_curvature) + 1L]] <- random_hessian
+      }
       report <- objective[["report"]](values)
       for (field in c(
         "jnll", "numbers_at_age", "biomass", "spawning_biomass",
@@ -2310,7 +2404,28 @@ test_that("real Julia joint configurations retain native gradients and uncertain
           info = paste(name, field))
       }
     }
+    if (!is.null(case[["conditional"]])) {
+      random_prior_results[[name]] <- list(
+        modes = point_modes, curvature = point_curvature,
+        covariance = covariance[indices, indices]
+      )
+    }
   }
+  control <- random_prior_results[["EWAA-fixed-prior-control"]]
+  augmented <- random_prior_results[["EWAA-random-priors"]]
+  native_control <- random_prior_oracle[["cases"]][["EWAA-fixed-prior-control"]]
+  native_augmented <- random_prior_oracle[["cases"]][["EWAA-random-priors"]]
+  random_order <- which(native_augmented[["parameters_table"]][["estimation_type"]] == "random_effects")
+  for (index in seq_along(native_control[["points"]])) {
+    expect_equal(augmented[["modes"]][[index]] - control[["modes"]][[index]],
+      (native_augmented[["points"]][[index]][["parameters"]] -
+        native_control[["points"]][[index]][["parameters"]])[random_order], tolerance = 1e-8)
+    expect_equal(augmented[["curvature"]][[index]] - control[["curvature"]][[index]],
+      native_augmented[["points"]][[index]][["random_hessian"]] -
+        native_control[["points"]][[index]][["random_hessian"]], tolerance = 1e-6)
+  }
+  expect_equal(augmented[["covariance"]] - control[["covariance"]],
+    native_augmented[["covariance"]] - native_control[["covariance"]], tolerance = 1e-4)
 })
 
 test_that("Julia likelihood plots count equal-valued components separately", {

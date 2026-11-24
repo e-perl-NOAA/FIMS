@@ -164,7 +164,46 @@ byte-identical pointer-free RDS files, MD5
 checks independent prior scores, random curvature, Laplace placement and
 covariance decomposition.
 
-**N1 captures independent expectations; it does not close N2.** No Julia
-results were used to construct or repair this reference. A real-Julia bridge
-comparison against both cases, including targeting/scales, changed modes,
-curvature and uncertainty, is still required.
+N1 captures independent expectations; no Julia results were used to construct
+or repair this reference.
+
+### Real-Julia comparison (N2)
+
+The test `real Julia joint configurations retain native gradients and uncertainty`
+now includes both cases alongside the three earlier configuration references.
+Fresh real R 4.6.2/Julia 1.10.10 execution passes **419 assertions across five
+optimized fits and ten nonoptimal fixed points**. No production changes,
+reference regeneration or tolerance relaxations were needed; the native fixture
+MD5 remains `d4d40b794b74d47a3eed6bfb948a8bbe`.
+
+The added comparisons verify prior component indices, distributions, means,
+SDs and identity scales, including the retained six fixed priors. They compare
+conditional modes, per-prior contributions, joint/marginal values and scores,
+joint and marginal curvature, complete covariance and all 32 common report-SE
+families. At each nonoptimal point, an all-active joint evaluation checks
+native scores augmented by independent analytic R prior scores. Removing only
+random priors at the **same augmented mode** recovers the native random
+curvature; the difference equals the independent prior Hessian. Paired cases
+also compare the changed modes, random curvature and optimized covariance.
+
+Enable `FIMS_RUN_JULIA_INTEGRATION=true` and select Julia explicitly with
+`JULIA_HOME`/`JULIA_BINDIR`. The existing real-integration CI paths run this
+expanded test. To run the backend regression file locally from the repository
+root, with the bridge already prepared:
+
+```powershell
+$env:FIMS_RUN_JULIA_INTEGRATION = 'true'
+$env:JULIA_HOME = 'C:\path\to\julia\bin'
+$env:JULIA_BINDIR = $env:JULIA_HOME
+$env:JULIA_NUM_THREADS = '1'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+& 'C:\Program Files\R\R-4.6.2\bin\x64\Rscript.exe' --vanilla -e 'pkgload::load_all(compile=FALSE, quiet=TRUE, helpers=FALSE); testthat::test_file("tests/testthat/test-julia-backend.R", reporter="summary", load_helpers=FALSE, stop_on_failure=TRUE)'
+```
+
+That command runs the other opt-in bridge tests too. The N2 validation selected
+only the named configuration test in a fresh process; the entire R regression
+file also passed separately with opt-in bridge tests disabled. Mocked checks
+were not counted toward the 419 real comparisons. N2 closes this bounded gate,
+not all prior families or supported model combinations.

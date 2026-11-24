@@ -120,6 +120,10 @@ VonBertalanffySchnute models, narrow catchability fits, and fresh joint
 selectivity/catchability/recruitment fits with four random effects. Joint
 parametric growth fits also exercise growth-derived length compositions and
 normal/lognormal fixed-effect priors using independent native/R oracles.
+The real configuration gate also passes independent references with normal
+priors on two coupled recruitment log-deviation coordinates, preserving fixed
+priors and comparing changed conditional modes, curvature, covariance and
+derived-report uncertainty.
 The saved complete 49-fixed/29-random fit passes native comparisons of estimates,
 full covariance and 32 derived-report standard-error families; this saved-fit
 check is not a fresh full-fit benchmark. A subsequent

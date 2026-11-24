@@ -94,7 +94,12 @@
   Laplace integration. It preserves fixed priors, nonoptimal evaluations,
   optimized estimates, full covariance and native report SEs, with a
   reproducible generator and pointer-free fixture. This supplies expectations
-  for N2; real-Julia random-prior parity is not yet established.
+  for N2 without using Julia-generated expectations.
+* Real-Julia comparisons now pass both independent random-prior references,
+  including prior targeting/scales, changed conditional modes and curvature,
+  full covariance and 32 derived-report SE families. The expanded configuration
+  gate passes 419 assertions across five fresh fits and ten nonoptimal points
+  at unchanged tolerances. No production backend changes were required.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
