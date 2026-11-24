@@ -50,6 +50,13 @@ normalize_key(key::Symbol) = key
 normalize_key(key) = Symbol(key)
 normalize_keys(x::AbstractDict) = Dict(normalize_key(key) => normalize_keys(value) for (key, value) in pairs(x))
 
+_prepare_model_input(value) = value
+function _prepare_model_input(value::Union{AbstractDict, NamedTuple})
+  normalized = normalize_keys(value)
+  names = Tuple(sort!(collect(keys(normalized))))
+  NamedTuple{names}(Tuple(_prepare_model_input(normalized[name]) for name in names))
+end
+
 has_component(params, name::Symbol) = name in propertynames(params)
 
 get_component(params, name::Symbol, default) = has_component(params, name) ? params[name] : default
@@ -863,9 +870,8 @@ function expected_age_comp(population)
 end
 
 function _evaluate_model(parameters_vector, data_dict, model_config, ::Val{compute_report}) where {compute_report}
-  data_dict = normalize_keys(data_dict)
   params = component_array_from_input(parameters_vector, model_config)
-  parameter_type = eltype(collect(params))
+  parameter_type = eltype(params)
   n_fleets = length(data_dict[:fleets])
   fleet_selectivity = zeros(
     parameter_type,
@@ -914,14 +920,14 @@ function _evaluate_model(parameters_vector, data_dict, model_config, ::Val{compu
     population,
     nothing,
     recruitment,
-    Dict(
-      :fishing_mortality => fishing_mortality,
-      :fleet_selectivity => fleet_selectivity,
-      :catchability => catchability,
-      :phi_0 => phi_0,
-      :log_recruit_devs => recruit_devs,
-      :log_recruitment => log_recruitment,
-      :recruitment_mode => recruitment_mode,
+    (
+      fishing_mortality = fishing_mortality,
+      fleet_selectivity = fleet_selectivity,
+      catchability = catchability,
+      phi_0 = phi_0,
+      log_recruit_devs = recruit_devs,
+      log_recruitment = log_recruitment,
+      recruitment_mode = recruitment_mode,
     ),
   )
 
@@ -1274,9 +1280,9 @@ function _evaluate_model(parameters_vector, data_dict, model_config, ::Val{compu
 end
 
 function evaluate_nll(parameters_vector, data_dict, model_config)
-  _evaluate_model(parameters_vector, data_dict, model_config, Val(false))
+  _evaluate_model(parameters_vector, normalize_keys(data_dict), model_config, Val(false))
 end
 
 function evaluate_model(parameters_vector, data_dict, model_config)
-  _evaluate_model(parameters_vector, data_dict, model_config, Val(true))
+  _evaluate_model(parameters_vector, normalize_keys(data_dict), model_config, Val(true))
 end

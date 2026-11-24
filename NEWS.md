@@ -68,6 +68,11 @@
   329.44/111.39 seconds and cold process-to-result 408.97/251.86 seconds.
   Runs used sequential batches on a shared workstation with continuous
   host telemetry; uncertainty remains the main measured Julia cost.
+* Fitted and live Julia objectives prepare normalized, typed data/configuration
+  once per objective instead of rebuilding dictionaries at every derivative
+  evaluation. Population stepping preserves concrete input types internally
+  while retaining dictionary inputs. Parameters and all mode/curvature
+  calculations remain live; no parameter-dependent results are cached.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

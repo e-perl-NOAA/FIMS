@@ -60,6 +60,15 @@ function _named_component_array(x, parameter_layout)
   ComponentArray(NamedTuple{Tuple(parameter_layout)}(Tuple(x)))
 end
 
+function _prepared_joint_objective(parameter_layout, data_dict, config)
+  prepared_data = _prepare_model_input(data_dict)
+  prepared_config = _prepare_model_input(config)
+  parameters -> _evaluate_model(
+    _named_component_array(parameters, parameter_layout),
+    prepared_data, prepared_config, Val(false),
+  )
+end
+
 function _result_dict(component)
   Dict(String(name) => getproperty(component, name) for name in propertynames(component))
 end
@@ -334,9 +343,7 @@ function evaluate_fixed_objective(init_params, data_dict, config, fixed_values, 
   derivative_order in (0, 1, 2, 3) ||
     throw(ArgumentError("derivative_order must be 0, 1, 2, or 3 (report)."))
   options = _optimizer_options(objective_config)
-  joint_objective = parameters -> evaluate_nll(
-    _named_component_array(parameters, parameter_layout), data_dict, objective_config,
-  )
+  joint_objective = _prepared_joint_objective(parameter_layout, data_dict, objective_config)
   objective = fixed -> begin
     result = _conditional_mode(
       x0, fixed_indices, fixed, random_indices, joint_objective, options,
@@ -519,8 +526,7 @@ function fit_model(init_params, data_dict, config = Dict())
   random_indices = findall(random_mask)
   active_indices = findall(fixed_mask .| random_mask)
   fixed_start = x0[fixed_indices]
-  joint_objective = parameters ->
-    evaluate_nll(_named_component_array(parameters, parameter_layout), data_dict, objective_config)
+  joint_objective = _prepared_joint_objective(parameter_layout, data_dict, objective_config)
 
   function conditional_mode(fixed_values, initial_parameters = x0; preconditioner = nothing)
     _optimizer_checkpoint(diagnostic_file, "conditional_mode:start")

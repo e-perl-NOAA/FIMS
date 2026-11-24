@@ -50,7 +50,7 @@ function step_population!(
   pop::PopulationModel{T},
   sel,
   rec,
-  catch_data::AbstractDict
+  catch_data::Union{AbstractDict, NamedTuple}
 ) where {T <: Real}
   n_years, n_ages = size(pop.mortality_F)
   @assert n_ages == length(pop.ages)

@@ -128,7 +128,10 @@ function full_fit(backend, progress)
   config[:diagnostic_file] = progress
   fit = backend == "baseline" ? Baseline.FIMSBackend.fit_model :
     backend == "candidate" ? FIMSBackend.fit_model : error("Unknown backend.")
+  Base.cumulative_compile_timing(true)
+  compile_start = Base.cumulative_compile_time_ns()
   measured = @timed fit(current.parameters, current.data, config)
+  compile_end = Base.cumulative_compile_time_ns()
   measured.value["convergence"] || error("Complete fit did not converge.")
   measured.value["pd_hessian"] || error("Complete fit uncertainty is not positive definite.")
   maximum(abs, measured.value["fixed_gradient"]) < 1e-3 ||
@@ -136,6 +139,8 @@ function full_fit(backend, progress)
   Dict(
     "backend" => backend, "seconds" => measured.time,
     "allocated_bytes" => Float64(measured.bytes), "gc_seconds" => measured.gctime,
+    "compilation_seconds" => (compile_end[1] - compile_start[1]) / 1e9,
+    "recompilation_seconds" => (compile_end[2] - compile_start[2]) / 1e9,
     "fit" => measured.value,
   )
 end

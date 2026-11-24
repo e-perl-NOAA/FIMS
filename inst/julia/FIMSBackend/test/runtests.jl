@@ -528,6 +528,25 @@ end
   )
 
   result = evaluate_model(parameters, data, config)
+  prepared_joint = FIMSBackend._prepared_joint_objective(parameters,
+    Dict(string(key) => value for (key, value) in data), config)
+  reference_q = values -> evaluate_nll(
+    ComponentArray(merge(parameter_values, (log_q = values,))), data, config,
+  )
+  prepared_q = values -> prepared_joint(
+    collect(ComponentArray(merge(parameter_values, (log_q = values,)))),
+  )
+  for values in (copy(parameters.log_q), parameters.log_q .+ [0.03, -0.02])
+    @test prepared_q(values) ≈ reference_q(values) atol = 1e-10
+    @test FIMSBackend.gradient(prepared_q, values) ≈
+          FIMSBackend.gradient(reference_q, values) atol = 1e-10
+    @test FIMSBackend.hessian(prepared_q, values) ≈
+          FIMSBackend.hessian(reference_q, values) atol = 1e-10
+  end
+  changed_config = merge(config, Dict(:catch_sigma => 0.2))
+  changed_joint = FIMSBackend._prepared_joint_objective(parameters, data, changed_config)
+  @test changed_joint(collect(parameters)) ≈ evaluate_nll(parameters, data, changed_config) atol = 1e-10
+  @test changed_joint(collect(parameters)) != prepared_joint(collect(parameters))
   report = result["report"]
   expected_selectivity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
   expected_mortality = 0.2 .+ (0.1 + exp(-200.0)) .* expected_selectivity
