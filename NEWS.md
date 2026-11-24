@@ -73,6 +73,11 @@
   evaluation. Population stepping preserves concrete input types internally
   while retaining dictionary inputs. Parameters and all mode/curvature
   calculations remain live; no parameter-dependent results are cached.
+* Differentiated fits preserve inactive parameter components and constant
+  population weights/maturity in their original numeric types rather than
+  promoting them into nested automatic differentiation. Active components
+  remain live, including mixed constant/estimated recruitment and selectivity
+  inputs; covariance and report calculations are unchanged.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

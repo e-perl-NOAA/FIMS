@@ -10,7 +10,7 @@ struct BevertonHolt{T <: Real}
   log_rzero::T
 end
 
-function (r::BevertonHolt{T})(spawners::T, phi_0::T) where {T <: Real}
+function (r::BevertonHolt{T})(spawners::Real, phi_0::Real) where {T <: Real}
   steep = inv_logit(T(0.2), one(T), r.logit_steep)
   rzero = exp(r.log_rzero)
   numerator = T(0.8) * rzero * steep * spawners
@@ -24,7 +24,7 @@ struct Ricker{T <: Real}
   log_rzero::T
 end
 
-function (r::Ricker{T})(spawners::T, phi_0::T) where {T <: Real}
+function (r::Ricker{T})(spawners::Real, phi_0::Real) where {T <: Real}
   steep = inv_logit(T(0.2), one(T), r.logit_steep)
   rzero = exp(r.log_rzero)
   steep_gap = (one(T) - steep) + oftype(steep, sqrt(eps(Float64)))

@@ -61,6 +61,12 @@ has_component(params, name::Symbol) = name in propertynames(params)
 
 get_component(params, name::Symbol, default) = has_component(params, name) ? params[name] : default
 
+_component_scalar_type(value::Number) = typeof(value)
+_component_scalar_type(value::AbstractArray) = eltype(value)
+_parameter_scalar_type(params::ComponentArray) = eltype(params)
+_parameter_scalar_type(params::NamedTuple) =
+  promote_type(map(_component_scalar_type, values(params))...)
+
 function component_array_from_input(parameters_vector, model_config)
   if parameters_vector isa ComponentArray
     return parameters_vector
@@ -121,14 +127,14 @@ function build_selectivity(params, model_config, fleet_index, ages, n_years = 1)
     end
     return AgeSpecificSelectivity(selectivity_parameters, collect(ages), n_years)
   elseif selectivity_type == "DoubleLogistic"
-    return DoubleLogisticSelectivity(
+    return DoubleLogisticSelectivity(promote(
       params.inflection_point_asc[fleet_index],
       params.slope_asc[fleet_index],
       params.inflection_point_desc[fleet_index],
       params.slope_desc[fleet_index],
-    )
+    )...)
   elseif selectivity_type == "Logistic"
-    return LogisticSelectivity(params.inflection_point[fleet_index], params.slope[fleet_index])
+    return LogisticSelectivity(promote(params.inflection_point[fleet_index], params.slope[fleet_index])...)
   end
 
   throw(ArgumentError("Unsupported selectivity type: $selectivity_type"))
@@ -138,9 +144,9 @@ function build_recruitment(params, model_config)
   recruitment_type = get(model_config, :recruitment, :beverton_holt)
 
   if string(recruitment_type) in ("ricker", ":ricker")
-    return Ricker(params.logit_steep, params.log_rzero)
+    return Ricker(promote(params.logit_steep, params.log_rzero)...)
   elseif string(recruitment_type) in ("beverton_holt", ":beverton_holt")
-    return BevertonHolt(params.logit_steep, params.log_rzero)
+    return BevertonHolt(promote(params.logit_steep, params.log_rzero)...)
   end
 
   throw(ArgumentError("Unsupported recruitment type: $recruitment_type"))
@@ -610,6 +616,7 @@ function build_population_model(params, data_dict, weights_at_age)
   length(proportion_female_values) in (1, data_dict[:n_ages]) ||
     throw(ArgumentError("proportion_female must be scalar or provide one value per age."))
   T = promote_type(
+    _parameter_scalar_type(params),
     eltype(collect(params.log_init_naa)),
     eltype(data_dict[:ages]),
     eltype(population_weights_at_age),
@@ -627,8 +634,8 @@ function build_population_model(params, data_dict, weights_at_age)
 
   PopulationModel(
     ages = collect(data_dict[:ages]),
-    weights_at_age = Matrix{T}(population_weights_at_age),
-    maturity_at_age = Matrix{T}(population_maturity_at_age),
+    weights_at_age = Matrix(population_weights_at_age),
+    maturity_at_age = Matrix(population_maturity_at_age),
     proportion_female = T.(proportion_female),
     numbers_at_age = numbers_at_age,
     catch_numbers_at_age = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
@@ -636,7 +643,7 @@ function build_population_model(params, data_dict, weights_at_age)
     spawning_biomass = zeros(T, data_dict[:n_years] + 1),
     expected_recruitment = zeros(T, data_dict[:n_years] + 1),
     mortality_F = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
-    mortality_M = exp.(reshape(collect(params.log_M), data_dict[:n_years], data_dict[:n_ages])),
+    mortality_M = Matrix{T}(exp.(reshape(collect(params.log_M), data_dict[:n_years], data_dict[:n_ages]))),
     mortality_Z = zeros(T, data_dict[:n_years], data_dict[:n_ages]),
     catch_expected = zeros(T, data_dict[:n_years]),
     index_expected = zeros(T, data_dict[:n_years]),
@@ -744,7 +751,7 @@ function parameter_prior_nll_components(params, model_config)
     transforms,
   )) || throw(DimensionMismatch("Parameter prior fields must have matching lengths."))
 
-  nll_components = eltype(collect(params))[]
+  nll_components = _parameter_scalar_type(params)[]
   for prior_index in 1:n_priors
     component_name = Symbol(components[prior_index])
     component = get_component(params, component_name, nothing)
@@ -788,7 +795,7 @@ function parameter_prior_nll_components(params, model_config)
 end
 
 function parameter_prior_nll(params, model_config)
-  total = zero(eltype(collect(params)))
+  total = zero(_parameter_scalar_type(params))
   for component in parameter_prior_nll_components(params, model_config)
     total += component
   end
@@ -871,7 +878,11 @@ end
 
 function _evaluate_model(parameters_vector, data_dict, model_config, ::Val{compute_report}) where {compute_report}
   params = component_array_from_input(parameters_vector, model_config)
-  parameter_type = eltype(params)
+  _evaluate_model_parameters(params, data_dict, model_config, Val(compute_report))
+end
+
+function _evaluate_model_parameters(params, data_dict, model_config, ::Val{compute_report}) where {compute_report}
+  parameter_type = _parameter_scalar_type(params)
   n_fleets = length(data_dict[:fleets])
   fleet_selectivity = zeros(
     parameter_type,
