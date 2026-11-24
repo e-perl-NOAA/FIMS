@@ -1,0 +1,55 @@
+epoch_seconds	cpu_load_percent	free_physical_memory_KiB	native_last_stage	Julia_last_stage
+1795539657.627	29	3656104	not-started	not-started
+1795539689.610	27	2903908	cold:start	not-started
+1795539721.437	18	2917456	uncertainty:start	not-started
+1795539753.201		2908524	uncertainty:start	not-started
+1795539785.089	52	2928812	uncertainty:start	not-started
+1795539816.953	33	2977248	uncertainty:start	not-started
+1795539848.652	32	2813712	uncertainty:start	not-started
+1795539880.386	4	2679400	optimization:start	not-started
+1795539912.127	12	2851700	uncertainty:start	not-started
+1795539943.856	45	2773764	uncertainty:start	not-started
+1795539975.578		2808568	uncertainty:start	not-started
+1795540007.290	14	2814804	uncertainty:start	not-started
+1795540038.979	8	2745568	uncertainty:start	not-started
+1795540070.680	14	2704496	uncertainty:start	not-started
+1795540102.391	18	2739988	uncertainty:start	not-started
+1795540134.149	8	2772568	uncertainty:start	not-started
+1795540165.942	7	2789088	uncertainty:start	not-started
+1795540197.759	11	3046452	uncertainty:start	not-started
+1795540229.430	10	3074140	warm-3:start	not-started
+1795540261.224	9	2895656	uncertainty:start	not-started
+1795540292.950	10	2878612	uncertainty:start	not-started
+1795540324.642	17	2903216	uncertainty:start	not-started
+1795540356.317	6	3005068	uncertainty:start	not-started
+1795540387.953	8	3001760	uncertainty:start	not-started
+1795540419.836	6	3055232	warm-3:complete	cold:start
+1795540451.620		2938584	warm-3:complete	cold:fit:start
+1795540483.380	12	2563232	warm-3:complete	cold:fit:start
+1795540515.160	5	2418248	warm-3:complete	cold:fit:start
+1795540546.874	10	2360468	warm-3:complete	cold:fit:start
+1795540578.508	9	2346856	warm-3:complete	cold:fit:start
+1795540610.347	13	2247544	warm-3:complete	cold:fit:start
+1795540642.082	10	2174576	warm-3:complete	cold:fit:start
+1795540674.101	14	2108148	warm-3:complete	cold:fit:start
+1795540705.925		2151840	warm-3:complete	cold:fit:start
+1795540737.749	32	1972024	warm-3:complete	cold:fit:start
+1795540769.449	36	1998048	warm-3:complete	cold:fit:start
+1795540801.399	45	1735528	warm-3:complete	warm-1:fit:start
+1795540833.160	4	1804952	warm-3:complete	warm-1:fit:start
+1795540865.037	60	1992788	warm-3:complete	warm-1:fit:start
+1795540896.737	24	1769004	warm-3:complete	warm-1:fit:start
+1795540928.551	47	1878944	warm-3:complete	warm-1:fit:start
+1795540960.401	4	1761904	warm-3:complete	warm-2:fit:start
+1795540992.117	25	1658964	warm-3:complete	warm-2:fit:start
+1795541023.855	44	1511300	warm-3:complete	warm-2:fit:start
+1795541055.714	17	1780700	warm-3:complete	warm-2:fit:start
+1795541087.495	9	1815604	warm-3:complete	warm-2:fit:start
+1795541119.307	33	1344744	warm-3:complete	warm-3:start
+1795541151.204	34	1198184	warm-3:complete	warm-3:fit:start
+1795541183.103	0	1181188	warm-3:complete	warm-3:fit:start
+1795541215.034	34	1347264	warm-3:complete	warm-3:fit:start
+1795541246.975	29	1492468	warm-3:complete	warm-3:fit:start
+1795541278.699	38	1411076	warm-3:complete	warm-3:fit:start
+1795541310.511		1482848	warm-3:complete	warm-3:complete
+1795541313.685	35	3219172	warm-3:complete	warm-3:complete

@@ -410,6 +410,32 @@ fit is not acceptance evidence.
   agreement. If it is slower, this stays unchecked and further bounded,
   evidence-based performance work is required.
 
+  **Verified recovery, not acceptance:** candidate `8f8d46fe` prepares typed
+  objective data/configuration once and avoids input type erasure and a
+  repeated parameter-vector copy. The 271 backend assertions and 216 fresh
+  real configuration comparisons passed. Three AB/BA/AB warm complete-Julia-fit
+  pairs against immutable `f9593222` took 303.02/151.56, 295.64/152.09 and
+  304.29/154.93 seconds baseline/candidate: median paired reduction **49.1%**,
+  with **40.7% fewer cumulative allocated bytes**. All complete numerical
+  comparisons passed, including covariance, fixed Hessians and parameter/report
+  SEs. All 98 uncertainty solves/exact gradients per fit remain. Warm compilation
+  was zero; first-use JIT/GC and profiler costs are retained, not subtracted.
+  [Full-precision paired evidence](../data-raw/benchmarks/prepared-objective-2026-11-24/comparison.json)
+  and [boundaries/command](../data-raw/BACKEND_BENCHMARK.md#p6-recovery-prepared-typed-objective-2026-11-24)
+  document that these shared-process Julia timers exclude high-level R adapters
+  symmetrically and are not the cold/warm native acceptance gate.
+
+  **Recovery acceptance attempt:** the fresh full `--backend both` protocol
+  on `8f8d46fe` passed all eight numerical fits and all four independent
+  comparisons. Warm walls were native 179.48/179.75/179.63 seconds and Julia
+  159.25/170.82/201.43: medians 179.63/170.82, ratio 0.950955. Cold
+  process-to-result was 192.89 seconds native and 372.03 Julia, ratio
+  1.928736. **The cold threshold failed; P6 is not complete.** The slower
+  third warm Julia trial and shared-host telemetry are retained.
+  [Full recovery acceptance evidence](../data-raw/benchmarks/prepared-objective-full-2026-11-24/comparison.json)
+  preserves all eight results, unchanged starts/controls/uncertainty outputs,
+  source hashes and timing distributions. Native sources/DLL still match P2.
+
   **Not passed:** 2026-11-24, measured candidate `569e01ef` (includes P4/P5).
   The existing full `--backend both` protocol completed one cold and three
   original-input warm fits per backend in separate processes on the same

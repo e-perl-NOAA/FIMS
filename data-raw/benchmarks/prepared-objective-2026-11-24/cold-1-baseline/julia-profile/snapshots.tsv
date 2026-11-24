@@ -1,0 +1,17 @@
+epoch_seconds	file	stage	raw_entries	write_seconds
+1.795537352407e9	snapshot-000001.txt	profile:start	0	0.15199995040893555
+1.795537410133e9	snapshot-000002.txt	conditional_mode:complete	55864	14.27999997138977
+1.79553745146e9	snapshot-000003.txt	laplace_joint_hessian:start	35850	9.315000057220459
+1.795537500107e9	snapshot-000004.txt	laplace_third_derivatives:complete	42039	12.14300012588501
+1.79553753156e9	snapshot-000005.txt	conditional_mode:complete	23027	1.433000087738037
+1.79553758511e9	snapshot-000006.txt	uncertainty_joint_hessian:complete	37530	10.410000085830688
+1.795537617581e9	snapshot-000007.txt	laplace_third_derivatives:complete	20289	1.193000078201294
+1.795537648079e9	snapshot-000008.txt	laplace_joint_hessian:complete	19508	0.3489999771118164
+1.795537678939e9	snapshot-000009.txt	laplace_third_derivatives:complete	19506	0.36700010299682617
+1.795537710735e9	snapshot-000010.txt	laplace_third_derivatives:complete	20267	0.3299999237060547
+1.795537742371e9	snapshot-000011.txt	laplace_third_derivatives:complete	20326	0.3380000591278076
+1.795537773989e9	snapshot-000012.txt	laplace_third_derivatives:complete	20189	0.309999942779541
+1.79553780449e9	snapshot-000013.txt	laplace_joint_hessian:complete	19666	0.3019998073577881
+1.795537835026e9	snapshot-000014.txt	laplace_third_derivatives:complete	19431	0.3259999752044678
+1.795537884404e9	snapshot-000015.txt	report_standard_errors:complete	32489	6.668999910354614
+1.795537890672e9	snapshot-000016.txt	profile:complete	3411	1.2970001697540283

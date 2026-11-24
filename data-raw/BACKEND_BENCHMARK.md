@@ -669,6 +669,96 @@ and StatsBase 0.34.14. The original 7,200-second worker cap, controls
 10000/10000, three restarts and every required native report-SE family
 were retained.
 
+## P6 recovery: prepared typed objective, 2026-11-24
+
+Candidate `8f8d46fe` prepares deterministic-key typed data/configuration once
+per fitted or live objective, instead of repeatedly normalizing heterogeneous
+dictionaries during differentiated evaluations. Population inputs retain
+their concrete types; retrieving the parameter element type no longer copies
+the entire vector. Parameters, conditional modes, exact derivatives and all
+uncertainty/report calculations remain live. Public evaluators still normalize
+their inputs. No controls, finite-difference steps or tolerances changed.
+
+The [paired recovery record](benchmarks/prepared-objective-2026-11-24/comparison.json)
+preserves all eight full-precision Julia fits, phase timestamps, snapshot
+indices, compilation/GC/allocation costs and source/dependency fingerprints.
+The six baseline source blobs were checked against Git `f9593222`.
+The existing paired `fits` command used that immutable backend export:
+
+```powershell
+& $Rscript --vanilla data-raw\benchmark_uncertainty_preconditioner.R fits C:\benchmarks\p6-baseline\inst\julia\FIMSBackend C:\benchmarks\p6-prepared-pairs-new
+```
+
+| Warm pair order | Baseline full fit (s) | Candidate full fit (s) | Candidate/baseline |
+| --- | ---: | ---: | ---: |
+| AB | 303.0247 | 151.5629 | 0.500167 |
+| BA | 295.6359 | 152.0910 | 0.514454 |
+| AB | 304.2899 | 154.9326 | 0.509161 |
+
+The median paired complete-fit reduction was **49.1%**; all three pairs
+improved. Warm medians were 303.0247 seconds baseline and 152.0910 candidate.
+Cumulative allocations fell **40.7%**, from about 529.24 to 314.09 GB per
+warm fit, not resident memory. Warm compilation/recompilation timer deltas
+were zero. Every pair passed unchanged objective, estimate, complete covariance,
+fixed-Hessian, parameter-SE and report-value/SE comparisons. All eight fits
+converged with positive-definite active 78-by-78 covariance and fixed gradients
+below `1e-3`. The 271 backend assertions and 216 fresh real configuration
+comparisons also passed.
+
+These are complete Julia `fit_model` timers, including optimization,
+uncertainty, GC and live profiling, but excluding high-level R initialization,
+adapters/extraction and between-trial GC symmetrically. Both implementations
+share a process. Excluded first-use calls took 530.65 seconds baseline and
+347.66 candidate, including measured compilation of 144.95/127.03 seconds;
+they are **not independent cold-process measurements**. Each warm fit still
+performed 98 conditional solves and exact perturbed gradients. Marginal-Hessian
+phases fell from 260.68/258.45/266.31 to 132.12/133.00/135.20 seconds.
+Warm profile writes took 2.77-3.35 seconds baseline and 1.00-1.12 candidate,
+included without subtraction.
+
+Raw local artifact `p6-prepared-pairs-01` retains full profiles/logs and the
+active Julia Project/Manifest. Windows x64, R 4.6.2, Julia 1.10.10,
+single-thread settings and the original 7,200-second worker cap were retained.
+The paired improvement does **not** close P6: acceptance still requires the
+separate full R native/Julia protocol, including cold process-to-result and
+warm complete-fit thresholds. The original failed P6 evidence above is unchanged.
+
+### Prepared-objective full acceptance attempt: 2026-11-24
+
+The unchanged separate-process `--backend both` protocol on `8f8d46fe`
+completed all eight fits. All four fresh native/Julia numerical comparisons,
+cold-versus-warm repetitions, identical full-precision starts, complete
+positive-definite 78-by-78 covariance and 32 native report-SE families passed.
+Controls, restarts, outputs and the 7,200-second worker cap were unchanged.
+The [complete acceptance record](benchmarks/prepared-objective-full-2026-11-24/comparison.json)
+retains all results, phases, source/dependency hashes and continuous host
+telemetry; local `p6-prepared-full-01` retains full raw profiles/logs.
+
+| Complete-fit measurement | Native (s) | Julia (s) |
+| --- | ---: | ---: |
+| Cold process-to-result | 192.89 | 372.03 |
+| Cold trial wall | 182.33 | 359.50 |
+| Warm trial 1 | 179.48 | 159.25 |
+| Warm trial 2 | 179.75 | 170.82 |
+| Warm trial 3 | 179.63 | 201.43 |
+| Warm median | 179.63 | 170.82 |
+
+The warm median threshold was met (ratio **0.950955**), but the cold threshold
+failed (ratio **1.928736**). **P6 remains unchecked.** All trials, including
+the slower third warm Julia fit, are retained. The shared workstation was not
+isolated; native ran before Julia, not in interleaved pairs. Available memory
+declined during Julia's batch. Missing CPU samples remain explicitly missing
+in the archive rather than being imputed. No host settings or unrelated
+processes were changed and no competing agent model fits/tests/builds ran.
+
+Cold Julia optimization took 121.09 seconds and marginal uncertainty 148.79;
+warm optimization took 19.18-22.96 seconds and marginal uncertainty
+117.45-162.72. Cold profile writes consumed 48.22 seconds, warm writes
+1.16-1.74, all included without subtraction. The first-use paired measurements
+above also identify substantial compilation cost. Further work must reduce
+first-use compilation and differentiated computation rather than exempt
+startup or move unreported work outside the timer.
+
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
 **This earlier attempt did not complete P3.** The cold Julia fit passed the full native numerical
