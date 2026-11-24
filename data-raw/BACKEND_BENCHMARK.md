@@ -570,6 +570,105 @@ Balanced power, one Julia/BLAS thread. Actual dependencies remained Optim
 StatsBase 0.34.14. P5 is complete at its measured exact-gradient scope;
 the migration and complete-fit performance gate are not complete.
 
+## P6 final performance attempt, not passed: 2026-11-24
+
+The final candidate `569e01ef`, containing the P4/P5 improvements, was
+measured against a fresh run of the preserved native oracle, not merely
+against P2's historical timing. The native DLL and all recorded native
+source hashes matched P2 exactly. The existing command was:
+
+```powershell
+& $Rscript --vanilla data-raw\benchmark_backends.R --case full --backend both --native-source C:\benchmarks\native-oracle --julia $Julia --output C:\benchmarks\p6-matched-new --warm-runs 3 --restarts 3
+```
+
+The native source must be the independently preserved, already-built
+`1e5a64a8` oracle with its verified DLL, not a restored production backend.
+The [portable P6 record](benchmarks/final-performance-2026-11-24/comparison.json)
+contains all eight complete fitted outputs, original input, source and
+dependency fingerprints, native/Julia phase records, snapshot indices and
+continuous aggregate host telemetry. Adjacent artifacts are checksummed.
+Local `p6-matched-full-01` retains full raw logs/profiles and Julia's actual
+Project/Manifest. No remote CI was inspected.
+
+All eight 49-fixed/29-random fits converged. The four fresh native/Julia
+comparisons passed joint/marginal objectives, all 78 estimates/parameter
+SEs, complete positive-definite 78-by-78 covariance and 32 common report-SE
+families (13,091 rows), at the unchanged tolerances. Cold-versus-warm
+numerical repetitions passed separately within each backend. Actual
+full-precision starting values matched between backends and every trial;
+input MD5 remained `ad075166d27afabb8dbe224aa73b84c6`.
+Maximum absolute fixed gradients were `0.000359420286652812` native and
+`9.70785316717349e-10` Julia, both below `1e-3`.
+
+| Complete-fit measurement | Native (s) | Julia (s) | Julia/native |
+| --- | ---: | ---: | ---: |
+| Cold process-to-result | 251.86 | 408.97 | 1.62 |
+| Cold trial wall | 240.01 | 392.99 | 1.64 |
+| Warm trial 1 | 126.78 | 329.44 | 2.60 |
+| Warm trial 2 | 103.20 | 323.99 | 3.14 |
+| Warm trial 3 | 111.39 | 335.28 | 3.01 |
+| Warm median | 111.39 | 329.44 | 2.96 |
+
+Warm means were 113.79 seconds native and 329.57 Julia; standard deviations
+11.97 and 5.65 seconds. Preparation was separate: native loading/verification
+18.97 seconds, Julia setup 3.78 seconds. Native used the preexisting DLL;
+native compilation was not timed. Trial-wall timings include initialization,
+complete optimization/uncertainty, extraction/validation and profiling.
+Cold process-to-result additionally includes process/package/bridge startup
+and JIT. No profiling, startup or uncertainty cost was subtracted and no
+unrequested exception was granted.
+
+**P6 failed both cold and warm runtime thresholds and remains unchecked.**
+The ordinal warm-trial ratios above are not interleaved timing pairs.
+Native ran its four-trial batch before Julia's batch on the same shared
+interactive workstation. A read-only controller recorded aggregate CPU
+load, available physical memory and active benchmark stage about every
+30 seconds in `host.tsv`, with per-trial summaries in the evidence record.
+Host conditions differed: Julia warm trials had median free memory
+944,506/1,073,052/1,112,238 KiB, compared with native
+1,630,902/1,809,000/1,825,100 KiB. Median CPU load was
+18.5%/18%/17.5% Julia versus 58%/45%/49% native. These samples include each
+backend's own load; they do not prove external contention caused the gap.
+This is not an isolated causal speed ratio. No concurrent agent builds,
+tests or model fits were launched, host settings were not changed and
+unrelated processes were not stopped.
+
+| Warm trial 1 phase (nested where indicated) | Native (s) | Julia (s) |
+| --- | ---: | ---: |
+| Initialization | 18.89 | 11.27 |
+| Complete fit call | 105.05 | 317.89 |
+| Optimization, including requested passes | 10.60 | 48.88 |
+| Marginal uncertainty Hessian (Julia) / uncertainty pass (native) | 91.83 | 262.17 |
+| Julia conditional solves within marginal Hessian | N/A | 31.04 |
+| Julia cross-curvature within marginal Hessian | N/A | 74.43 |
+| Julia exact third-derivative traces within marginal Hessian | N/A | 153.63 |
+| Extraction/validation | 2.80 | 0.03 |
+
+The Julia columns for solves/cross-curvature/traces are nested, not extra
+costs to add to their parent. Native's uncertainty pass and Julia's
+marginal Hessian are not identical internal boundaries; both complete-fit
+timers nevertheless include every required covariance/report-SE operation.
+Julia still evaluates 98 complete exact gradients/conditional solves
+for its centered marginal Hessian. The median Julia warm trial spends
+about 80% of total wall time in this phase. Warm snapshot writes took
+3.35-3.53 seconds; cold writes took 33.21 seconds, included in all timings.
+Profiler formatting alone does not explain or close the remaining gap.
+
+The next performance work should target repeated exact marginal-curvature
+calculations, with independent coupled-effect/full-perturbation numerical
+checks and paired complete-fit measurements before retrying P6. Preserve
+the current gate failure: do not infer acceptance from the earlier faster
+gradient probes, omit uncertainty, substitute saved-fit results, or relax
+controls/tolerances. A reserved/quieter timing host would improve
+attribution, not establish that the current candidate meets the requirement.
+
+Environment: Windows 11 x64, R 4.6.2, Julia 1.10.10, Intel i7-1365U,
+Balanced power and one BLAS/Julia thread. Dependency versions remained
+Optim 1.13.3, ForwardDiff 0.10.39, ComponentArrays 0.15.50, Functors 0.5.5
+and StatsBase 0.34.14. The original 7,200-second worker cap, controls
+10000/10000, three restarts and every required native report-SE family
+were retained.
+
 ## P3 incomplete attempt and diagnosis: 2026-11-23
 
 **This earlier attempt did not complete P3.** The cold Julia fit passed the full native numerical

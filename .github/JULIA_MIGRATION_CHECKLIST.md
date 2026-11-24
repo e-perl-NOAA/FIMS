@@ -410,6 +410,61 @@ fit is not acceptance evidence.
   agreement. If it is slower, this stays unchecked and further bounded,
   evidence-based performance work is required.
 
+  **Not passed:** 2026-11-24, measured candidate `569e01ef` (includes P4/P5).
+  The existing full `--backend both` protocol completed one cold and three
+  original-input warm fits per backend in separate processes on the same
+  day. The preserved native source hashes and DLL exactly matched P2's
+  independent `1e5a64a8` oracle. P2 input checksum, 49-fixed/29-random
+  layout, controls 10000/10000, three restarts, all uncertainty/report
+  outputs, single-thread settings and the 7,200-second worker cap were
+  unchanged. No startup or uncertainty exemption was applied.
+
+  **Numerical gate passed:** all eight fits converged with complete
+  positive-definite 78-by-78 covariance and all 32 required report-SE
+  families (13,091 rows). All four fresh native/Julia comparisons passed
+  at existing tolerances, as did cold-versus-warm numerical repetitions.
+  Actual full-precision starts matched across both backends and every
+  trial. Maximum fixed gradients were `0.000359420286652812` native and
+  `9.70785316717349e-10` Julia, both below `1e-3`.
+
+  **Performance gate failed:** native warm trial walls were
+  126.78/103.20/111.39 seconds (median 111.39); Julia warm walls were
+  329.44/323.99/335.28 seconds (median 329.44), an observed **2.96 times**
+  native. Cold process-to-result was 251.86 seconds native versus
+  408.97 Julia (1.62 times). Both cold and warm thresholds failed;
+  P6 remains unchecked. Preparation was measured separately, not hidden.
+
+  **Conditions and diagnosis:** native ran before Julia in sequential
+  batches, not interleaved or isolated. Continuous 30-second aggregate
+  host telemetry is retained. The shared workstation had less available
+  memory during Julia trials; these timings are an observed rejection,
+  not a precise isolated causal speed ratio. No concurrent agent builds,
+  tests or model fits were launched, and no unrelated processes were stopped.
+  The median Julia warm trial spent 262.17 of 329.44 seconds in the
+  marginal uncertainty Hessian, including 98 conditional solves (31.04
+  seconds), cross-curvature (74.43) and exact third-derivative traces
+  (153.63). The matched native trial's uncertainty stage took 91.83
+  seconds. Julia warm snapshot writes took only 3.35-3.53 seconds,
+  included without subtraction: profiler formatting alone cannot close
+  this gap.
+
+  **Next bounded work:** reduce repeated exact marginal-curvature work,
+  verifying full perturbed gradients/covariance and paired complete-fit
+  measurements before another P6 attempt. Retain the native oracle,
+  original workload and tolerances; do not skip uncertainty, substitute
+  saved fits, extend the process cap, or claim acceptance from gradient
+  improvements. A quieter/reserved host would improve attribution but
+  is not evidence that the present implementation passes.
+
+  **Evidence:** [fresh native/Julia results, timing decision and host telemetry](../data-raw/benchmarks/final-performance-2026-11-24/comparison.json)
+  and [command, distributions and phase breakdown](../data-raw/BACKEND_BENCHMARK.md#p6-final-performance-attempt-not-passed-2026-11-24).
+  All eight full-precision results, input, phase timestamps and host
+  samples are portable and checksummed. Runtime source hashes, starts,
+  Cholesky decompositions, report families, native comparisons and profile
+  write sums were independently verified. Local artifact
+  `p6-matched-full-01` retains full logs/profiles/dependency provenance.
+  Windows x64, R 4.6.2, Julia 1.10.10, Intel i7-1365U, Balanced power.
+
 ## N. Remaining representative configuration gates
 
 These are gaps in **integrated independent numerical evidence**, not claims

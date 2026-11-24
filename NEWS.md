@@ -63,6 +63,11 @@
   Laplace-gradient reduction, with identical gradients and 12% fewer
   allocations. Fresh full R fits preserve native numerical parity;
   complete-fit performance acceptance remains open.
+* The P6 same-day full benchmark preserves numerical parity but does not
+  pass performance acceptance: Julia/native warm medians were
+  329.44/111.39 seconds and cold process-to-result 408.97/251.86 seconds.
+  Runs used sequential batches on a shared workstation with continuous
+  host telemetry; uncertainty remains the main measured Julia cost.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
