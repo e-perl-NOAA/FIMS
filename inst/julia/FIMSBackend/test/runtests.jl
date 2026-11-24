@@ -547,8 +547,16 @@ end
   changed_joint = FIMSBackend._prepared_joint_objective(parameters, data, changed_config)
   @test changed_joint(collect(parameters)) ≈ evaluate_nll(parameters, data, changed_config) atol = 1e-10
   @test changed_joint(collect(parameters)) != prepared_joint(collect(parameters))
+  other_parameters, other_data, other_config = FIMSBackend._precompile_model_input(4, 5)
+  other_joint = FIMSBackend._prepared_joint_objective(other_parameters, other_data, other_config)
+  @test typeof(other_joint) == typeof(prepared_joint)
+  @test other_joint(collect(other_parameters)) ≈
+        evaluate_nll(other_parameters, other_data, other_config) atol = 1e-10
+  @test prepared_joint(collect(parameters)) ≈ evaluate_nll(parameters, data, config) atol = 1e-10
   report = result["report"]
   expected_selectivity = 1.0 ./ (1.0 .+ exp.(-([1.0, 2.0, 3.0] .- 2.0)))
+  @test report["sum_selectivity"] ≈
+        repeat(reshape(2 .* expected_selectivity, 1, :), 2, 1) rtol = 1e-13
   expected_mortality = 0.2 .+ (0.1 + exp(-200.0)) .* expected_selectivity
   expected_catch_numbers =
     [1000.0, 800.0, 600.0] .* 0.1 .* expected_selectivity ./

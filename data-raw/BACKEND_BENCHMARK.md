@@ -111,6 +111,11 @@ the candidate. BLAS/OpenMP/Julia thread environment variables are set to one.
   dependency/bridge preparation. Native uses a preexisting DLL; its build time
   is explicitly **not measured**, not reported as zero. Existing dependency
   caches are reused; this is not a clean-depot Julia installation benchmark.
+- `julia/package-preparation.toml` retains the last successful standalone
+  setup's dependency-resolution, package-precompilation and backend-loading
+  elapsed times. This preserves the representative derivative workload's
+  original preparation cost even when the later benchmark prepare process
+  reuses that cache. Preparation is not free: an unprepared first fit pays it.
 - `run-environment.json` records package/bridge load/setup time in the fresh
   run process. The first cold fit still pays its own model JIT compilation.
 - `cold/timing.json` includes `cold_process_to_result_seconds`, starting before
@@ -142,6 +147,11 @@ the trial's `optimizer.progress` plus `julia-profile` directory:
 - `snapshots.tsv` records stage, timestamp, raw sample entries, and write cost.
   Windows are cleared after persistence to bound sampling-buffer use; a full
   buffer fails explicitly rather than silently dropping samples.
+- `compilation.tsv` records cumulative compilation, recompilation and GC
+  seconds at every checkpoint, independently of the snapshot interval.
+  Recompilation is a subset of compilation; these counters and snapshot
+  writing overlap elapsed phase times. Do not sum or subtract them when
+  deciding complete cold/warm acceptance.
 - Julia frames retain function, file, line, and sample counts, but omit typed
   method signatures when rendering. Formatting deeply nested differentiation
   signatures can dominate the measured fit; snapshot costs remain recorded.

@@ -61,6 +61,12 @@ has_component(params, name::Symbol) = name in propertynames(params)
 
 get_component(params, name::Symbol, default) = has_component(params, name) ? params[name] : default
 
+_component_scalar_type(value::Number) = typeof(value)
+_component_scalar_type(value::AbstractArray) = eltype(value)
+_parameter_scalar_type(params::ComponentArray) = eltype(params)
+_parameter_scalar_type(params::NamedTuple) =
+  promote_type(map(_component_scalar_type, values(params))...)
+
 function component_array_from_input(parameters_vector, model_config)
   if parameters_vector isa ComponentArray
     return parameters_vector
@@ -744,7 +750,7 @@ function parameter_prior_nll_components(params, model_config)
     transforms,
   )) || throw(DimensionMismatch("Parameter prior fields must have matching lengths."))
 
-  nll_components = eltype(collect(params))[]
+  nll_components = _parameter_scalar_type(params)[]
   for prior_index in 1:n_priors
     component_name = Symbol(components[prior_index])
     component = get_component(params, component_name, nothing)
@@ -788,7 +794,7 @@ function parameter_prior_nll_components(params, model_config)
 end
 
 function parameter_prior_nll(params, model_config)
-  total = zero(eltype(collect(params)))
+  total = zero(_parameter_scalar_type(params))
   for component in parameter_prior_nll_components(params, model_config)
     total += component
   end
@@ -870,8 +876,12 @@ function expected_age_comp(population)
 end
 
 function _evaluate_model(parameters_vector, data_dict, model_config, ::Val{compute_report}) where {compute_report}
-  params = component_array_from_input(parameters_vector, model_config)
-  parameter_type = eltype(params)
+  params = NamedTuple(component_array_from_input(parameters_vector, model_config))
+  _evaluate_model_parameters(params, data_dict, model_config, Val(compute_report))
+end
+
+function _evaluate_model_parameters(params, data_dict, model_config, ::Val{compute_report}) where {compute_report}
+  parameter_type = _parameter_scalar_type(params)
   n_fleets = length(data_dict[:fleets])
   fleet_selectivity = zeros(
     parameter_type,
@@ -887,14 +897,18 @@ function _evaluate_model(parameters_vector, data_dict, model_config, ::Val{compu
       data_dict[:ages],
       data_dict[:n_years],
     )
-    for year in 1:data_dict[:n_years], age in 1:data_dict[:n_ages]
+    for age in 1:data_dict[:n_ages]
       age_value = data_dict[:ages][age]
-      selectivity_value = if selectivity isa AgeSpecificSelectivity
-        selectivity(age_value, year)
+      if selectivity isa AgeSpecificSelectivity
+        for year in 1:data_dict[:n_years]
+          fleet_selectivity[year, age, fleet_index] = selectivity(age_value, year)
+        end
       else
-        selectivity(age_value)
+        selectivity_value = selectivity(age_value)
+        for year in 1:data_dict[:n_years]
+          fleet_selectivity[year, age, fleet_index] = selectivity_value
+        end
       end
-      fleet_selectivity[year, age, fleet_index] = selectivity_value
     end
   end
   recruitment = build_recruitment(params, model_config)
@@ -914,7 +928,8 @@ function _evaluate_model(parameters_vector, data_dict, model_config, ::Val{compu
     zeros(parameter_type, max(data_dict[:n_years] - 1, 0))
   )
   recruitment_mode = string(get(model_config, :recruitment_process_mode, "log_devs"))
-  phi_0 = get(data_dict, :phi_0, spawning_biomass_per_recruit(population))
+  phi_0 = haskey(data_dict, :phi_0) ? data_dict[:phi_0] :
+    spawning_biomass_per_recruit(population)
 
   step_population!(
     population,

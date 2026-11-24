@@ -246,7 +246,13 @@ benchmark_worker <- function(config_path, backend, phase) {
       "Native DLL checksum differs: supply --native-dll-md5 for an independently built historical DLL.")
   } else {
     Sys.setenv(JULIA_HOME = dirname(config[["julia"]]), JULIA_BINDIR = dirname(config[["julia"]]))
-    if (phase == "prepare") FIMS::setup_julia(julia = config[["julia"]])
+    if (phase == "prepare") {
+      project <- FIMS::setup_julia(julia = config[["julia"]])
+      details <- file.path(project, "preparation.toml")
+      benchmark_require(file.exists(details) &&
+        file.copy(details, file.path(output, "package-preparation.toml")),
+        "Cannot preserve Julia package preparation costs.")
+    }
     if (phase == "run") {
       benchmark_require(FIMS:::initialize_julia_backend(), "Julia bridge initialization failed.")
       JuliaCall::julia_call("include", file.path(config[["root"]], "data-raw", "benchmark_profile.jl"))

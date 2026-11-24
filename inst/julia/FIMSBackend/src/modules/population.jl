@@ -56,14 +56,14 @@ function step_population!(
   @assert n_ages == length(pop.ages)
   @assert size(pop.numbers_at_age) == (n_years + 1, n_ages)
 
-  fishing_mortality = Matrix{T}(catch_data[:fishing_mortality])
+  fishing_rates = exp.(Matrix{T}(catch_data[:fishing_mortality]))
   fleet_selectivity = Array{T, 3}(catch_data[:fleet_selectivity])
-  catchability = T.(collect(get(catch_data, :catchability, ones(T, size(fishing_mortality, 2)))))
-  phi_0 = T(get(catch_data, :phi_0, spawning_biomass_per_recruit(pop)))
+  catchability = T.(collect(get(catch_data, :catchability, ones(T, size(fishing_rates, 2)))))
+  phi_0 = T(haskey(catch_data, :phi_0) ? catch_data[:phi_0] : spawning_biomass_per_recruit(pop))
   recruit_devs = T.(collect(get(catch_data, :log_recruit_devs, zeros(T, max(n_years - 1, 0)))))
   log_recruitment = T.(collect(get(catch_data, :log_recruitment, zeros(T, max(n_years - 1, 0)))))
   recruitment_mode = string(get(catch_data, :recruitment_mode, "log_devs"))
-  n_fleets = size(fishing_mortality, 2)
+  n_fleets = size(fishing_rates, 2)
 
   size(fleet_selectivity) == (n_years, n_ages, n_fleets) ||
     throw(ArgumentError("fleet_selectivity must have one year-age matrix per fleet."))
@@ -88,7 +88,7 @@ function step_population!(
       total_fishing_mortality = zero(T)
       for fleet in 1:n_fleets
         fleet_selectivity_value = fleet_selectivity[year, age, fleet]
-        fleet_fishing_mortality = exp(fishing_mortality[year, fleet]) * fleet_selectivity_value
+        fleet_fishing_mortality = fishing_rates[year, fleet] * fleet_selectivity_value
         total_fishing_mortality += fleet_fishing_mortality
       end
       pop.mortality_F[year, age] = total_fishing_mortality
@@ -116,7 +116,7 @@ function step_population!(
       for fleet in 1:n_fleets
         selectivity_value = fleet_selectivity[year, age, fleet]
         fleet_fishing_mortality =
-          exp(fishing_mortality[year, fleet]) * selectivity_value
+          fishing_rates[year, fleet] * selectivity_value
         catch_numbers =
           pop.numbers_at_age[year, age] *
           fleet_fishing_mortality * harvest_per_mortality

@@ -18,6 +18,14 @@ end
 function snapshot(stage; force = false, resume = true)
   current = state[]
   isnothing(current) && return nothing
+  compilation = Base.cumulative_compile_time_ns()
+  garbage_collection = Base.gc_num()
+  open(joinpath(current.directory, "compilation.tsv"), "a") do io
+    println(io, time(), '\t', stage, '\t',
+      (compilation[1] - current.compilation[1]) / 1e9, '\t',
+      (compilation[2] - current.compilation[2]) / 1e9, '\t',
+      (garbage_collection.total_time - current.gc_time) / 1e9)
+  end
   !force && time() - current.last[] < current.interval && return nothing
   started = time()
   Profile.stop_timer()
@@ -59,12 +67,16 @@ function start(directory, interval)
   try
     isfinite(interval) && interval > 0 || error("Snapshot interval must be positive and finite.")
     mkpath(directory)
+    Base.cumulative_compile_timing(true)
     state[] = (
       directory = directory, interval = Float64(interval), last = Ref(0.0),
       count = Ref(0), seconds = Ref(0.0),
+      compilation = Base.cumulative_compile_time_ns(), gc_time = Base.gc_num().total_time,
     )
     write(joinpath(directory, "snapshots.tsv"),
       "epoch_seconds\tfile\tstage\traw_entries\twrite_seconds\n")
+    write(joinpath(directory, "compilation.tsv"),
+      "epoch_seconds\tstage\tcompilation_seconds\trecompilation_seconds\tgc_seconds\n")
     Profile.clear()
     Profile.init(n = 10_000_000, delay = 0.1)
     # Snapshot on the optimizer's own task, never from an R background thread.

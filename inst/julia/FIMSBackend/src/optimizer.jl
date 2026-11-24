@@ -1,6 +1,6 @@
 using ComponentArrays: ComponentArray, getaxes
 using ForwardDiff: gradient, hessian
-using LinearAlgebra: Symmetric, cholesky, diag, inv, isposdef, logdet
+using LinearAlgebra: I, Symmetric, cholesky, diag, inv, isposdef, logdet
 using Optim: LBFGS, OnceDifferentiable, Options, converged, iterations, minimum, minimizer, optimize
 using Optim: LineSearches
 
@@ -60,14 +60,43 @@ function _named_component_array(x, parameter_layout)
   ComponentArray(NamedTuple{Tuple(parameter_layout)}(Tuple(x)))
 end
 
+struct _ScalarModelEvaluator
+  evaluate::Function
+end
+
+struct _ReportModelEvaluator
+  evaluate::Function
+end
+
+# Keep model layout/configuration types out of nested ForwardDiff tags.
+(objective::_ScalarModelEvaluator)(parameters::AbstractVector{T}) where {T} =
+  objective.evaluate(parameters)::T
+(objective::_ReportModelEvaluator)(parameters::AbstractVector{T}) where {T} =
+  objective.evaluate(parameters)::Vector{T}
+
 function _prepared_joint_objective(parameter_layout, data_dict, config)
-  prepared_data = _prepare_model_input(data_dict)
-  prepared_config = _prepare_model_input(config)
-  parameters -> _evaluate_model(
+  normalized_data = normalize_keys(data_dict)
+  pop!(normalized_data, :data, nothing)
+  prepared_data = _prepare_model_input(normalized_data)
+  model_config = normalize_keys(config)
+  for name in (
+    :parameter_names, :fixed_parameter_mask, :random_parameter_mask,
+    :optimizer_max_iterations, :optimizer_max_evaluations, :optimizer_restarts,
+    :optimizer_trace, :compute_standard_errors, :compute_report_covariance, :diagnostic_file,
+  )
+    pop!(model_config, name, nothing)
+  end
+  prepared_config = _prepare_model_input(model_config)
+  _ScalarModelEvaluator(parameters -> _evaluate_model(
     _named_component_array(parameters, parameter_layout),
     prepared_data, prepared_config, Val(false),
-  )
+  ))
 end
+
+_active_joint_objective(parameters, indices, joint_objective) =
+  values -> joint_objective(_compose_parameter_vector(
+    parameters, indices, values, Int[], Float64[],
+  ))
 
 function _result_dict(component)
   Dict(String(name) => getproperty(component, name) for name in propertynames(component))
@@ -306,10 +335,7 @@ end
 function _outer_preconditioner(joint_objective, parameters, fixed_indices, random_indices)
   fixed_count = length(fixed_indices)
   active_indices = vcat(fixed_indices, random_indices)
-  active_objective = values -> joint_objective(_compose_parameter_vector(
-    parameters, fixed_indices, values[1:fixed_count],
-    random_indices, values[(fixed_count + 1):end],
-  ))
+  active_objective = _active_joint_objective(parameters, active_indices, joint_objective)
   curvature = hessian(active_objective, parameters[active_indices])
   fixed = 1:fixed_count
   random = (fixed_count + 1):length(active_indices)
@@ -460,7 +486,7 @@ function _report_standard_errors(
   end
   report_jacobian = isempty(parameter_indices) ?
     zeros(Float64, sum(report_lengths), 0) :
-    ForwardDiff.jacobian(flatten_reports, parameters[parameter_indices])
+    ForwardDiff.jacobian(_ReportModelEvaluator(flatten_reports), parameters[parameter_indices])
   active_covariance = covariance[parameter_indices, parameter_indices]
   weighted_jacobian = report_jacobian * active_covariance
   report_variances = vec(sum(weighted_jacobian .* report_jacobian, dims = 2))
@@ -616,9 +642,7 @@ function fit_model(init_params, data_dict, config = Dict())
   joint_hessian = fill(NaN, length(xhat), length(xhat))
   _optimizer_checkpoint(diagnostic_file, "uncertainty_joint_hessian:start")
   if !isempty(active_indices)
-    active_objective = values -> joint_objective(_compose_parameter_vector(
-      xhat, active_indices, values, Int[], Float64[],
-    ))
+    active_objective = _active_joint_objective(xhat, active_indices, joint_objective)
     joint_hessian[active_indices, active_indices] .=
       hessian(active_objective, xhat[active_indices])
   end

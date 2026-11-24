@@ -96,6 +96,14 @@ in one environment. Startup failures report the underlying error. On Linux,
 FIMS loads Julia's bundled libunwind before starting JuliaCall.
 First-time preparation precompiles one dependency at a time to limit memory
 use; an explicit `JULIA_NUM_PRECOMPILE_TASKS` setting takes precedence.
+Preparation also caches representative objective, Laplace-derivative and
+report-derivative workloads using Julia's package images. This can take
+several minutes after installation or a backend update; run `setup_julia()`
+explicitly to perform that work before an analysis. It caches compiled code,
+not fitted values or uncertainty results. New model layouts can still require
+compilation. Without explicit preparation, the first fit also pays setup
+costs. Benchmarks report one-time preparation separately from a fresh-process
+first fit with dependencies already prepared.
 
 ### Migration and numerical guarantees
 

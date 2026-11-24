@@ -40,4 +40,6 @@ export BevertonHolt,
   set_backend_input!,
   step_population!
 
+include("precompile.jl")
+
 end
