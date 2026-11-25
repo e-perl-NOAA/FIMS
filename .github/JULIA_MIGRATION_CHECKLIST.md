@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N4**.
+   Name that item before starting. The default next item is **N5**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -40,7 +40,7 @@ for a continuation.
 | Backend cutover | Julia is the default/sole backend; FIMS native sources, headers, registration, and direct Rcpp/TMB build dependencies have been removed. Third-party dependencies such as JuliaCall still contain compiled code. |
 | Examples | Bundled fitted examples have been regenerated using real Julia execution, including the complete 49-fixed/29-random example. |
 | Full-model numerical reference | Saved full-model estimates, complete covariance, and 32 derived-report SE families pass independent native comparisons. This is not a fresh full-fit benchmark. |
-| Fresh configuration fits | Six bounded two-fleet reference cases pass 534 real-Julia comparisons, including jointly estimated DoubleLogistic ascending/descending limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed priors plus priors on coupled recruitment random effects. |
+| Fresh configuration fits | Eight bounded two-fleet reference cases pass 778 real-Julia comparisons, including static scalar/per-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
 | R compatibility | Live objectives/gradients/Hessians/reports, uncertainty adapters, conditional observation simulation, extraction, and small projection checks exist. |
 | Parallel diagnostics | Small single-fixed-effect profiles and retrospectives match between sequential and two-worker execution; current installed worker-package provenance was verified. |
 | Windows installation/check | A complete compiler-disabled Windows package check, default vignettes, and PDF manual have passed. A final-candidate recheck is still required below. |
@@ -693,15 +693,66 @@ remain useful and must be reused.
   `n3-real-gate-results.rds` and `n3-r-backend-tests-final.log` retain execution
   details and profiles.
   Existing real-integration CI paths include the expanded test; no remote
-  CI was monitored. The next ready item is **N4**.
+  CI was monitored. N4 below extends this gate.
 
-- [ ] **N4 - Pass the static AgeSpecific selectivity layout gate.**
+- [x] **N4 - Pass the static AgeSpecific selectivity layout gate.**
   **Depends on:** none.
   **Done when:** the supported scalar and per-age layouts have independent
   real-bridge numerical coverage, including fleet ownership, serialization
   order, and report behavior. Include an identifiable optimized per-age case
   with uncertainty; keep confounded effects fixed or use documented priors.
   A standalone Julia logistic calculation is not sufficient.
+
+  **Completed:** 2026-11-25, generator/reference/fix/regression commit
+  `dbdb8144`. Two five-year, 12-age, two-fleet EWAA assessments cover per-age
+  vectors in both fleets and a scalar fishing/per-age survey mixed layout.
+  Both estimate survey catchability, recruitment level and four recruitment
+  random effects. Per-age vectors fix age 6 at selectivity 0.9 to anchor
+  scale; fishing mortality and other confounded effects stay fixed.
+  The scalar fishing selectivity remains estimated. No added priors are needed.
+
+  **Independent reference:** the per-age case estimates 24 fixed effects with
+  complete 28-by-28 covariance; the mixed case estimates 14 fixed effects
+  with 18-by-18 covariance. Both converge with fixed gradients below
+  `0.000162` and positive-definite covariance stable at halved Hessian
+  differentiation steps. Native marginal/joint objectives are
+  `477.170685289972/470.393919467990` and
+  `483.256036646988/476.016117476143`. All estimated selectivity logits have
+  finite, positive SEs below 1. Each case retains two nonoptimal points,
+  conditional modes, joint scores/Hessians, marginal gradients and reports,
+  and 2,216 derived rows across 32 native AD report-SE families.
+
+  **Real verification:** the expanded configuration gate passes **778
+  assertions across eight fresh optimized fits and sixteen nonoptimal
+  points** in R 4.6.2/explicit Julia 1.10.10, single-thread settings and
+  `FIMS_RUN_JULIA_INTEGRATION=true`: no failures, errors or skips.
+  The static cases reverse fleet and age input rows, checking serialization,
+  lengths/offsets/masks, parameter ownership/IDs, anchors, joint/marginal
+  derivatives, modes, complete covariance, derived estimates and report SEs.
+  This exposed and fixed R extraction using parameter-tibble fleet order;
+  extraction now follows the serialized data fleet order. Native numerical
+  expectations and tolerances are unchanged; fitting, optimizer and
+  uncertainty calculations were not modified. Constant parameter SEs remain
+  unavailable. The historical native scalar's first-age display key is
+  normalized only for comparison to the unindexed input, not numerically.
+
+  **Reproduction and evidence:** two fresh native-only processes generated
+  byte-identical pointer-free fixtures, MD5
+  `7b6ffd6fc4411e10e2ba98ebf787f7aa`; provenance preserves DLL
+  `7791104ab1295dcec1725062eb5f1f0a`, native R-source, input and generator
+  hashes, TMB 1.9.21 and controls. The full R backend regression file also
+  passes, including 18 new R-only consistency assertions, with five opt-in
+  bridge tests skipped; those checks are not part of the 778 real assertions.
+  See [generator](../data-raw/generate_native_static_selectivity_oracle.R),
+  `tests/testthat/fixtures/native-static-selectivity-oracle.rds`, the
+  static-reference and real-configuration tests in
+  `tests/testthat/test-julia-backend.R`, and
+  [method/regeneration/verification commands](../tests/testthat/fixtures/native-backend-oracle.md#independent-static-agespecific-references-n4).
+  Local `n4-native-01.log`, `n4-native-reproduced.log`, `n4-real-gate.R`,
+  `n4-real-gate-passing.log`, `n4-real-gate-results.rds` and
+  `n4-r-backend-tests-final.log` retain execution details and profiles.
+  The existing real-integration CI paths include these cases; no remote CI
+  was monitored. The next ready item is **N5**.
 
 - [ ] **N5 - Pass the year-by-age AgeSpecific selectivity layout gate.**
   **Depends on:** N4.
