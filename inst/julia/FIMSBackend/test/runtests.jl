@@ -795,6 +795,51 @@ end
   @test all(isapprox.(sum(fleet_specific_conversion, dims = 2), 1.0))
   @test all(fleet_specific_conversion[:, 3, 1] .== 0)
   @test all(fleet_specific_conversion[:, 1, 2] .== 0)
+  shared_size_edges = collect(5.0:36.0)
+  expected_fleet_conversion = zeros(3, 3, 2)
+  for age_index in 1:3
+    mean_length = vonb_report["mean_length_at_age"][1, age_index]
+    sd_length = native_max(vonb_report["sd_length_at_age"][1, age_index], 1e-8)
+    cdf(edge) = 0.5 * (1 + erf((edge - mean_length) / (sd_length * sqrt(2))))
+    size_probabilities = [
+      cdf(shared_size_edges[2]);
+      [
+        cdf(shared_size_edges[index + 1]) - cdf(shared_size_edges[index]) for
+        index in 2:(length(shared_size_edges) - 2)
+      ];
+      cdf(2 * mean_length - shared_size_edges[end - 1]);
+    ]
+    size_probabilities .+= 1e-12
+    size_probabilities ./= sum(size_probabilities)
+    for fleet_index in 1:2
+      fleet_edges = fleet_index == 1 ? [5.0, 15.0, 36.0] : [5.0, 25.0, 36.0]
+      row = zeros(2)
+      for length_index in 1:2, size_index in eachindex(size_probabilities)
+        overlap = max(
+          0.0,
+          min(fleet_edges[length_index + 1], shared_size_edges[size_index + 1]) -
+          max(fleet_edges[length_index], shared_size_edges[size_index]),
+        )
+        row[length_index] += size_probabilities[size_index] * overlap /
+          (shared_size_edges[size_index + 1] - shared_size_edges[size_index])
+      end
+      row .+= 1e-12
+      row ./= sum(row)
+      indices = fleet_index == 1 ? [1, 2] : [2, 3]
+      expected_fleet_conversion[age_index, indices, fleet_index] .= row
+    end
+  end
+  @test fleet_specific_conversion ≈ expected_fleet_conversion rtol = 1e-13 atol = 1e-15
+  no_length_result = evaluate_model(
+    vonb_parameters,
+    merge(fleet_specific_data, Dict(
+      :n_lengths_by_fleet => [0, 0],
+      :observed_length_comp => fill(-999.0, 2, 3, 2),
+    )),
+    merge(config, Dict(:growth_model_type => "VonBertalanffySchnute")),
+  )
+  @test all(iszero, no_length_result["report"]["age_to_length_conversion"])
+  @test isfinite(no_length_result["nll"])
   @test isfinite(fleet_specific_result["nll"])
   changed_length_comp = copy(fleet_specific_data[:observed_length_comp])
   changed_length_comp[1, 1, 1] += 10

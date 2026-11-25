@@ -499,6 +499,18 @@ function build_growth_products(params, data_dict, model_config)
         age_to_length_conversion[age_index, :] .= row
       end
     else
+      observation_edges_by_fleet = [
+        growth_observation_edges(fleet_lengths[1:fleet_length_counts[index], index]) for
+        index in eachindex(data_dict[:fleets]) if fleet_length_counts[index] > 0
+      ]
+      size_edges = if isempty(observation_edges_by_fleet)
+        Float64[]
+      else
+        growth_population_size_edges([
+          minimum(first, observation_edges_by_fleet),
+          maximum(last, observation_edges_by_fleet),
+        ])
+      end
       age_to_length_conversion = zeros(
         promote_type(eltype(mean_length), eltype(sd_length)),
         n_ages,
@@ -517,7 +529,6 @@ function build_growth_products(params, data_dict, model_config)
           push!(global_indices, global_index)
         end
         observation_edges = growth_observation_edges(fleet_bins)
-        size_edges = growth_population_size_edges(observation_edges)
         rebin_weights = growth_rebin_weights(size_edges, observation_edges)
         for age_index in 1:n_ages
           sd = growth_smooth_max(sd_length[age_index], oftype(sd_length[age_index], 1e-8))

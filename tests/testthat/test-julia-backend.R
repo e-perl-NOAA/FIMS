@@ -2452,6 +2452,46 @@ test_that("native female-proportion references preserve spawning and recruitment
   }
 })
 
+test_that("native heterogeneous observations retain independent row likelihoods", {
+  oracle <- readRDS(testthat::test_path("fixtures", "native-heterogeneous-observation-oracle.rds"))
+  case <- oracle[["cases"]][[1]]
+  data <- case[["model_data"]]
+  for (point in c(case[["points"]], list(list(report = case[["report"]],
+    parameters = case[["parameters_table"]][["estimated"]],
+    observation_likelihood = case[["observation_likelihood"]])))) {
+    likelihood <- point[["observation_likelihood"]]
+    for (index in seq_len(nrow(likelihood))) {
+      row <- likelihood[index, ]
+      observations <- data |>
+        dplyr::filter(.data$fleet == row[["fleet"]], .data$timing == row[["year_i"]],
+          .data$type == switch(row[["label"]], agecomp_expected = "age_comp",
+            lengthcomp_expected = "length_comp", sub("_expected$", "", row[["label"]]))) |>
+        dplyr::arrange(.data$age, .data$length)
+      fleet_index <- match(row[["fleet"]], names(case[["length_bins"]]))
+      if (row[["missing"]]) {
+        expect_true(all(observations[["observed"]] == -999))
+        expect_equal(row[["lpdf"]], 0)
+        next
+      }
+      expected <- matrix(point[["report"]][[row[["label"]]]][[fleet_index]],
+        ncol = nrow(observations), byrow = TRUE)[row[["year_i"]], ]
+      parsed <- FIMS:::parse_data_distribution(observations[["uncertainty"]])
+      lpdf <- switch(row[["distribution"]],
+        dnorm = stats::dnorm(observations[["observed"]], expected, unlist(parsed[["sd"]]), log = TRUE),
+        dlnorm = stats::dlnorm(observations[["observed"]], log(expected), unlist(parsed[["sdlog"]]), log = TRUE),
+        dmultinom = stats::dmultinom(round(observations[["observed"]] * 1000), prob = expected, log = TRUE))
+      expect_equal(as.numeric(lpdf), row[["lpdf"]], tolerance = 1e-12)
+    }
+    random <- case[["parameters_table"]][["estimation_type"]] == "random_effects"
+    process <- -sum(stats::dnorm(point[["parameters"]][random], sd = exp(
+      case[["parameters"]][["value"]][case[["parameters"]][["label"]] == "log_sd"]), log = TRUE))
+    expect_equal(as.numeric(point[["report"]][["jnll"]]),
+      -sum(likelihood[["lpdf"]]) + process, tolerance = 1e-12)
+  }
+  expect_gt(min(eigen(case[["covariance"]], symmetric = TRUE, only.values = TRUE)[["values"]]), 0)
+  expect_equal(solve(case[["fixed_hessian"]]), solve(case[["check_fixed_hessian"]]), tolerance = 1e-5)
+})
+
 test_that("real Julia joint configurations retain native gradients and uncertainty", {
   skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
     "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
@@ -2462,14 +2502,64 @@ test_that("real Julia joint configurations retain native gradients and uncertain
   yearly_selectivity_oracle <- readRDS(testthat::test_path("fixtures", "native-yearly-selectivity-oracle.rds"))
   growth_delta_oracle <- readRDS(testthat::test_path("fixtures", "native-growth-delta-oracle.rds"))
   proportion_female_oracle <- readRDS(testthat::test_path("fixtures", "native-proportion-female-oracle.rds"))
+  heterogeneous_oracle <- readRDS(testthat::test_path("fixtures", "native-heterogeneous-observation-oracle.rds"))
   cases <- c(oracle[["cases"]], random_prior_oracle[["cases"]],
     double_logistic_oracle[["cases"]], static_selectivity_oracle[["cases"]],
     yearly_selectivity_oracle[["cases"]], growth_delta_oracle[["cases"]],
-    proportion_female_oracle[["cases"]])
+    proportion_female_oracle[["cases"]], heterogeneous_oracle[["cases"]])
   random_prior_results <- list()
   keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
   for (case in cases) {
     name <- case[["name"]]
+    check_observation_reports <- function(report, native_report, native_likelihood, tolerance) {
+      for (field in c("catch_numbers", "index_numbers", "catch_weight", "index_weight",
+        "catch_numbers_at_age", "index_numbers_at_age", "catch_weight_at_age", "index_weight_at_age",
+        "catch_numbers_at_length", "index_numbers_at_length", "agecomp_proportion",
+        "lengthcomp_proportion", "age_to_length_conversion_derived")) {
+        expect_equal(unname(unlist(report[[field]])), unname(unlist(native_report[[field]])),
+          tolerance = tolerance, info = paste(name, field))
+      }
+      native_components <- native_likelihood |>
+        dplyr::summarize(nll = -sum(.data$lpdf), .by = c("fleet", "label"))
+      actual_components <- tibble::tibble(
+        fleet = report[["nll_component_fleets"]],
+        label = report[["nll_component_labels"]],
+        nll = report[["nll_components"]]
+      ) |>
+        dplyr::inner_join(native_components, by = c("fleet", "label"),
+          suffix = c("_julia", "_native"), relationship = "one-to-one")
+      expect_equal(nrow(actual_components), nrow(native_components))
+      expect_equal(actual_components[["nll_julia"]], actual_components[["nll_native"]],
+        tolerance = tolerance, info = name)
+      expect_equal(sum(report[["nll_components"]]), as.numeric(native_report[["jnll"]]),
+        tolerance = tolerance, info = name)
+      expected_rows <- native_likelihood
+      for (index in seq_len(nrow(expected_rows))) {
+        row <- expected_rows[index, ]
+        fleet_index <- match(row[["fleet"]], config[["fleet_names"]])
+        year <- row[["year_i"]]
+        label <- row[["label"]]
+        if (grepl("comp", label)) {
+          lpdf <- fit_result[["report"]][[paste0(sub("_expected$", "", label),
+            "_log_likelihood_by_fleet")]][year, fleet_index]
+        } else {
+          type <- sub("_expected$", "", label)
+          observed <- julia_input[["data"]][[paste0("observed_", type)]][year, fleet_index]
+          expected <- report[[label]][[fleet_index]][[year]]
+          family <- config[[paste0(type, "_distribution")]]
+          family <- if (is.matrix(family)) family[year, fleet_index] else family
+          sigma <- config[[paste0(type, "_sigma")]][year, fleet_index]
+          lpdf <- if (observed == -999) 0 else if (family == "dnorm") {
+            stats::dnorm(observed, expected, sigma, log = TRUE)
+          } else {
+            stats::dlnorm(observed, log(expected), sigma, log = TRUE)
+          }
+        }
+        expect_equal(as.numeric(lpdf), row[["lpdf"]], tolerance = tolerance,
+          info = paste(name, row[["fleet"]], label, year))
+        if (row[["missing"]]) expect_equal(as.numeric(lpdf), 0)
+      }
+    }
     case_parameters <- case[["parameters"]]
     if (!is.null(case[["proportion_female_length"]])) {
       case_parameters <- dplyr::bind_rows(
@@ -2567,7 +2657,8 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         unname(rows[["uncertainty_native"]]), tolerance = 1e-4,
         info = paste(name, label))
       if (identical(name, "DoubleLogistic-joint") || !is.null(case[["selectivity_lengths"]]) ||
-          !is.null(case[["growth_variability"]]) || !is.null(case[["proportion_female_length"]])) {
+          !is.null(case[["growth_variability"]]) || !is.null(case[["proportion_female_length"]]) ||
+          !is.null(case[["length_bins"]])) {
         expect_equal(unname(rows[["estimated"]]), unname(rows[["estimate"]]),
           tolerance = 1e-4, info = paste(name, label))
       }
@@ -2597,6 +2688,41 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         case[["joint_hessian"]], tolerance = 1e-4, info = name)
       expect_equal(objective[["he"]](objective[["par"]])[fixed_order, fixed_order],
         unname(case[["fixed_hessian"]]), tolerance = 1e-4, info = name)
+    }
+    if (!is.null(case[["length_bins"]])) {
+      expect_equal(julia_input[["data"]][["n_lengths_by_fleet"]],
+        unname(lengths(case[["length_bins"]])))
+      for (fleet_index in seq_along(config[["fleet_names"]])) {
+        fleet_name <- config[["fleet_names"]][[fleet_index]]
+        expected_bins <- case[["length_bins"]][[fleet_name]]
+        for (label in c("lengthcomp_expected", "lengthcomp_proportion",
+          "catch_numbers_at_length", "index_numbers_at_length")) {
+          rows <- get_estimates(fit) |>
+            dplyr::filter(.data$fleet == .env$fleet_name, .data$label == .env$label,
+              .data$type == "derived_quantity") |>
+            dplyr::arrange(.data$year_i, .data$length)
+          expect_equal(nrow(rows), 5L * length(expected_bins), info = paste(name, label))
+          expect_equal(rows[["length"]], rep(expected_bins, 5L), info = paste(name, label))
+        }
+      }
+      for (type in c("catch", "index")) {
+        data_rows <- case[["model_data"]] |>
+          dplyr::filter(.data$type == .env$type, .data$observed != -999)
+        for (index in seq_len(nrow(data_rows))) {
+          row <- data_rows[index, ]
+          parsed <- FIMS:::parse_data_distribution(row[["uncertainty"]])
+          family <- parsed[["family"]][[1]]
+          configured <- config[[paste0(type, "_distribution")]]
+          fleet_index <- match(row[["fleet"]], config[["fleet_names"]])
+          configured <- if (is.matrix(configured)) configured[row[["timing"]], fleet_index] else configured
+          expect_equal(configured, family)
+          scale <- unlist(parsed[[if (family == "dnorm") "sd" else "sdlog"]])
+          expect_equal(config[[paste0(type, "_sigma")]][row[["timing"]], fleet_index],
+            as.numeric(scale))
+        }
+      }
+      check_observation_reports(get_report(fit), case[["report"]],
+        case[["observation_likelihood"]], tolerance = 1e-4)
     }
     if (!is.null(case[["growth_variability"]])) {
       expect_equal(config[["growth_model_type"]], "VonBertalanffySchnute")
@@ -2837,6 +2963,11 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         point_curvature[[length(point_curvature) + 1L]] <- random_hessian
       }
       report <- objective[["report"]](values)
+      if (!is.null(case[["length_bins"]])) {
+        fit_result <- FIMS:::evaluate_julia_fixed_objective(julia_input, config, values, 3L)
+        check_observation_reports(report, point[["report"]],
+          point[["observation_likelihood"]], tolerance = 1e-8)
+      }
       if (!is.null(case[["proportion_female_length"]])) {
         for (field in c("unfished_spawning_biomass", "spawning_biomass_ratio", "nll_components")) {
           expect_equal(unname(unlist(report[[field]])),

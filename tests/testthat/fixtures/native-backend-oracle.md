@@ -604,3 +604,92 @@ bridge tests skipped, including 24 new R-only formula/fixture assertions
 that are not counted as real-Julia evidence. No production optimizer/
 derivative code or numerical tolerances changed; existing P6 evidence is
 not invalidated. This numerical gate is not a new performance measurement.
+
+## Independent heterogeneous observation reference (N8)
+
+`native-heterogeneous-observation-oracle.rds` adds a five-year, 12-age,
+two-fleet assessment with fishing length bins `seq(0, 1100, 100)` and survey
+bins `c(0, 150, 300, 450, 600, 750, 900, 1100)`: **12 versus eight bins**,
+embedded in a 15-bin union. The fishing fleet has age and length compositions,
+catch and an index; the survey has length compositions and an index but
+no age observations. Growth is fixed VonBertalanffySchnute with two-reference-age
+SD interpolation. Both fleets use growth-derived conversion, not a supplied
+conversion matrix. Native-generated compositions use deterministic integer
+largest-remainder samples and multinomial likelihood sizes of 1,000.
+
+Catch and survey index use normal observations; fishing index uses lognormal
+observations. Scales vary by modeled year, with small deterministic residuals
+in the generating observations. This follows the historical high-level
+interface's supported granularity: **one family per fleet/data stream, with
+per-cell scales**, not mixed normal/lognormal families within one native
+stream. Julia's separate mixed-family serialization checks are not native
+numerical parity evidence.
+
+The data omit fishing catch in year two, age compositions in year three,
+fishing length compositions in year two and survey length compositions in
+year four. Explicit `-999` indices mark fishing year three and survey year
+four. Those observations have no uncertainty formula; omitted rows are
+completed by `FIMSFrame`. The historical native missing-value contract uses
+`-999`, not arbitrary `NA` observed values. The fixture preserves supplied
+data and the completed native frame. Independent R normal, lognormal and
+multinomial row densities reconstruct each native joint objective, including
+its Gaussian recruitment process. All six missing stream/year contributions
+are exactly zero.
+
+The identifiable fit estimates four Logistic selectivity parameters, two
+catchabilities and recruitment level with four coupled random recruitment
+deviations: **seven fixed and four random effects**, without added priors.
+The native marginal/joint objectives are
+`238.331326865617/230.534059899415`, maximum fixed gradient is
+`0.000107837782709`, and the smallest covariance eigenvalue is
+`0.000246569205520`. Its positive-definite 11-by-11 covariance is stable
+when halving the marginal Hessian differencing step from `1e-4` to `5e-5`.
+Native TMB AD supplies **1,696 derived rows in all 32 common report-SE
+families**, retaining survey age-composition quantities despite absent
+age observations.
+
+Two fresh native-only processes produce byte-identical pointer-free fixtures,
+MD5 `e11365ca00628d3f7eac6aff7e3877e1`. Provenance retains historical revision
+`1e5a64a8`, DLL MD5 `7791104ab1295dcec1725062eb5f1f0a`, native R-source/
+input hashes, generator MD5 `9187e213307218476ac343c54a848916`,
+R 4.6.2, TMB 1.9.21 and optimizer controls (400 iterations/1,000 evaluations
+per attempt, up to three restarts). Neither Julia output nor modified native
+sources construct or repair expectations. Regenerate from the candidate root
+with the prepared historical checkout/DLL and a **new output path**:
+
+```powershell
+$env:LC_ALL = 'C'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+& 'C:\Program Files\R\R-4.6.2\bin\x64\Rscript.exe' --vanilla data-raw\generate_native_heterogeneous_observation_oracle.R C:\benchmarks\native-oracle C:\benchmarks\native-heterogeneous-observation-new.rds
+```
+
+The real gate exposed two production gaps. Heterogeneous growth conversions
+previously constructed separate population size grids for each fleet, altering
+the native smoothing/normalization convention. They now use one biological
+grid spanning the minimum fleet lower edge and maximum fleet upper edge,
+then rebin to each fleet. The equal-bin branch is unchanged. R adapters
+previously leaked global structural-zero bins into public length reports,
+labels and SE rows and omitted unobserved age-composition estimates. They now
+select each fleet's bin indices consistently for values, observations and
+uncertainty while retaining unobserved derived quantities. Global internal
+tensors remain padded. A standalone independent Gaussian-CDF/rebin oracle
+checks the shared grid, including a valid zero-length-bin layout.
+
+Fresh real R 4.6.2/Julia 1.10.10 execution with explicit Julia selection and
+single-thread settings passes **1,640 assertions across thirteen fresh
+optimized fits and twenty-six nonoptimal points**, with no failures, errors
+or skips. Comparisons include objectives, conditional modes, gradients/
+Hessians, complete covariance, every derived estimate/SE family, exact bin
+labels/counts, configured per-cell scales and families, all 30 observation
+row densities and the six zero missing contributions at the optimum and
+both nonoptimal points. Likelihood components align by fleet/label, not native
+registration order, which places index before catch for a fleet with both.
+
+The standalone Julia suite and full R backend regression file pass separately.
+The latter skips five opt-in bridge tests and includes 113 new independent
+R fixture assertions, not counted as real-Julia evidence. The existing N2
+opt-in command and integration CI paths include the new case. Numerical
+tolerances are unchanged. This is numerical validation, not a fresh full-fit
+performance measurement; final-candidate release checks remain required.

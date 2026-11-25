@@ -143,6 +143,14 @@
   fixed female inputs retain unavailable parameter SEs. The expanded gate
   passes 1,331 assertions across twelve fresh fits and twenty-four nonoptimal
   points without production changes or relaxed numerical tolerances.
+* Heterogeneous fleet observations now pass independent native/real-Julia
+  comparisons with unequal length bins, different composition coverage,
+  missing years and normal/lognormal streams with year-specific uncertainty.
+  Growth-derived conversions share the native biological size grid. R
+  reports, length-bin labels and SEs exclude other fleets' structural padding;
+  composition quantities without observations remain available. The expanded
+  configuration gate passes 1,640 assertions across thirteen fresh fits and
+  twenty-six nonoptimal points at unchanged tolerances.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

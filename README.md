@@ -147,6 +147,12 @@ likelihoods, parameter mapping, complete covariance and derived-report SEs.
 These biology inputs remain fixed in identifiable six-fixed/four-random fits:
 scalar female scaling cancels from recruitment likelihoods. Separate joint
 derivative probes cover female coordinates without claiming fitted female SEs.
+Heterogeneous observation comparisons cover unequal 12/8 fleet length bins,
+fishing age/length versus survey length-only coverage, missing years and
+normal/lognormal streams with year-specific scales. Growth-derived conversions
+use one shared biological size grid; R reports and estimate/SE rows use each
+fleet's own length bins, not padded global bins. Missing observations contribute
+zero likelihood, while unobserved composition quantities remain reportable.
 The saved complete 49-fixed/29-random fit passes native comparisons of estimates,
 full covariance and 32 derived-report standard-error families; this saved-fit
 check is not a fresh full-fit benchmark. A subsequent
