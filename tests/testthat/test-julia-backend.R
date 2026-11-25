@@ -2379,6 +2379,79 @@ test_that("native growth references distinguish both variability routes", {
   }
 })
 
+test_that("native female-proportion references preserve spawning and recruitment feedback", {
+  oracle <- readRDS(testthat::test_path("fixtures", "native-proportion-female-oracle.rds"))
+  for (case in oracle[["cases"]]) {
+    truth <- case[["truth"]]
+    female <- truth[["parameters"]] |>
+      dplyr::filter(.data$label == "proportion_female") |>
+      dplyr::arrange(.data$age) |>
+      dplyr::pull(.data$value)
+    weights <- case[["data"]] |>
+      dplyr::filter(.data$type == "weight_at_age", .data$fleet == "fleet1") |>
+      dplyr::arrange(.data$timing, .data$age) |>
+      dplyr::pull(.data$observed) |>
+      matrix(ncol = 12L, byrow = TRUE)
+    numbers <- matrix(unlist(truth[["report"]][["numbers_at_age"]]), ncol = 12L, byrow = TRUE)
+    maturity <- matrix(unlist(truth[["report"]][["proportion_mature_at_age"]]),
+      ncol = 12L, byrow = TRUE)
+    spawning <- rowSums(sweep(numbers * weights * maturity, 2L, rep_len(female, 12L), `*`))
+    expect_equal(unname(unlist(truth[["report"]][["spawning_biomass"]])),
+      unname(spawning), tolerance = 1e-12)
+    mortality <- truth[["parameters"]] |>
+      dplyr::filter(.data$label == "log_M", .data$timing == 1) |>
+      dplyr::arrange(.data$age) |>
+      dplyr::pull(.data$value) |>
+      exp()
+    per_recruit <- exp(-c(0, cumsum(head(mortality, -1L))))
+    per_recruit[[12]] <- per_recruit[[12]] / (1 - exp(-mortality[[12]]))
+    spawning_per_recruit <- sum(per_recruit * rep_len(female, 12L) * weights[1, ] * maturity[1, ])
+    recruitment_parameters <- truth[["parameters"]] |>
+      dplyr::filter(.data$module_name == "Recruitment") |>
+      dplyr::arrange(.data$timing)
+    rzero <- exp(recruitment_parameters[["value"]][recruitment_parameters[["label"]] == "log_rzero"])
+    steepness <- 0.2 + 0.8 * stats::plogis(
+      recruitment_parameters[["value"]][recruitment_parameters[["label"]] == "logit_steep"]
+    )
+    expected <- 0.8 * rzero * steepness * spawning[1:5] /
+      (0.2 * spawning_per_recruit * rzero * (1 - steepness) + spawning[1:5] * (steepness - 0.2))
+    expected[1:4] <- expected[1:4] * exp(
+      recruitment_parameters[["value"]][recruitment_parameters[["label"]] == "log_devs"]
+    )
+    expect_equal(unname(unlist(truth[["report"]][["expected_recruitment"]])),
+      unname(c(numbers[1, 1], expected)), tolerance = 1e-12)
+    expect_gt(min(eigen(case[["covariance"]], symmetric = TRUE, only.values = TRUE)[["values"]]), 0)
+    expect_equal(solve(case[["fixed_hessian"]]), solve(case[["check_fixed_hessian"]]), tolerance = 1e-5)
+    point <- case[["points"]][[1]]
+    counterfactual <- case[["female_counterfactual"]][["report"]]
+    female_ids <- which(case[["female_probe_rows"]][["label"]] == "proportion_female")
+    if (case[["proportion_female_length"]] == 1L) {
+      expect_lt(max(abs(point[["female_probe"]][["gradient"]][female_ids])), 1e-8)
+      expect_equal(counterfactual[["jnll"]], point[["report"]][["jnll"]], tolerance = 1e-12)
+      expect_equal(unname(unlist(counterfactual[["expected_recruitment"]])),
+        unname(unlist(point[["report"]][["expected_recruitment"]])), tolerance = 1e-12)
+      expect_equal(unname(unlist(counterfactual[["spawning_biomass"]])),
+        unname(unlist(point[["report"]][["spawning_biomass"]])) *
+          case[["female_counterfactual"]][["values"]] / female, tolerance = 1e-12)
+    } else {
+      expect_gt(max(abs(point[["female_probe"]][["gradient"]][female_ids])), 1e-3)
+      expect_gt(abs(counterfactual[["jnll"]] - point[["report"]][["jnll"]]), 1e-2)
+      expect_gt(max(abs(unlist(counterfactual[["expected_recruitment"]]) -
+        unlist(point[["report"]][["expected_recruitment"]]))), 1)
+      expect_gt(max(abs(unlist(counterfactual[["spawning_biomass"]]) -
+        unlist(point[["report"]][["spawning_biomass"]]))), 1)
+    }
+    random <- which(case[["parameters_table"]][["estimation_type"]] == "random_effects")
+    for (point in case[["points"]]) {
+      expect_lt(max(abs(point[["joint_gradient"]][random])), 1e-6)
+      expect_equal(as.numeric(point[["marginal"]] - point[["report"]][["jnll"]]),
+        as.numeric(determinant(point[["joint_hessian"]][random, random],
+          logarithm = TRUE)[["modulus"]]) / 2 - length(random) * log(2 * pi) / 2,
+        tolerance = 1e-12)
+    }
+  }
+})
+
 test_that("real Julia joint configurations retain native gradients and uncertainty", {
   skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
     "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
@@ -2388,14 +2461,24 @@ test_that("real Julia joint configurations retain native gradients and uncertain
   static_selectivity_oracle <- readRDS(testthat::test_path("fixtures", "native-static-selectivity-oracle.rds"))
   yearly_selectivity_oracle <- readRDS(testthat::test_path("fixtures", "native-yearly-selectivity-oracle.rds"))
   growth_delta_oracle <- readRDS(testthat::test_path("fixtures", "native-growth-delta-oracle.rds"))
+  proportion_female_oracle <- readRDS(testthat::test_path("fixtures", "native-proportion-female-oracle.rds"))
   cases <- c(oracle[["cases"]], random_prior_oracle[["cases"]],
     double_logistic_oracle[["cases"]], static_selectivity_oracle[["cases"]],
-    yearly_selectivity_oracle[["cases"]], growth_delta_oracle[["cases"]])
+    yearly_selectivity_oracle[["cases"]], growth_delta_oracle[["cases"]],
+    proportion_female_oracle[["cases"]])
   random_prior_results <- list()
   keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
   for (case in cases) {
     name <- case[["name"]]
     case_parameters <- case[["parameters"]]
+    if (!is.null(case[["proportion_female_length"]])) {
+      case_parameters <- dplyr::bind_rows(
+        case_parameters |> dplyr::filter(.data$label != "proportion_female"),
+        case_parameters |>
+          dplyr::filter(.data$label == "proportion_female") |>
+          dplyr::arrange(dplyr::desc(.data$age))
+      )
+    }
     if (!is.null(case[["selectivity_lengths"]])) {
       case_parameters <- dplyr::bind_rows(
         case_parameters |> dplyr::filter(.data$module_name != "Selectivity"),
@@ -2484,7 +2567,7 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         unname(rows[["uncertainty_native"]]), tolerance = 1e-4,
         info = paste(name, label))
       if (identical(name, "DoubleLogistic-joint") || !is.null(case[["selectivity_lengths"]]) ||
-          !is.null(case[["growth_variability"]])) {
+          !is.null(case[["growth_variability"]]) || !is.null(case[["proportion_female_length"]])) {
         expect_equal(unname(rows[["estimated"]]), unname(rows[["estimate"]]),
           tolerance = 1e-4, info = paste(name, label))
       }
@@ -2557,6 +2640,34 @@ test_that("real Julia joint configurations retain native gradients and uncertain
           unname(unlist(case[["report"]][[field]])), tolerance = 1e-4, info = paste(name, field))
       }
     }
+    if (!is.null(case[["proportion_female_length"]])) {
+      female_rows <- get_estimates(fit) |>
+        dplyr::filter(.data$module_name == "Population", .data$label == "proportion_female") |>
+        dplyr::arrange(.data$age)
+      expected_female <- case[["parameters"]] |>
+        dplyr::filter(.data$label == "proportion_female") |>
+        dplyr::arrange(.data$age)
+      expect_equal(nrow(female_rows), nrow(expected_female))
+      expect_equal(female_rows[["age"]], expected_female[["age"]])
+      expect_equal(unname(female_rows[["estimated"]]), unname(expected_female[["value"]]))
+      expect_equal(unname(julia_input[["parameters"]][["proportion_female"]]),
+        unname(expected_female[["value"]]))
+      expect_false(any(config[["fixed_parameter_mask"]][female_rows[["parameter_id"]]]))
+      expect_false(any(config[["random_parameter_mask"]][female_rows[["parameter_id"]]]))
+      expect_true(all(is.na(female_rows[["uncertainty"]])))
+      probe_rows <- dplyr::inner_join(case[["female_probe_rows"]], get_estimates(fit),
+        by = keys, relationship = "one-to-one")
+      expect_equal(nrow(probe_rows), nrow(case[["female_probe_rows"]]))
+      probe_ids <- probe_rows[["parameter_id"]]
+      probe_config <- joint_config
+      probe_config[["fixed_parameter_mask"]][probe_ids] <- TRUE
+      probe_active_ids <- which(probe_config[["fixed_parameter_mask"]])
+      probe_order <- match(probe_ids, probe_active_ids)
+      for (field in c("unfished_spawning_biomass", "spawning_biomass_ratio", "nll_components")) {
+        expect_equal(unname(unlist(get_report(fit)[[field]])),
+          unname(unlist(case[["report"]][[field]])), tolerance = 1e-4, info = paste(name, field))
+      }
+    }
     if (!is.null(case[["conditional"]])) {
       config <- environment(objective[["fn"]])[["model_config"]]
       julia_input <- attr(input, "julia_input")
@@ -2620,8 +2731,10 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         score <- FIMS:::evaluate_julia_fixed_objective(julia_input, joint_config, joint_values, 1L)
         expect_equal(as.numeric(score)[joint_order], point[["joint_gradient"]],
           tolerance = 1e-6, info = name)
-        if (!is.null(point[["variability_probe"]])) {
-          expect_equal(parameter_vector[probe_ids], point[["variability_probe"]][["parameters"]],
+        probe_reference <- point[["variability_probe"]]
+        if (!is.null(point[["female_probe"]])) probe_reference <- point[["female_probe"]]
+        if (!is.null(probe_reference)) {
+          expect_equal(parameter_vector[probe_ids], probe_reference[["parameters"]],
             tolerance = 1e-8, info = name)
           probe_values <- parameter_vector[probe_active_ids]
           probe_gradient <- FIMS:::evaluate_julia_fixed_objective(
@@ -2631,9 +2744,26 @@ test_that("real Julia joint configurations retain native gradients and uncertain
             julia_input, probe_config, probe_values, 2L
           )
           expect_equal(as.numeric(probe_gradient)[probe_order],
-            point[["variability_probe"]][["gradient"]], tolerance = 1e-6, info = name)
+            probe_reference[["gradient"]], tolerance = 1e-6, info = name)
           expect_equal(as.matrix(probe_hessian)[probe_order, probe_order],
-            point[["variability_probe"]][["hessian"]], tolerance = 1e-6, info = name)
+            probe_reference[["hessian"]], tolerance = 1e-6, info = name)
+          if (!is.null(point[["female_probe"]]) &&
+              identical(point[["fixed"]], case[["points"]][[1]][["fixed"]])) {
+            counterfactual_values <- probe_values
+            female_active_ids <- match(female_rows[["parameter_id"]], probe_active_ids)
+            counterfactual_values[female_active_ids] <- case[["female_counterfactual"]][["values"]]
+            counterfactual <- FIMS:::evaluate_julia_fixed_objective(
+              julia_input, probe_config, counterfactual_values, 3L
+            )
+            native_counterfactual <- case[["female_counterfactual"]][["report"]]
+            expect_equal(counterfactual[["nll"]], as.numeric(native_counterfactual[["jnll"]]),
+              tolerance = 1e-8, info = name)
+            for (field in c("spawning_biomass", "expected_recruitment", "nll_components")) {
+              expect_equal(unname(unlist(counterfactual[["report"]][[field]])),
+                unname(unlist(native_counterfactual[[field]])), tolerance = 1e-8,
+                info = paste(name, "counterfactual", field))
+            }
+          }
         }
         if (identical(name, "AgeSpecific-year-by-age") &&
             identical(point[["fixed"]], case[["points"]][[1]][["fixed"]])) {
@@ -2707,6 +2837,12 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         point_curvature[[length(point_curvature) + 1L]] <- random_hessian
       }
       report <- objective[["report"]](values)
+      if (!is.null(case[["proportion_female_length"]])) {
+        for (field in c("unfished_spawning_biomass", "spawning_biomass_ratio", "nll_components")) {
+          expect_equal(unname(unlist(report[[field]])),
+            unname(unlist(point[["report"]][[field]])), tolerance = 1e-8, info = paste(name, field))
+        }
+      }
       if (!is.null(case[["growth_variability"]])) {
         for (field in c("growth_mean_LAA", "growth_sd_LAA", "growth_mean_WAA",
           "growth_derived_mean_WAA", "age_to_length_conversion_derived",

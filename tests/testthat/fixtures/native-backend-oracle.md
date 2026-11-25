@@ -516,3 +516,91 @@ section and real-integration CI paths include this case. No production
 optimizer/derivative code or numerical tolerances changed; existing P6
 evidence is not invalidated, and this numerical gate is not a new
 performance measurement.
+
+## Independent proportion-female references (N7)
+
+`native-proportion-female-oracle.rds` contains two native-generated,
+five-year, 12-age, two-fleet assessments. One uses scalar proportion female
+`0.37`; the other uses the nonuniform age vector
+`c(0.21, 0.28, 0.35, 0.43, 0.52, 0.62, 0.7, 0.76, 0.81, 0.78, 0.69, 0.57)`.
+Native catch/index expectations and integer largest-remainder composition
+samples of 1,000 supply observations; multinomial likelihood sizes are also
+1,000. Both cases jointly estimate four Logistic selectivity parameters,
+survey catchability and recruitment level, with four coupled recruitment
+random deviations: **six fixed and four random effects**, without added priors.
+
+Female inputs remain **constant** in these identifiable fits. A scalar
+female proportion scales spawning biomass and unfished spawning biomass
+per recruit equally, cancelling from Beverton-Holt recruitment and the
+catch/index likelihoods. Estimating that scalar here would introduce an
+unidentifiable direction. The generator registers female coordinates in
+the native model, fixes them through TMB's map for fitting, and removes only
+those restrictions on separate joint derivative tapes. At two nonoptimal
+points it captures 11-coordinate scalar and 22-coordinate per-age joint
+gradients and Hessians at the same conditional random modes. These probes
+do not establish fitted female estimates or female-parameter uncertainty.
+
+Counterfactual reports isolate the biology's effect while holding all other
+parameters and conditional modes fixed. Replacing scalar `0.37` with `0.61`
+rescales spawning biomass but leaves recruitment and likelihood unchanged.
+Reversing the age vector changes spawning biomass, recruitment and joint
+likelihood: its native first-point likelihood change is about `-0.012916`,
+and its maximum recruitment change exceeds 11,700. Independent R formulas
+also reconstruct spawning biomass, unfished spawning biomass per recruit,
+and Beverton-Holt recruitment with the plus group and recruitment deviations
+directly from native truth inputs/reports.
+
+The scalar native optimum has marginal/joint objectives
+`697.880647744499/688.530397929101`, maximum fixed gradient
+`0.000153333421787`, and smallest covariance eigenvalue
+`0.000232081095699`. The per-age optimum has objectives
+`697.878492408535/688.529857198377`, maximum fixed gradient
+`0.000215991755489`, and smallest covariance eigenvalue
+`0.000232715060159`. Both 10-by-10 covariance matrices are positive definite,
+and marginal covariance is stable when halving the Hessian differencing
+step from `1e-4` to `5e-5`. Native TMB AD supplies 2,216 report rows in the
+32 common report-SE families, including spawning and recruitment uncertainty.
+Constants have no fitted parameter SEs.
+
+Historical native female JSON metadata omits the module ID and labels the
+scalar with the first age. The generator preserves those original rows.
+For semantic joins only, it recovers module ownership from exact registered
+parameter IDs/names after checking input values at `1e-14`, and normalizes
+the scalar's probe age to `NA`. No native numerical kernels, registered
+values, likelihoods, derivatives or uncertainty expectations are repaired.
+
+Two fresh native-only processes produce byte-identical pointer-free
+fixtures, MD5 `a6ce5d1a9b02e496e5c0b64c05e0218a`. Provenance retains historical
+revision `1e5a64a8`, native DLL MD5 `7791104ab1295dcec1725062eb5f1f0a`,
+native R-source/input hashes, generator MD5
+`ea54f982121c1557ba964e9700e1c350`, R 4.6.2, TMB 1.9.21 and optimizer
+controls (400 iterations/1,000 evaluations per attempt, up to three
+restarts). Regenerate from the candidate root with the prepared historical
+checkout/DLL and a **new output path**:
+
+```powershell
+$env:LC_ALL = 'C'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+& 'C:\Program Files\R\R-4.6.2\bin\x64\Rscript.exe' --vanilla data-raw\generate_native_proportion_female_oracle.R C:\benchmarks\native-oracle C:\benchmarks\native-proportion-female-new.rds
+```
+
+The real configuration test reverses female input age rows before
+initialization and verifies scalar/per-age ownership, exact values, fixed
+masks and unavailable female parameter SEs. It compares joint/marginal
+objectives, conditional modes, derivatives, complete covariance, derived
+estimates and all 32 common report-SE families. Additional comparisons cover
+unfished spawning biomass, spawning biomass ratios, likelihood components,
+all female-coordinate joint derivatives, and the changed-input feedback
+reports. The existing N2 opt-in command and real-integration CI paths
+include both cases. R-only formula/fixture checks are not bridge evidence.
+
+Fresh real R 4.6.2/Julia 1.10.10 execution with explicit Julia selection
+and single-thread settings passes **1,331 assertions across twelve optimized
+fits and twenty-four nonoptimal points**, with no failures, errors or skips.
+The full R backend regression file passes separately with its five opt-in
+bridge tests skipped, including 24 new R-only formula/fixture assertions
+that are not counted as real-Julia evidence. No production optimizer/
+derivative code or numerical tolerances changed; existing P6 evidence is
+not invalidated. This numerical gate is not a new performance measurement.

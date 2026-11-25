@@ -134,6 +134,15 @@
   likelihood components are checked explicitly. The expanded gate passes 1,053
   assertions across ten fresh fits and twenty nonoptimal points, with unchanged
   production numerics and tolerances.
+* Scalar and nonuniform age-specific proportion-female inputs now pass
+  independent native/real-Julia comparisons of spawning biomass, recruitment
+  feedback, likelihoods, mapping, complete covariance and report uncertainty.
+  The six-fixed/four-random fits keep female inputs constant because scalar
+  scaling is unidentifiable from these likelihoods. Separate native joint
+  tapes check female-coordinate derivatives and changed-input feedback;
+  fixed female inputs retain unavailable parameter SEs. The expanded gate
+  passes 1,331 assertions across twelve fresh fits and twenty-four nonoptimal
+  points without production changes or relaxed numerical tolerances.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

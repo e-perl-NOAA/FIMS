@@ -141,6 +141,12 @@ Year-by-age AgeSpecific comparisons also pass a five-year fishing vector paired
 with a static survey vector, including shuffled fleet/year/age input rows,
 20 fixed and four random effects, full covariance and all 32 report-SE families.
 Deliberately swapped year, age and fleet indices change the objective and reports.
+Scalar and nonuniform age-specific proportion-female inputs pass independent
+native/real-Julia comparisons of spawning biomass, recruitment feedback,
+likelihoods, parameter mapping, complete covariance and derived-report SEs.
+These biology inputs remain fixed in identifiable six-fixed/four-random fits:
+scalar female scaling cancels from recruitment likelihoods. Separate joint
+derivative probes cover female coordinates without claiming fitted female SEs.
 The saved complete 49-fixed/29-random fit passes native comparisons of estimates,
 full covariance and 32 derived-report standard-error families; this saved-fit
 check is not a fresh full-fit benchmark. A subsequent
