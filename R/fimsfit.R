@@ -883,7 +883,8 @@ build_julia_backend_estimates <- function(input, fit_result, report) {
   }
 
   parameter_rows <- flatten_julia_parameter_rows(
-    parameter_info = parameter_info,
+    parameter_info = parameter_info |>
+      dplyr::arrange(match(.data$fleet, .env$fleet_names)),
     estimates = estimates[names(julia_input[["parameters"]])],
     standard_errors = standard_errors
   )

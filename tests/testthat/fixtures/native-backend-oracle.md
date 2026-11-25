@@ -261,7 +261,7 @@ covariance validity/stability and selectivity identifiability before saving.
 The R-only fixture regression separately checks native synthetic observation
 rounding/sample sizes, identifiable estimates, curvature and Laplace placement.
 
-The expanded real bridge test passes **534 assertions across six optimized
+For N3, the expanded real bridge test passed **534 assertions across six optimized
 fits and twelve nonoptimal points** in fresh R 4.6.2/Julia 1.10.10 execution
 with single-thread settings. N3 adds comparisons of both fleets' parameter
 ownership, joint/marginal values and gradients, conditional modes, joint and
@@ -272,3 +272,76 @@ estimate/curvature/covariance/SE tolerances. The opt-in command above includes
 this case automatically, as do the existing real-integration CI paths.
 No production changes were required. This bounded case closes N3, not every
 selectivity/growth/prior combination or the overall migration.
+
+## Independent static AgeSpecific references (N4)
+
+`native-static-selectivity-oracle.rds` covers two five-year, 12-age,
+two-fleet assessments with EWAA growth and four coupled recruitment random
+effects. Native-generated catch/index observations and largest-remainder
+multinomial samples of 200 provide identifiable, nonuniform age patterns
+that differ between fleets. Starting selectivity logits are shifted by 0.15
+from their generating values. No additional priors are used.
+
+| Case | Fleet layouts | Estimated fixed effects | Full covariance |
+| --- | --- | --- | --- |
+| `AgeSpecific-per-age` | 12 per-age logits in each fleet | 22 selectivity logits, survey catchability, recruitment level | 28-by-28 |
+| `AgeSpecific-scalar-mixed` | One unindexed fishing logit, 12 survey logits | One scalar and 11 age logits, survey catchability, recruitment level | 18-by-18 |
+
+Each per-age vector fixes age 6 at selectivity 0.9 to anchor its scale,
+including the survey's otherwise confounded selectivity/catchability scale.
+Fishing mortalities and the remaining confounded effects stay fixed in both
+cases; the scalar fishing selectivity remains estimable. All estimated
+selectivity logits have finite, positive SEs below 1. The native marginal/
+joint objectives are `477.170685289972/470.393919467990` for per-age and
+`483.256036646988/476.016117476143` for scalar/mixed. Both converge with
+maximum fixed gradients below `0.000162` and positive-definite covariance.
+
+The reproducible generator `data-raw/generate_native_static_selectivity_oracle.R`
+uses the preserved native DLL and R implementation, not Julia. Two nonoptimal
+points per case retain marginal gradients, conditional modes, joint scores/
+Hessians and reports. Native TMB AD report Jacobians provide 2,216 derived
+rows across 32 SE families. Marginal covariance is checked with gradient
+differencing steps `1e-4` and `5e-5`. Native declared revision, DLL/R-source
+hashes, input/generator hashes, R 4.6.2, TMB 1.9.21 and optimizer controls
+(400 iterations/1,000 evaluations per attempt, up to three restarts) are saved.
+Two fresh native-only processes produce byte-identical pointer-free fixtures,
+MD5 `7b6ffd6fc4411e10e2ba98ebf787f7aa`.
+
+Regenerate from the candidate root with the separately prepared historical
+checkout/DLL and a **new output path**:
+
+```powershell
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+& 'C:\Program Files\R\R-4.6.2\bin\x64\Rscript.exe' --vanilla data-raw\generate_native_static_selectivity_oracle.R C:\benchmarks\native-oracle C:\benchmarks\native-static-selectivity-new.rds
+```
+
+Progress logs and an R sampling profile are emitted beside the output.
+The R-only consistency test verifies scalar/per-age broadcasting against
+native fishing mortality, anchored logits, valid/stable covariance,
+conditional scores and Laplace placement.
+
+The real configuration test reverses AgeSpecific fleet and age input rows
+before initializing Julia. It checks canonical serialization, lengths/offsets,
+fixed masks, fleet/age ownership, preserved anchors, conditional modes,
+joint/marginal objectives and derivatives, full covariance, derived estimates
+and all 32 report-SE families. This exposed and fixed R extraction using the
+input tibble's fleet order instead of the serialized data fleet order; the
+numerical objective, optimizer, covariance calculations and tolerances did
+not change. Constant parameter SEs remain unavailable, not fitted uncertainty.
+
+The native scalar output labels its single vector slot with the first modeled
+age, although its input is unindexed and the native kernel broadcasts it.
+The fixture retains that native metadata unchanged. Only the comparison key
+is normalized to the original input's unindexed `age = NA`; no numeric native
+expectations are changed or regenerated to agree with Julia.
+
+Fresh real R 4.6.2/Julia 1.10.10 execution, with explicit Julia selection and
+single-thread settings, passes **778 assertions across eight optimized fits
+and sixteen nonoptimal points**, without failures, errors or skips. The full
+R backend regression file also passes separately with its five opt-in bridge
+tests skipped; its 18 new R-only fixture checks do not count as real-Julia
+evidence. The opt-in command in the N2 section and existing integration CI
+paths include both cases. N4 closes static layouts only; year-by-age
+selectivity remains a separate N5 gate.

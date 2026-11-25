@@ -107,6 +107,16 @@
   14-effect covariance and 32 report-SE families. The expanded gate passes 534
   assertions across six fresh fits and twelve nonoptimal points without
   changing production code or numerical tolerances.
+* Static AgeSpecific per-age and mixed scalar/per-age layouts now pass
+  independent native/real-Julia comparisons, with positive-definite 28-effect
+  and 18-effect covariance and all 32 report-SE families. Per-age vectors
+  anchor one age per fleet to remove scale confounding; no added priors are
+  needed. The expanded gate passes 778 assertions across eight fresh fits
+  and sixteen nonoptimal points at unchanged tolerances.
+* Julia parameter extraction follows the serialized data fleet order rather
+  than input tibble order. Shuffled AgeSpecific rows no longer attach estimates,
+  parameter IDs or SEs to the wrong fleet. Numerical fitting and optimization
+  controls are unchanged; constants retain unavailable parameter SEs.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
