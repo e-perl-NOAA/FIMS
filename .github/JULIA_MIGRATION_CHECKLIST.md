@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N7**.
+   Name that item before starting. The default next item is **N8**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -40,7 +40,7 @@ for a continuation.
 | Backend cutover | Julia is the default/sole backend; FIMS native sources, headers, registration, and direct Rcpp/TMB build dependencies have been removed. Third-party dependencies such as JuliaCall still contain compiled code. |
 | Examples | Bundled fitted examples have been regenerated using real Julia execution, including the complete 49-fixed/29-random example. |
 | Full-model numerical reference | Saved full-model estimates, complete covariance, and 32 derived-report SE families pass independent native comparisons. This is not a fresh full-fit benchmark. |
-| Fresh configuration fits | Ten bounded two-fleet reference cases pass 1,053 real-Julia comparisons, including both VonBertalanffySchnute variability routes, static scalar/per-age and year-by-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
+| Fresh configuration fits | Twelve bounded two-fleet reference cases pass 1,331 real-Julia comparisons, including scalar/per-age proportion female, both VonBertalanffySchnute variability routes, static scalar/per-age and year-by-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
 | R compatibility | Live objectives/gradients/Hessians/reports, uncertainty adapters, conditional observation simulation, extraction, and small projection checks exist. |
 | Parallel diagnostics | Small single-fixed-effect profiles and retrospectives match between sequential and two-worker execution; current installed worker-package provenance was verified. |
 | Windows installation/check | A complete compiler-disabled Windows package check, default vignettes, and PDF manual have passed. A final-candidate recheck is still required below. |
@@ -880,13 +880,75 @@ remain useful and must be reused.
   CI paths include the new case; no remote CI was monitored. The next ready
   item is **N7**.
 
-- [ ] **N7 - Pass scalar versus age-specific proportion-female parity.**
+- [x] **N7 - Pass scalar versus age-specific proportion-female parity.**
   **Depends on:** none.
   **Done when:** independent real-bridge comparisons exercise a nonuniform
   age vector as well as a scalar, using an identifiable jointly estimated
   subset. Verify spawning biomass, recruitment feedback, likelihoods,
   parameter mapping, and applicable uncertainty; do not compare only serialized
   vector lengths.
+
+  **Completed:** `11ec12d9` adds reproducible independent native scalar and
+  nonuniform age-vector references, real-bridge comparisons, independent
+  R formula checks and documentation. Both five-year, 12-age, two-fleet
+  assessments use native-generated observations and integer multinomial
+  samples/likelihood sizes of 1,000, without added priors. Each jointly
+  estimates four Logistic selectivity parameters, survey catchability and
+  recruitment level, with four coupled recruitment random effects:
+  six fixed/four random effects and positive-definite 10-by-10 covariance.
+
+  **Identifiability and feedback:** female biology inputs remain constant.
+  Scalar scaling cancels between spawning biomass and unfished spawning
+  biomass per recruit in Beverton-Holt recruitment, so these likelihoods
+  cannot identify an estimated scalar. Separate native joint tapes unlock
+  female coordinates only for AD probes: 11 scalar/22 per-age coordinates
+  at each of two nonoptimal conditional modes. Fixed female inputs retain
+  unavailable parameter SEs; these are not fitted female estimates.
+  A scalar counterfactual rescales spawning biomass without changing
+  recruitment or likelihood. Reversing the nonuniform age vector changes
+  spawning biomass, recruitment and likelihood at fixed other parameters.
+  Independent R formulas reconstruct spawning and recruitment, including
+  plus-group survival and recruitment deviations.
+
+  **Independent reference:** two fresh native-only processes produce
+  byte-identical pointer-free fixtures, MD5
+  `a6ce5d1a9b02e496e5c0b64c05e0218a`. Provenance retains historical revision
+  `1e5a64a8`, native DLL `7791104ab1295dcec1725062eb5f1f0a`, native R-source/
+  input hashes, generator MD5 `ea54f982121c1557ba964e9700e1c350` and
+  optimizer controls. Native female metadata's missing module ID and
+  scalar first-age label are normalized only for semantic joins after
+  checking registered parameter IDs/input values; original metadata is
+  preserved. Native numerical expectations are unmodified and never
+  constructed from Julia output. Both covariance matrices remain stable
+  when halving the marginal Hessian differencing step.
+
+  **Real verification:** R 4.6.2/Julia 1.10.10, explicit Julia selection
+  and single-thread settings pass **1,331 assertions across twelve fresh
+  optimized fits and twenty-four nonoptimal points**, with no failures,
+  errors or skips. Comparisons cover joint/marginal objectives, conditional
+  modes, gradients/Hessians, all-female-coordinate probes, complete
+  covariance, derived estimates and all 32 common report-SE families
+  (2,216 rows per new case). Reversed input age order verifies mapping,
+  masks and constant-input SE semantics. Spawning biomass, unfished
+  spawning biomass, their ratios, recruitment, likelihood components and
+  counterfactual feedback are checked explicitly. Production numerics
+  and tolerances are unchanged; P6 is not invalidated and this is not a
+  new performance measurement.
+
+  **Reproduction and evidence:** see
+  [generator](../data-raw/generate_native_proportion_female_oracle.R),
+  `tests/testthat/fixtures/native-proportion-female-oracle.rds`, the
+  female-reference and real-configuration tests in
+  `tests/testthat/test-julia-backend.R`, and
+  [method/regeneration/verification commands](../tests/testthat/fixtures/native-backend-oracle.md#independent-proportion-female-references-n7).
+  Local `n7-native-03.log`, `n7-native-reproduced.log`,
+  `n7-real-gate.R`, `n7-targeted.log`, `n7-real-gate.log`,
+  `n7-real-gate-results.rds` and `n7-r-backend-tests.log` retain execution
+  details and profiles. The full R backend regression file passes
+  separately with five opt-in bridge tests skipped; the 24 new R-only
+  checks do not count as real-Julia evidence. Existing integration CI
+  paths include both cases; no remote CI was monitored. The next ready
+  item is **N8**.
 
 - [ ] **N8 - Pass a heterogeneous-fleet observation gate.**
   **Depends on:** none.
