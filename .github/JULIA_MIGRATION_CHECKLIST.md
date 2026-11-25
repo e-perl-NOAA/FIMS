@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N5**.
+   Name that item before starting. The default next item is **N6**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -40,7 +40,7 @@ for a continuation.
 | Backend cutover | Julia is the default/sole backend; FIMS native sources, headers, registration, and direct Rcpp/TMB build dependencies have been removed. Third-party dependencies such as JuliaCall still contain compiled code. |
 | Examples | Bundled fitted examples have been regenerated using real Julia execution, including the complete 49-fixed/29-random example. |
 | Full-model numerical reference | Saved full-model estimates, complete covariance, and 32 derived-report SE families pass independent native comparisons. This is not a fresh full-fit benchmark. |
-| Fresh configuration fits | Eight bounded two-fleet reference cases pass 778 real-Julia comparisons, including static scalar/per-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
+| Fresh configuration fits | Nine bounded two-fleet reference cases pass 906 real-Julia comparisons, including static scalar/per-age and year-by-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
 | R compatibility | Live objectives/gradients/Hessians/reports, uncertainty adapters, conditional observation simulation, extraction, and small projection checks exist. |
 | Parallel diagnostics | Small single-fixed-effect profiles and retrospectives match between sequential and two-worker execution; current installed worker-package provenance was verified. |
 | Windows installation/check | A complete compiler-disabled Windows package check, default vignettes, and PDF manual have passed. A final-candidate recheck is still required below. |
@@ -752,13 +752,63 @@ remain useful and must be reused.
   `n4-real-gate-passing.log`, `n4-real-gate-results.rds` and
   `n4-r-backend-tests-final.log` retain execution details and profiles.
   The existing real-integration CI paths include these cases; no remote CI
-  was monitored. The next ready item is **N5**.
+  was monitored. N5 below extends this gate.
 
-- [ ] **N5 - Pass the year-by-age AgeSpecific selectivity layout gate.**
+- [x] **N5 - Pass the year-by-age AgeSpecific selectivity layout gate.**
   **Depends on:** N4.
   **Done when:** a bounded year-varying case passes the configuration gate and
   detects swapped year/age/fleet indices. Include unequal selectivity layouts
   across two fleets and verify derived-report SE placement.
+
+  **Completed:** `9ca6eb5f` adds the independent native-only generator,
+  pointer-free reference, real-bridge regression, R-only consistency checks
+  and documentation. The five-year, 12-age assessment pairs a 60-logit
+  year-by-age fishing vector with a 12-logit static survey vector. Ages 2,
+  5 and 9 are estimated in every fishing year and the survey, together with
+  survey catchability and recruitment level: 20 fixed and four coupled
+  random effects, no added priors. Other logits and fishing mortalities stay
+  fixed to remove confounding. Native-generated compositions use integer
+  largest-remainder samples and likelihood sample sizes of 1,000.
+
+  **Independent reference:** the native optimum has marginal/joint objectives
+  `678.360261724154/668.838910940096`, maximum fixed gradient
+  `0.000138322621382`, positive-definite 24-by-24 covariance and selectivity
+  SEs in `(0.06551, 0.61269)`. Covariance is stable when halving the marginal
+  Hessian differencing step. Two fresh native-only processes produce
+  byte-identical fixtures, MD5 `1e40ac6b0ac843135356d7c81d384f57`.
+  Provenance retains historical revision `1e5a64a8`, native DLL
+  `7791104ab1295dcec1725062eb5f1f0a`, R-source/input/generator hashes and
+  optimizer controls. Native JSON incorrectly declares only 12 ages for the
+  60-value vector; the generator preserves the original selectivity JSON,
+  corrects only the local dimension header before historical reshaping and
+  verifies registered active starts at full precision. No native numerical
+  expectations come from Julia.
+
+  **Real verification:** R 4.6.2/Julia 1.10.10, explicit Julia selection and
+  single-thread settings pass **906 assertions across nine fresh optimized
+  fits and eighteen nonoptimal points**, with no failures, errors or skips.
+  The new case reverses fleet/year/age input rows, checking serialization,
+  60/12 lengths, 1/61 offsets, fixed masks, constants, parameter ownership,
+  conditional modes, joint/marginal objectives and derivatives, full
+  covariance, derived estimates and all 32 report-SE families (2,216 rows
+  joined by module/fleet/label/year/age/length). Deliberate year/age
+  transposition, swapped years and swapped fleet blocks each change both
+  objective and fishing mortality. Numerical tolerances and production
+  optimizer/derivative code are unchanged; this is not a new P6 measurement.
+
+  **Reproduction and evidence:** see
+  [generator](../data-raw/generate_native_yearly_selectivity_oracle.R),
+  `tests/testthat/fixtures/native-yearly-selectivity-oracle.rds`, the
+  yearly-reference and real-configuration tests in
+  `tests/testthat/test-julia-backend.R`, and
+  [method/regeneration/verification commands](../tests/testthat/fixtures/native-backend-oracle.md#independent-year-by-age-agespecific-reference-n5).
+  Local `n5-native-06.log`, `n5-native-reproduced.log`, `n5-real-gate.R`,
+  `n5-real-gate-passing.log`, `n5-real-gate-results.rds` and
+  `n5-r-backend-tests.log` retain execution details and profiles. The full
+  R backend regression file passes separately with five opt-in bridge
+  tests skipped; the 15 new R-only checks are not part of the 906 real
+  assertions. Existing integration CI paths include the new case; no remote
+  CI was monitored. The next ready item is **N6**.
 
 - [ ] **N6 - Close the alternate VonBertalanffySchnute variability gate.**
   **Depends on:** none.
