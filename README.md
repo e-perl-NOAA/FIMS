@@ -124,6 +124,10 @@ The real configuration gate also passes independent references with normal
 priors on two coupled recruitment log-deviation coordinates, preserving fixed
 priors and comparing changed conditional modes, curvature, covariance and
 derived-report uncertainty.
+Joint DoubleLogistic fits now cover both ascending and descending limbs in two
+fleets, with ten fixed and four coupled recruitment random effects. A
+native-generated, identifiable reference passes nonoptimal and optimized
+comparisons, including the complete covariance and 32 report-SE families.
 The saved complete 49-fixed/29-random fit passes native comparisons of estimates,
 full covariance and 32 derived-report standard-error families; this saved-fit
 check is not a fresh full-fit benchmark. A subsequent

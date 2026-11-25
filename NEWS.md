@@ -100,6 +100,13 @@
   full covariance and 32 derived-report SE families. The expanded configuration
   gate passes 419 assertions across five fresh fits and ten nonoptimal points
   at unchanged tolerances. No production backend changes were required.
+* Both fleets' DoubleLogistic ascending and descending selectivity parameters
+  now pass an independent native/real-Julia configuration gate, jointly with
+  catchability, recruitment and four coupled random effects. The reproducible
+  native-generated assessment needs no added priors and retains positive-definite
+  14-effect covariance and 32 report-SE families. The expanded gate passes 534
+  assertions across six fresh fits and twelve nonoptimal points without
+  changing production code or numerical tolerances.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

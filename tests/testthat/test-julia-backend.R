@@ -2233,12 +2233,55 @@ test_that("native random-prior reference includes the prior before Laplace integ
     augmented[["marginal"]]), 1e-3)
 })
 
+test_that("native DoubleLogistic reference identifies both limbs in both fleets", {
+  oracle <- readRDS(testthat::test_path("fixtures", "native-double-logistic-oracle.rds"))
+  case <- oracle[["cases"]][["DoubleLogistic-joint"]]
+  for (fleet_index in seq_along(c("fleet1", "survey1"))) {
+    fleet <- c("fleet1", "survey1")[[fleet_index]]
+    selectivity <- case[["parameters_table"]] |>
+      dplyr::filter(.data$module_name == "Selectivity", .data$fleet == .env$fleet)
+    truth <- oracle[["truth"]][["parameters"]] |>
+      dplyr::filter(.data$module_name == "Selectivity", .data$fleet == .env$fleet)
+    truth_values <- truth[["value"]][match(selectivity[["label"]], truth[["label"]])]
+    expect_lt(max(abs(selectivity[["estimated"]] - truth_values)), 0.1)
+    expect_true(all(selectivity[["uncertainty"]] > 0 & selectivity[["uncertainty"]] < 0.3))
+    for (specification in list(
+      c("age_comp", "agecomp_expected", "age"),
+      c("length_comp", "lengthcomp_expected", "length")
+    )) {
+      observations <- case[["data"]] |>
+        dplyr::filter(.data$fleet == .env$fleet, .data$type == specification[[1]]) |>
+        dplyr::arrange(.data$timing, .data[[specification[[3]]]])
+      bins <- dplyr::n_distinct(observations[[specification[[3]]]])
+      observed <- matrix(observations[["observed"]], nrow = bins)
+      expected <- matrix(
+        oracle[["truth"]][["report"]][[specification[[2]]]][[fleet_index]], nrow = bins
+      )
+      expected <- sweep(expected, 2, colSums(expected), "/")
+      expect_equal(colSums(observed), rep(1, ncol(observed)), tolerance = 1e-12)
+      expect_equal(200 * observed, round(200 * observed), tolerance = 1e-12)
+      expect_lt(max(abs(observed - expected)), 1 / 200)
+    }
+  }
+  expect_gt(min(eigen(case[["covariance"]], symmetric = TRUE, only.values = TRUE)[["values"]]), 0)
+  expect_equal(solve(case[["fixed_hessian"]]), solve(case[["check_fixed_hessian"]]), tolerance = 1e-5)
+  random <- which(case[["parameters_table"]][["estimation_type"]] == "random_effects")
+  for (point in case[["points"]]) {
+    expect_lt(max(abs(point[["joint_gradient"]][random])), 1e-6)
+    expect_equal(as.numeric(point[["marginal"]] - point[["report"]][["jnll"]]),
+      as.numeric(determinant(point[["joint_hessian"]][random, random],
+        logarithm = TRUE)[["modulus"]]) / 2 - length(random) * log(2 * pi) / 2,
+      tolerance = 1e-12)
+  }
+})
+
 test_that("real Julia joint configurations retain native gradients and uncertainty", {
   skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
     "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
   oracle <- readRDS(testthat::test_path("fixtures", "native-configuration-oracle.rds"))
   random_prior_oracle <- readRDS(testthat::test_path("fixtures", "native-random-prior-oracle.rds"))
-  cases <- c(oracle[["cases"]], random_prior_oracle[["cases"]])
+  double_logistic_oracle <- readRDS(testthat::test_path("fixtures", "native-double-logistic-oracle.rds"))
+  cases <- c(oracle[["cases"]], random_prior_oracle[["cases"]], double_logistic_oracle[["cases"]])
   random_prior_results <- list()
   keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
   for (case in cases) {
@@ -2290,12 +2333,32 @@ test_that("real Julia joint configurations retain native gradients and uncertain
       expect_equal(unname(rows[["uncertainty_julia"]]),
         unname(rows[["uncertainty_native"]]), tolerance = 1e-4,
         info = paste(name, label))
+      if (identical(name, "DoubleLogistic-joint")) {
+        expect_equal(unname(rows[["estimated"]]), unname(rows[["estimate"]]),
+          tolerance = 1e-4, info = paste(name, label))
+      }
     }
     fixed_rows <- matched |>
       dplyr::filter(.data$estimation_type_native == "fixed_effects")
     fixed_ids <- which(config[["fixed_parameter_mask"]])
     fixed_order <- match(fixed_rows[["parameter_id"]], fixed_ids)
     expect_setequal(fixed_order, seq_along(objective[["par"]]))
+    if (identical(name, "DoubleLogistic-joint")) {
+      expect_equal(config[["selectivity_types"]], rep("DoubleLogistic", 2))
+      expect_equal(sum(reference[["module_name"]] == "Selectivity"), 8L)
+      expect_equal(sum(reference[["estimation_type"]] == "random_effects"), 4L)
+      julia_input <- attr(input, "julia_input")
+      joint_config <- config
+      joint_config[["fixed_parameter_mask"]] <-
+        config[["fixed_parameter_mask"]] | config[["random_parameter_mask"]]
+      joint_config[["random_parameter_mask"]] <- rep(FALSE, length(config[["random_parameter_mask"]]))
+      active_ids <- which(joint_config[["fixed_parameter_mask"]])
+      joint_order <- match(indices, active_ids)
+      expect_equal(as.matrix(fit_result[["hessian"]])[indices, indices],
+        case[["joint_hessian"]], tolerance = 1e-4, info = name)
+      expect_equal(objective[["he"]](objective[["par"]])[fixed_order, fixed_order],
+        unname(case[["fixed_hessian"]]), tolerance = 1e-4, info = name)
+    }
     if (!is.null(case[["conditional"]])) {
       config <- environment(objective[["fn"]])[["model_config"]]
       julia_input <- attr(input, "julia_input")
@@ -2345,6 +2408,21 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         tolerance = 1e-8, info = name)
       expect_equal(unname(objective[["gr"]](values)[fixed_order]),
         point[["gradient"]], tolerance = 1e-6, info = name)
+      if (identical(name, "DoubleLogistic-joint")) {
+        evaluated <- FIMS:::evaluate_julia_fixed_objective(julia_input, config, values, 3L)
+        parameter_vector <- purrr::flatten_dbl(evaluated[["estimates"]][names(julia_input[["parameters"]])])
+        expect_equal(parameter_vector[indices], point[["parameters"]],
+          tolerance = 1e-8, info = name)
+        joint_values <- parameter_vector[active_ids]
+        joint_hessian <- FIMS:::evaluate_julia_fixed_objective(
+          julia_input, joint_config, joint_values, 2L
+        )
+        expect_equal(as.matrix(joint_hessian)[joint_order, joint_order],
+          point[["joint_hessian"]], tolerance = 1e-6, info = name)
+        score <- FIMS:::evaluate_julia_fixed_objective(julia_input, joint_config, joint_values, 1L)
+        expect_equal(as.numeric(score)[joint_order], point[["joint_gradient"]],
+          tolerance = 1e-6, info = name)
+      }
       if (!is.null(case[["conditional"]])) {
         evaluated <- FIMS:::evaluate_julia_fixed_objective(julia_input, config, values, 3L)
         parameter_vector <- purrr::flatten_dbl(evaluated[["estimates"]][names(julia_input[["parameters"]])])
