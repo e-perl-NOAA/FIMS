@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N8**.
+   Name that item before starting. The default next item is **N9**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -40,7 +40,7 @@ for a continuation.
 | Backend cutover | Julia is the default/sole backend; FIMS native sources, headers, registration, and direct Rcpp/TMB build dependencies have been removed. Third-party dependencies such as JuliaCall still contain compiled code. |
 | Examples | Bundled fitted examples have been regenerated using real Julia execution, including the complete 49-fixed/29-random example. |
 | Full-model numerical reference | Saved full-model estimates, complete covariance, and 32 derived-report SE families pass independent native comparisons. This is not a fresh full-fit benchmark. |
-| Fresh configuration fits | Twelve bounded two-fleet reference cases pass 1,331 real-Julia comparisons, including scalar/per-age proportion female, both VonBertalanffySchnute variability routes, static scalar/per-age and year-by-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
+| Fresh configuration fits | Thirteen bounded two-fleet reference cases pass 1,640 real-Julia comparisons, including heterogeneous bins/coverage and missing observations, scalar/per-age proportion female, both VonBertalanffySchnute variability routes, static scalar/per-age and year-by-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
 | R compatibility | Live objectives/gradients/Hessians/reports, uncertainty adapters, conditional observation simulation, extraction, and small projection checks exist. |
 | Parallel diagnostics | Small single-fixed-effect profiles and retrospectives match between sequential and two-worker execution; current installed worker-package provenance was verified. |
 | Windows installation/check | A complete compiler-disabled Windows package check, default vignettes, and PDF manual have passed. A final-candidate recheck is still required below. |
@@ -950,13 +950,91 @@ remain useful and must be reused.
   paths include both cases; no remote CI was monitored. The next ready
   item is **N8**.
 
-- [ ] **N8 - Pass a heterogeneous-fleet observation gate.**
+- [x] **N8 - Pass a heterogeneous-fleet observation gate.**
   **Depends on:** none.
   **Done when:** a bounded case covers different fleet composition coverage/
   bins, missing observations, and supported normal/lognormal observation
   families at their supported per-cell granularity. Pass the configuration
   gate and verify zero missing-row likelihood contributions, composition
   shapes, fleet report quantities, and uncertainty alignment.
+
+  **Completed:** `dfeb7a82` adds a reproducible independent native heterogeneous
+  observation reference, fixes shared biological grid and R output alignment,
+  and adds real-bridge comparisons, independent Julia/R checks and documentation.
+  Its five-year, 12-age, two-fleet case has 12 fishing/eight survey length
+  bins in a 15-bin union. Fishing has age and length compositions plus catch
+  and index; survey has length compositions/index but no age observations.
+  Fixed VonBertalanffySchnute growth supplies derived conversion. Native-
+  generated observations use integer multinomial samples/likelihood sizes
+  of 1,000 and small deterministic catch/index residuals.
+
+  **Supported observation granularity:** normal catch/survey index and
+  lognormal fishing index use year-specific scales. The historical native
+  high-level interface supports one family per fleet/data stream with
+  per-cell scales, not mixed families within one stream. Omitted fishing
+  catch/age/length and survey length years, plus explicit `-999` fishing/
+  survey indices, give six missing stream/year contributions. Missing
+  observations have no uncertainty formula; `FIMSFrame` completes omitted
+  rows. Arbitrary `NA` observed values are not claimed as native support.
+
+  **Independent reference:** seven identifiable fixed effects (four
+  Logistic selectivity parameters, two catchabilities and recruitment level)
+  plus four coupled random effects, without added priors. The native
+  marginal/joint objectives are `238.331326865617/230.534059899415`,
+  maximum fixed gradient `0.000107837782709`, and smallest covariance
+  eigenvalue `0.000246569205520`. Complete 11-by-11 covariance is positive
+  definite and stable under a halved marginal Hessian differencing step.
+  Native TMB AD supplies 1,696 derived rows in all 32 common report-SE
+  families, including unobserved survey age-composition quantities.
+  Independent R row densities plus Gaussian recruitment density reconstruct
+  native joint objectives at the optimum and two nonoptimal points;
+  all six missing contributions are exactly zero.
+
+  Two fresh native-only processes reproduce byte-identical pointer-free
+  fixtures, MD5 `e11365ca00628d3f7eac6aff7e3877e1`. Provenance retains
+  historical revision `1e5a64a8`, DLL `7791104ab1295dcec1725062eb5f1f0a`,
+  native R-source/input hashes, generator
+  `9187e213307218476ac343c54a848916` and optimizer controls. No native
+  kernels were changed and no Julia output generated/repaired expectations.
+
+  **Fixes:** heterogeneous growth conversion now uses one population
+  biological size grid spanning the minimum fleet lower edge and maximum
+  fleet upper edge before rebinning; the equal-bin branch is unchanged.
+  A standalone independent Gaussian-CDF/rebin oracle verifies this and the
+  valid zero-length-bin edge case. R adapters consistently select each
+  fleet's actual bins for public reports, length labels, observed values
+  and SEs, while internal tensors retain structural padding. Unobserved
+  composition derived quantities remain available without invented
+  observation likelihoods. Native/Julia likelihood components align by
+  fleet/label rather than native registration order.
+
+  **Real verification:** final R 4.6.2/Julia 1.10.10 execution with explicit
+  Julia selection and single-thread settings passes **1,640 assertions
+  across thirteen fresh optimized fits and twenty-six nonoptimal points**,
+  with no failures, errors or skips. Objectives, modes, gradients/Hessians,
+  complete covariance, all derived values/SE families, exact bin counts/
+  labels, configured per-cell families/scales, all 30 observation row
+  densities and zero missing contributions pass at unchanged tolerances.
+  The standalone Julia suite and full R backend regression file also pass.
+  The R-only run skips five opt-in bridge tests and includes 113 new fixture
+  assertions, not counted as real-Julia evidence. This is numerical
+  validation, not a new complete-fit performance measurement; historical
+  P6 measurements are not extrapolated to this changed candidate and the
+  final-candidate release recheck remains required.
+
+  **Reproduction and evidence:** see
+  [generator](../data-raw/generate_native_heterogeneous_observation_oracle.R),
+  `tests/testthat/fixtures/native-heterogeneous-observation-oracle.rds`,
+  the heterogeneous-reference and real-configuration tests in
+  `tests/testthat/test-julia-backend.R`,
+  `inst/julia/FIMSBackend/test/runtests.jl`, and
+  [method/regeneration/verification commands](../tests/testthat/fixtures/native-backend-oracle.md#independent-heterogeneous-observation-reference-n8).
+  Local `n8-native-02.log`, `n8-native-reproduced.log`, `n8-real-gate.R`,
+  `n8-targeted-03.log`, `n8-real-gate-final.log`,
+  `n8-real-gate-results.rds`, `n8-julia-tests-final.log` and
+  `n8-r-tests-final.log` retain detailed execution/profiles. Existing
+  integration CI paths include this case; no remote CI was monitored.
+  The next ready item is **N9**.
 
 - [ ] **N9 - Close the recruitment-variant support gate.**
   **Depends on:** none.
