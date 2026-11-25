@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N3**.
+   Name that item before starting. The default next item is **N4**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -40,7 +40,7 @@ for a continuation.
 | Backend cutover | Julia is the default/sole backend; FIMS native sources, headers, registration, and direct Rcpp/TMB build dependencies have been removed. Third-party dependencies such as JuliaCall still contain compiled code. |
 | Examples | Bundled fitted examples have been regenerated using real Julia execution, including the complete 49-fixed/29-random example. |
 | Full-model numerical reference | Saved full-model estimates, complete covariance, and 32 derived-report SE families pass independent native comparisons. This is not a fresh full-fit benchmark. |
-| Fresh configuration fits | Five bounded two-fleet reference cases pass 419 real-Julia comparisons, including joint growth/selectivity/catchability/recruitment, four random effects, and fixed priors plus priors on coupled recruitment random effects. |
+| Fresh configuration fits | Six bounded two-fleet reference cases pass 534 real-Julia comparisons, including jointly estimated DoubleLogistic ascending/descending limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed priors plus priors on coupled recruitment random effects. |
 | R compatibility | Live objectives/gradients/Hessians/reports, uncertainty adapters, conditional observation simulation, extraction, and small projection checks exist. |
 | Parallel diagnostics | Small single-fixed-effect profiles and retrospectives match between sequential and two-worker execution; current installed worker-package provenance was verified. |
 | Windows installation/check | A complete compiler-disabled Windows package check, default vignettes, and PDF manual have passed. A final-candidate recheck is still required below. |
@@ -640,13 +640,60 @@ remain useful and must be reused.
   [comparison details and local command](../tests/testthat/fixtures/native-backend-oracle.md#real-julia-comparison-n2).
   Local `n2-real-gate.R`, `n2-real-gate.log`,
   `n2-real-gate-results.rds` and `n2-r-backend-tests.log` retain the selected
-  real run and separate R regression details. The next ready item is **N3**.
+  real run and separate R regression details. N3 below extends this gate.
 
-- [ ] **N3 - Pass a jointly estimated DoubleLogistic selectivity gate.**
+- [x] **N3 - Pass a jointly estimated DoubleLogistic selectivity gate.**
   **Depends on:** none.
   **Done when:** a bounded multi-fleet case with identifiable ascending and
   descending selectivity parameters passes the configuration gate. Include
   more than one recruitment random effect; do not substitute a Logistic fit.
+
+  **Completed:** 2026-11-25, generator/reference/regression commit `9be81663`.
+  The five-year, 12-age, two-fleet assessment jointly estimates all eight
+  DoubleLogistic ascending/descending parameters, survey catchability and
+  recruitment level, with four coupled recruitment random effects. Native
+  expectations generate deterministic catch/index and integer multinomial
+  composition observations; perturbed starts are shared between backends.
+  No additional priors are needed for identifiability.
+
+  **Independent reference:** fresh historical native fitting converges with
+  maximum fixed gradient `0.000175849` or less and positive-definite complete
+  14-by-14 covariance. Both fitted inflection points lie within the modeled
+  ages; all eight selectivity estimates recover the generating values within
+  0.1, with positive SEs below 0.3. Marginal/joint objectives are
+  `445.695208967045/439.033294374469`. Two nonoptimal points retain conditional
+  modes, marginal gradients, joint scores/Hessians and reports. Native AD
+  report uncertainty covers 2,216 rows across 32 SE families; marginal
+  covariance is stable with differentiation steps halved.
+
+  **Real verification:** the expanded configuration gate passes **534
+  assertions across six fresh optimized fits and twelve nonoptimal points**
+  in R 4.6.2/explicit Julia 1.10.10 with single-thread settings and
+  `FIMS_RUN_JULIA_INTEGRATION=true`: no failures, errors or skips.
+  DoubleLogistic comparisons include fleet ownership, joint/marginal
+  objectives/gradients and curvature, conditional modes, convergence,
+  parameter estimates/SEs, full covariance, derived estimates and all 32
+  report-SE families. Existing tolerances are unchanged; no production
+  backend or performance controls were modified.
+  The full R backend regression file also passes, including 22 new R-only
+  fixture-consistency assertions, with its five opt-in bridge tests skipped.
+  Those R-only/mocked checks are not counted toward the 534 real comparisons.
+
+  **Reproduction and evidence:** two fresh native-only processes generated
+  byte-identical pointer-free fixtures, MD5
+  `5151032bb90d6dd116bbd1d61be24f16`, using the preserved DLL
+  `7791104ab1295dcec1725062eb5f1f0a` and source/input/generator hashes.
+  See [generator](../data-raw/generate_native_double_logistic_oracle.R),
+  `tests/testthat/fixtures/native-double-logistic-oracle.rds`, the
+  fixture-consistency and real-configuration tests in
+  `tests/testthat/test-julia-backend.R`, and
+  [method/regeneration/verification commands](../tests/testthat/fixtures/native-backend-oracle.md#independent-doublelogistic-reference-n3).
+  Local `n3-native-final.log`, `n3-native-reproduced.log`,
+  `n3-real-gate.R`, `n3-real-gate-final.log` and
+  `n3-real-gate-results.rds` and `n3-r-backend-tests-final.log` retain execution
+  details and profiles.
+  Existing real-integration CI paths include the expanded test; no remote
+  CI was monitored. The next ready item is **N4**.
 
 - [ ] **N4 - Pass the static AgeSpecific selectivity layout gate.**
   **Depends on:** none.
