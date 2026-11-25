@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N6**.
+   Name that item before starting. The default next item is **N7**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -40,7 +40,7 @@ for a continuation.
 | Backend cutover | Julia is the default/sole backend; FIMS native sources, headers, registration, and direct Rcpp/TMB build dependencies have been removed. Third-party dependencies such as JuliaCall still contain compiled code. |
 | Examples | Bundled fitted examples have been regenerated using real Julia execution, including the complete 49-fixed/29-random example. |
 | Full-model numerical reference | Saved full-model estimates, complete covariance, and 32 derived-report SE families pass independent native comparisons. This is not a fresh full-fit benchmark. |
-| Fresh configuration fits | Nine bounded two-fleet reference cases pass 906 real-Julia comparisons, including static scalar/per-age and year-by-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
+| Fresh configuration fits | Ten bounded two-fleet reference cases pass 1,053 real-Julia comparisons, including both VonBertalanffySchnute variability routes, static scalar/per-age and year-by-age AgeSpecific layouts, jointly estimated DoubleLogistic limbs, growth/selectivity/catchability/recruitment, four random effects, and fixed/random-effect priors. |
 | R compatibility | Live objectives/gradients/Hessians/reports, uncertainty adapters, conditional observation simulation, extraction, and small projection checks exist. |
 | Parallel diagnostics | Small single-fixed-effect profiles and retrospectives match between sequential and two-worker execution; current installed worker-package provenance was verified. |
 | Windows installation/check | A complete compiler-disabled Windows package check, default vignettes, and PDF manual have passed. A final-candidate recheck is still required below. |
@@ -808,9 +808,9 @@ remain useful and must be reused.
   R backend regression file passes separately with five opt-in bridge
   tests skipped; the 15 new R-only checks are not part of the 906 real
   assertions. Existing integration CI paths include the new case; no remote
-  CI was monitored. The next ready item is **N6**.
+  CI was monitored. N6 below extends this gate.
 
-- [ ] **N6 - Close the alternate VonBertalanffySchnute variability gate.**
+- [x] **N6 - Close the alternate VonBertalanffySchnute variability gate.**
   **Depends on:** none.
   **Done when:** identify which variability route the current native fixtures
   cover, then add the missing integrated gate so both two-reference-age SD
@@ -818,6 +818,67 @@ remain useful and must be reused.
   Exercise growth-derived length compositions, their likelihood/derivatives,
   natural-scale transforms, and uncertainty. Existing unit formulas or
   serialization tests alone do not close the missing route.
+
+  **Completed:** `b10f12cb` adds the reproducible native-only delta-method
+  reference, real-bridge comparisons, R-only fixture checks and documentation.
+  The original native deterministic VonBertalanffySchnute cases and
+  `VonBertalanffySchnute-joint-priors` configuration use two-reference-age
+  SD interpolation (28 and 73 at ages 1 and 12). The new case covers the
+  missing six-parameter delta-method variability route.
+
+  **Independent reference:** a five-year, 12-age, two-fleet assessment uses
+  native-generated catch/index and integer multinomial samples of 1,000,
+  with growth-derived length compositions and no supplied conversion matrix.
+  It jointly estimates two reference lengths, growth coefficient, three
+  variability log SDs, survey catchability and recruitment level, with four
+  coupled random effects: eight fixed/four random, no added priors.
+  The three nonzero correlation coordinates are fixed through native TMB's
+  parameter map for this identifiable fit; a separate native joint tape
+  unlocks them at the same conditional modes, capturing gradients and
+  Hessians for all six variability coordinates (15 total coordinates).
+  They are not claimed to have been jointly estimated.
+
+  The native optimum has marginal/joint objectives
+  `701.357391022803/691.997087999145`, maximum fixed gradient
+  `0.000563030085652`, positive-definite 12-by-12 covariance and finite
+  natural-scale growth uncertainty. Exact exponential Jacobians transform
+  the six estimated growth coordinates and their covariance; marginal
+  covariance is stable when halving the Hessian differencing step.
+  The generator explicitly enables the historical optional conversion tensor
+  report, preserving 1,380 values per fleet without changing native kernels
+  or likelihoods. Two fresh native-only processes produce byte-identical
+  pointer-free fixtures, MD5 `6dcd43437232cc0d704618e74be6923a`; provenance
+  retains native revision `1e5a64a8`, DLL
+  `7791104ab1295dcec1725062eb5f1f0a`, R-source/input/generator hashes and
+  optimizer controls. No Julia output constructs or repairs expectations.
+
+  **Real verification:** R 4.6.2/Julia 1.10.10, explicit Julia selection
+  and single-thread settings pass **1,053 assertions across ten fresh
+  optimized fits and twenty nonoptimal points**, with no failures, errors
+  or skips. Both variability routes remain in the configuration gate.
+  Comparisons cover conditional modes, joint/marginal objectives and
+  derivatives, all-six-coordinate AD probes, working/natural-scale growth
+  covariance and SEs, complete covariance, derived estimates and all 32
+  common report-SE families (2,216 rows). Growth mean/SD/weight reports,
+  full derived conversion tensors, usage flags and likelihood components
+  are checked explicitly. Production numerics and tolerances are unchanged;
+  this numerical gate does not invalidate P6 or constitute new performance
+  evidence.
+
+  **Reproduction and evidence:** see
+  [generator](../data-raw/generate_native_growth_delta_oracle.R),
+  `tests/testthat/fixtures/native-growth-delta-oracle.rds`, the
+  growth-reference and real-configuration tests in
+  `tests/testthat/test-julia-backend.R`, and
+  [method/regeneration/verification commands](../tests/testthat/fixtures/native-backend-oracle.md#independent-delta-method-growth-reference-n6).
+  Local `n6-native-05.log`, `n6-native-final-reproduced.log`,
+  `n6-real-gate.R`, `n6-real-gate-passing.log`,
+  `n6-real-gate-results.rds` and `n6-r-backend-tests-final-fixture.log`
+  retain execution details and profiles. The full R backend regression file
+  passes separately with its five opt-in bridge tests skipped; the 18 new
+  R-only checks do not count as real-Julia evidence. Existing integration
+  CI paths include the new case; no remote CI was monitored. The next ready
+  item is **N7**.
 
 - [ ] **N7 - Pass scalar versus age-specific proportion-female parity.**
   **Depends on:** none.
