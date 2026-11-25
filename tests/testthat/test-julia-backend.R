@@ -2343,6 +2343,42 @@ test_that("native yearly selectivity reference preserves year-age coordinates", 
   }
 })
 
+test_that("native growth references distinguish both variability routes", {
+  interpolation <- readRDS(testthat::test_path("fixtures", "native-configuration-oracle.rds"))[["cases"]][[
+    "VonBertalanffySchnute-joint-priors"
+  ]]
+  delta <- readRDS(testthat::test_path("fixtures", "native-growth-delta-oracle.rds"))[["cases"]][[1]]
+  interpolation_sd <- interpolation[["parameters"]] |>
+    dplyr::filter(.data$label == "length_at_age_sd_at_reference_ages") |>
+    dplyr::arrange(.data$age)
+  expect_equal(unname(interpolation_sd[["value"]]), c(28, 73))
+  expect_false(any(delta[["parameters"]][["label"]] == "length_at_age_sd_at_reference_ages"))
+  expect_false(any(delta[["data"]][["type"]] == "age_to_length_conversion"))
+  expect_true(all(unlist(delta[["truth"]][["report"]][["age_to_length_conversion_derived_used"]]) == 1))
+  growth <- delta[["parameters_table"]] |>
+    dplyr::filter(.data$module_name == "Growth")
+  expect_equal(sum(growth[["transform"]] == "exp"), 3L)
+  expect_equal(sum(grepl("^log_sd_", growth[["label"]])), 3L)
+  expect_gt(min(eigen(delta[["covariance"]], symmetric = TRUE, only.values = TRUE)[["values"]]), 0)
+  expect_equal(solve(delta[["fixed_hessian"]]), solve(delta[["check_fixed_hessian"]]), tolerance = 1e-5)
+  growth_indices <- which(delta[["parameters_table"]][["module_name"]] == "Growth")
+  natural_values <- delta[["natural_growth"]][["estimated"]]
+  expect_equal(diag(natural_values) %*% delta[["covariance"]][growth_indices, growth_indices] %*%
+    diag(natural_values), delta[["natural_growth_covariance"]], tolerance = 1e-12)
+  expect_true(all(delta[["natural_growth"]][["uncertainty"]] > 0))
+  random <- which(delta[["parameters_table"]][["estimation_type"]] == "random_effects")
+  for (point in delta[["points"]]) {
+    expect_lt(max(abs(point[["joint_gradient"]][random])), 1e-6)
+    expect_equal(as.numeric(point[["marginal"]] - point[["report"]][["jnll"]]),
+      as.numeric(determinant(point[["joint_hessian"]][random, random],
+        logarithm = TRUE)[["modulus"]]) / 2 - length(random) * log(2 * pi) / 2,
+      tolerance = 1e-12)
+    expect_equal(dim(point[["variability_probe"]][["hessian"]]), c(15L, 15L))
+    variability <- grepl("log_sd_|logit_corr", delta[["variability_probe_rows"]][["label"]])
+    expect_true(all(abs(point[["variability_probe"]][["gradient"]][variability]) > 1e-3))
+  }
+})
+
 test_that("real Julia joint configurations retain native gradients and uncertainty", {
   skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
     "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
@@ -2351,9 +2387,10 @@ test_that("real Julia joint configurations retain native gradients and uncertain
   double_logistic_oracle <- readRDS(testthat::test_path("fixtures", "native-double-logistic-oracle.rds"))
   static_selectivity_oracle <- readRDS(testthat::test_path("fixtures", "native-static-selectivity-oracle.rds"))
   yearly_selectivity_oracle <- readRDS(testthat::test_path("fixtures", "native-yearly-selectivity-oracle.rds"))
+  growth_delta_oracle <- readRDS(testthat::test_path("fixtures", "native-growth-delta-oracle.rds"))
   cases <- c(oracle[["cases"]], random_prior_oracle[["cases"]],
     double_logistic_oracle[["cases"]], static_selectivity_oracle[["cases"]],
-    yearly_selectivity_oracle[["cases"]])
+    yearly_selectivity_oracle[["cases"]], growth_delta_oracle[["cases"]])
   random_prior_results <- list()
   keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
   for (case in cases) {
@@ -2446,7 +2483,8 @@ test_that("real Julia joint configurations retain native gradients and uncertain
       expect_equal(unname(rows[["uncertainty_julia"]]),
         unname(rows[["uncertainty_native"]]), tolerance = 1e-4,
         info = paste(name, label))
-      if (identical(name, "DoubleLogistic-joint") || !is.null(case[["selectivity_lengths"]])) {
+      if (identical(name, "DoubleLogistic-joint") || !is.null(case[["selectivity_lengths"]]) ||
+          !is.null(case[["growth_variability"]])) {
         expect_equal(unname(rows[["estimated"]]), unname(rows[["estimate"]]),
           tolerance = 1e-4, info = paste(name, label))
       }
@@ -2463,6 +2501,8 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         if (identical(name, "DoubleLogistic-joint")) 8L else
           sum(selectivity[["estimation_type"]] == "fixed_effects"))
       expect_equal(sum(reference[["estimation_type"]] == "random_effects"), 4L)
+    }
+    if (!is.null(case[["joint_hessian"]]) && is.null(case[["conditional"]])) {
       julia_input <- attr(input, "julia_input")
       joint_config <- config
       joint_config[["fixed_parameter_mask"]] <-
@@ -2474,6 +2514,48 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         case[["joint_hessian"]], tolerance = 1e-4, info = name)
       expect_equal(objective[["he"]](objective[["par"]])[fixed_order, fixed_order],
         unname(case[["fixed_hessian"]]), tolerance = 1e-4, info = name)
+    }
+    if (!is.null(case[["growth_variability"]])) {
+      expect_equal(config[["growth_model_type"]], "VonBertalanffySchnute")
+      expect_false("growth_log_length_sd_at_young" %in% names(julia_input[["parameters"]]))
+      variability_labels <- c(
+        "log_sd_mean_length_young", "log_sd_mean_length_old", "log_sd_growth_coefficient",
+        "mean_length_young_mean_length_old_logit_corr",
+        "mean_length_young_growth_coefficient_logit_corr",
+        "mean_length_old_growth_coefficient_logit_corr"
+      )
+      starts <- case_parameters |>
+        dplyr::filter(.data$module_name == "Growth", .data$label %in% variability_labels) |>
+        dplyr::arrange(match(.data$label, variability_labels))
+      expect_equal(unname(unlist(julia_input[["parameters"]][paste0("growth_", variability_labels)])),
+        unname(starts[["value"]]))
+      natural <- dplyr::inner_join(case[["natural_growth"]], parameters, by = keys,
+        suffix = c("_native", "_julia"), relationship = "one-to-one")
+      expect_equal(nrow(natural), nrow(case[["natural_growth"]]))
+      log_sd <- grepl("^log_sd_", natural[["label"]])
+      values <- natural[["estimated_julia"]]
+      standard_errors <- natural[["uncertainty_julia"]]
+      standard_errors[log_sd] <- exp(values[log_sd]) * standard_errors[log_sd]
+      values[log_sd] <- exp(values[log_sd])
+      expect_equal(unname(values), natural[["estimated_native"]], tolerance = 1e-4)
+      expect_equal(unname(standard_errors), natural[["uncertainty_native"]], tolerance = 1e-4)
+      natural_ids <- natural[["parameter_id"]]
+      expect_equal(unname(diag(values) %*% covariance[natural_ids, natural_ids] %*% diag(values)),
+        case[["natural_growth_covariance"]], tolerance = 1e-4)
+      probe_rows <- dplyr::inner_join(case[["variability_probe_rows"]], get_estimates(fit),
+        by = keys, relationship = "one-to-one")
+      expect_equal(nrow(probe_rows), nrow(case[["variability_probe_rows"]]))
+      probe_ids <- probe_rows[["parameter_id"]]
+      probe_config <- joint_config
+      probe_config[["fixed_parameter_mask"]][probe_ids] <- TRUE
+      probe_active_ids <- which(probe_config[["fixed_parameter_mask"]])
+      probe_order <- match(probe_ids, probe_active_ids)
+      for (field in c("growth_mean_LAA", "growth_sd_LAA", "growth_mean_WAA",
+        "growth_derived_mean_WAA", "age_to_length_conversion_derived",
+        "age_to_length_conversion_derived_used", "nll_components")) {
+        expect_equal(unname(unlist(get_report(fit)[[field]])),
+          unname(unlist(case[["report"]][[field]])), tolerance = 1e-4, info = paste(name, field))
+      }
     }
     if (!is.null(case[["conditional"]])) {
       config <- environment(objective[["fn"]])[["model_config"]]
@@ -2524,7 +2606,7 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         tolerance = 1e-8, info = name)
       expect_equal(unname(objective[["gr"]](values)[fixed_order]),
         point[["gradient"]], tolerance = 1e-6, info = name)
-      if (identical(name, "DoubleLogistic-joint") || !is.null(case[["selectivity_lengths"]])) {
+      if (!is.null(case[["joint_hessian"]]) && is.null(case[["conditional"]])) {
         evaluated <- FIMS:::evaluate_julia_fixed_objective(julia_input, config, values, 3L)
         parameter_vector <- purrr::flatten_dbl(evaluated[["estimates"]][names(julia_input[["parameters"]])])
         expect_equal(parameter_vector[indices], point[["parameters"]],
@@ -2538,6 +2620,21 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         score <- FIMS:::evaluate_julia_fixed_objective(julia_input, joint_config, joint_values, 1L)
         expect_equal(as.numeric(score)[joint_order], point[["joint_gradient"]],
           tolerance = 1e-6, info = name)
+        if (!is.null(point[["variability_probe"]])) {
+          expect_equal(parameter_vector[probe_ids], point[["variability_probe"]][["parameters"]],
+            tolerance = 1e-8, info = name)
+          probe_values <- parameter_vector[probe_active_ids]
+          probe_gradient <- FIMS:::evaluate_julia_fixed_objective(
+            julia_input, probe_config, probe_values, 1L
+          )
+          probe_hessian <- FIMS:::evaluate_julia_fixed_objective(
+            julia_input, probe_config, probe_values, 2L
+          )
+          expect_equal(as.numeric(probe_gradient)[probe_order],
+            point[["variability_probe"]][["gradient"]], tolerance = 1e-6, info = name)
+          expect_equal(as.matrix(probe_hessian)[probe_order, probe_order],
+            point[["variability_probe"]][["hessian"]], tolerance = 1e-6, info = name)
+        }
         if (identical(name, "AgeSpecific-year-by-age") &&
             identical(point[["fixed"]], case[["points"]][[1]][["fixed"]])) {
           permutations <- list(
@@ -2610,6 +2707,14 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         point_curvature[[length(point_curvature) + 1L]] <- random_hessian
       }
       report <- objective[["report"]](values)
+      if (!is.null(case[["growth_variability"]])) {
+        for (field in c("growth_mean_LAA", "growth_sd_LAA", "growth_mean_WAA",
+          "growth_derived_mean_WAA", "age_to_length_conversion_derived",
+          "age_to_length_conversion_derived_used", "nll_components")) {
+          expect_equal(unname(unlist(report[[field]])),
+            unname(unlist(point[["report"]][[field]])), tolerance = 1e-8, info = paste(name, field))
+        }
+      }
       for (field in c(
         "jnll", "numbers_at_age", "biomass", "spawning_biomass",
         "expected_recruitment", "mortality_F", "mortality_M", "mortality_Z",

@@ -120,6 +120,11 @@ VonBertalanffySchnute models, narrow catchability fits, and fresh joint
 selectivity/catchability/recruitment fits with four random effects. Joint
 parametric growth fits also exercise growth-derived length compositions and
 normal/lognormal fixed-effect priors using independent native/R oracles.
+Both VonBertalanffySchnute variability routes are covered: two-reference-age
+SD interpolation and the six-parameter delta method. The latter jointly
+estimates the two reference lengths, growth coefficient and three variability
+SDs, checking all six variability-coordinate derivatives, natural-scale
+uncertainty and growth-derived composition likelihoods against native results.
 The real configuration gate also passes independent references with normal
 priors on two coupled recruitment log-deviation coordinates, preserving fixed
 priors and comparing changed conditional modes, curvature, covariance and

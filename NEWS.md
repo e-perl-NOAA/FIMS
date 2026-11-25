@@ -126,6 +126,14 @@
   production changes or relaxed numerical tolerances. The native-only generator
   preserves the historical malformed JSON dimension descriptor and corrects
   only that metadata to recover registered parameter coordinates.
+* Both VonBertalanffySchnute variability routes now pass integrated native/
+  real-Julia comparisons. A reproducible delta-method reference adds jointly
+  estimated reference lengths, growth coefficient and three variability SDs,
+  full covariance, natural-scale uncertainty and all six variability-coordinate
+  derivative probes. Growth-derived compositions, conversion tensors and
+  likelihood components are checked explicitly. The expanded gate passes 1,053
+  assertions across ten fresh fits and twenty nonoptimal points, with unchanged
+  production numerics and tolerances.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins
