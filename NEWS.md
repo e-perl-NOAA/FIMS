@@ -117,6 +117,15 @@
   than input tibble order. Shuffled AgeSpecific rows no longer attach estimates,
   parameter IDs or SEs to the wrong fleet. Numerical fitting and optimization
   controls are unchanged; constants retain unavailable parameter SEs.
+* Year-by-age AgeSpecific selectivity now passes an independent native/real-Julia
+  gate with unequal 60-logit fishing and 12-logit survey layouts, 20 fixed
+  effects and four coupled random effects. It verifies shuffled fleet/year/age
+  mapping, positive-definite full covariance, 32 report-SE families and
+  sensitivity to swapped indices. The expanded configuration gate passes 906
+  assertions across nine fresh fits and eighteen nonoptimal points without
+  production changes or relaxed numerical tolerances. The native-only generator
+  preserves the historical malformed JSON dimension descriptor and corrects
+  only that metadata to recover registered parameter coordinates.
 * Julia estimate extraction keeps maturity and selectivity parameters separate
   when their labels overlap, and retains parameter year indices for refits.
   Estimate tables preserve their established columns, annotate age/length bins

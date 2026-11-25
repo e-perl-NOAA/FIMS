@@ -132,6 +132,10 @@ Static AgeSpecific comparisons cover per-age vectors in both fleets and a
 scalar/per-age mixed layout, including identifiable fits with anchored
 selectivity, full covariance and report uncertainty. Parameter extraction
 uses the serialized data fleet order even when input parameter rows are shuffled.
+Year-by-age AgeSpecific comparisons also pass a five-year fishing vector paired
+with a static survey vector, including shuffled fleet/year/age input rows,
+20 fixed and four random effects, full covariance and all 32 report-SE families.
+Deliberately swapped year, age and fleet indices change the objective and reports.
 The saved complete 49-fixed/29-random fit passes native comparisons of estimates,
 full covariance and 32 derived-report standard-error families; this saved-fit
 check is not a fresh full-fit benchmark. A subsequent

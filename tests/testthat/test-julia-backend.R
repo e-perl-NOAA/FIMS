@@ -2306,6 +2306,43 @@ test_that("native static selectivity references preserve scalar and age layouts"
   }
 })
 
+test_that("native yearly selectivity reference preserves year-age coordinates", {
+  oracle <- readRDS(testthat::test_path("fixtures", "native-yearly-selectivity-oracle.rds"))
+  case <- oracle[["cases"]][["AgeSpecific-year-by-age"]]
+  truth <- case[["truth"]][["parameters"]]
+  selectivity <- truth |>
+    dplyr::filter(.data$module_name == "Selectivity", .data$fleet == "fleet1") |>
+    dplyr::arrange(.data$timing, .data$age)
+  fishing_mortality <- truth |>
+    dplyr::filter(.data$module_name == "Fleet", .data$fleet == "fleet1", .data$label == "log_Fmort") |>
+    dplyr::arrange(.data$timing)
+  expected <- stats::plogis(selectivity[["value"]]) *
+    rep(exp(fishing_mortality[["value"]]), each = 12L)
+  expect_equal(unname(unlist(case[["truth"]][["report"]][["mortality_F"]])),
+    unname(expected), tolerance = 1e-12)
+  expect_gt(max(abs(expected - as.numeric(t(matrix(expected, nrow = 12L))))), 1e-3)
+  expect_gt(max(abs(expected - c(expected[13:24], expected[1:12], expected[25:60]))), 1e-3)
+  expect_equal(case[["selectivity_lengths"]], c(60L, 12L))
+  expect_equal(oracle[["native_selectivity_metadata"]][[1]][["parameters"]][[1]][["dimensionality"]],
+    list(header = list("n_ages"), dimensions = list(12L)))
+  expect_equal(dim(case[["covariance"]]), c(24L, 24L))
+  expect_gt(min(eigen(case[["covariance"]], symmetric = TRUE, only.values = TRUE)[["values"]]), 0)
+  expect_equal(solve(case[["fixed_hessian"]]), solve(case[["check_fixed_hessian"]]), tolerance = 1e-5)
+  selected <- case[["parameters_table"]] |>
+    dplyr::filter(.data$module_name == "Selectivity")
+  expect_equal(selected[["year_i"]], c(rep(seq_len(5L), each = 3L), rep(NA_real_, 3L)))
+  expect_equal(selected[["age"]], rep(c(2, 5, 9), 6L))
+  expect_true(all(selected[["uncertainty"]] > 0 & selected[["uncertainty"]] < 1))
+  random <- which(case[["parameters_table"]][["estimation_type"]] == "random_effects")
+  for (point in case[["points"]]) {
+    expect_lt(max(abs(point[["joint_gradient"]][random])), 1e-6)
+    expect_equal(as.numeric(point[["marginal"]] - point[["report"]][["jnll"]]),
+      as.numeric(determinant(point[["joint_hessian"]][random, random],
+        logarithm = TRUE)[["modulus"]]) / 2 - length(random) * log(2 * pi) / 2,
+      tolerance = 1e-12)
+  }
+})
+
 test_that("real Julia joint configurations retain native gradients and uncertainty", {
   skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
     "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
@@ -2313,8 +2350,10 @@ test_that("real Julia joint configurations retain native gradients and uncertain
   random_prior_oracle <- readRDS(testthat::test_path("fixtures", "native-random-prior-oracle.rds"))
   double_logistic_oracle <- readRDS(testthat::test_path("fixtures", "native-double-logistic-oracle.rds"))
   static_selectivity_oracle <- readRDS(testthat::test_path("fixtures", "native-static-selectivity-oracle.rds"))
+  yearly_selectivity_oracle <- readRDS(testthat::test_path("fixtures", "native-yearly-selectivity-oracle.rds"))
   cases <- c(oracle[["cases"]], random_prior_oracle[["cases"]],
-    double_logistic_oracle[["cases"]], static_selectivity_oracle[["cases"]])
+    double_logistic_oracle[["cases"]], static_selectivity_oracle[["cases"]],
+    yearly_selectivity_oracle[["cases"]])
   random_prior_results <- list()
   keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
   for (case in cases) {
@@ -2325,7 +2364,7 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         case_parameters |> dplyr::filter(.data$module_name != "Selectivity"),
         case_parameters |>
           dplyr::filter(.data$module_name == "Selectivity") |>
-          dplyr::arrange(dplyr::desc(.data$fleet), dplyr::desc(.data$age))
+          dplyr::arrange(dplyr::desc(.data$fleet), dplyr::desc(.data$timing), dplyr::desc(.data$age))
       )
     }
     input <- initialize_fims(
@@ -2335,7 +2374,7 @@ test_that("real Julia joint configurations retain native gradients and uncertain
     if (!is.null(case[["selectivity_lengths"]])) {
       selectivity <- case[["parameters"]] |>
         dplyr::filter(.data$module_name == "Selectivity") |>
-        dplyr::arrange(match(.data$fleet, config[["fleet_names"]]), .data$age)
+        dplyr::arrange(match(.data$fleet, config[["fleet_names"]]), .data$timing, .data$age)
       serialized <- attr(input, "julia_input")[["parameters"]][["logit_sel_at_age"]]
       expect_equal(serialized, unname(selectivity[["value"]]), info = name)
       expect_equal(config[["selectivity_parameter_lengths"]], case[["selectivity_lengths"]])
@@ -2369,8 +2408,14 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         ))
       constants <- get_estimates(fit) |>
         dplyr::filter(.data$module_name == "Selectivity", .data$estimation_type == "constant")
-      expect_equal(constants[["age"]], rep(6, nrow(constants)))
-      expect_equal(constants[["estimated"]], rep(stats::qlogis(0.9), nrow(constants)))
+      expected_constants <- selectivity |>
+        dplyr::filter(.data$estimation_type == "constant") |>
+        dplyr::rename(year_i = "timing")
+      matched_constants <- dplyr::inner_join(constants, expected_constants,
+        by = c("module_name", "fleet", "label", "year_i", "age"),
+        relationship = "one-to-one")
+      expect_equal(nrow(matched_constants), nrow(expected_constants))
+      expect_equal(unname(matched_constants[["estimated"]]), unname(matched_constants[["value"]]))
       expect_true(all(is.na(constants[["uncertainty"]])))
     }
     matched <- dplyr::inner_join(
@@ -2493,6 +2538,28 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         score <- FIMS:::evaluate_julia_fixed_objective(julia_input, joint_config, joint_values, 1L)
         expect_equal(as.numeric(score)[joint_order], point[["joint_gradient"]],
           tolerance = 1e-6, info = name)
+        if (identical(name, "AgeSpecific-year-by-age") &&
+            identical(point[["fixed"]], case[["points"]][[1]][["fixed"]])) {
+          permutations <- list(
+            year_age_transpose = c(as.numeric(t(matrix(seq_len(60L), nrow = 12L))), 61:72),
+            swapped_years = c(13:24, 1:12, 25:72),
+            swapped_fleet_blocks = c(61:72, 13:60, 1:12)
+          )
+          for (permutation in permutations) {
+            corrupted_input <- julia_input
+            corrupted_input[["parameters"]] <-
+              evaluated[["estimates"]][names(julia_input[["parameters"]])]
+            corrupted_input[["parameters"]][["logit_sel_at_age"]] <-
+              corrupted_input[["parameters"]][["logit_sel_at_age"]][permutation]
+            corrupted_values <- purrr::flatten_dbl(corrupted_input[["parameters"]])
+            corrupted <- FIMS:::evaluate_julia_fixed_objective(
+              corrupted_input, joint_config, corrupted_values[active_ids], 3L
+            )
+            expect_gt(abs(corrupted[["nll"]] - point[["report"]][["jnll"]]), 1e-2)
+            expect_gt(max(abs(unlist(corrupted[["report"]][["mortality_F"]]) -
+              unlist(point[["report"]][["mortality_F"]]))), 1e-4)
+          }
+        }
       }
       if (!is.null(case[["conditional"]])) {
         evaluated <- FIMS:::evaluate_julia_fixed_objective(julia_input, config, values, 3L)

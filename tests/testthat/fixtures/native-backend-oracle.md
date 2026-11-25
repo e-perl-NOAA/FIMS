@@ -343,5 +343,82 @@ and sixteen nonoptimal points**, without failures, errors or skips. The full
 R backend regression file also passes separately with its five opt-in bridge
 tests skipped; its 18 new R-only fixture checks do not count as real-Julia
 evidence. The opt-in command in the N2 section and existing integration CI
-paths include both cases. N4 closes static layouts only; year-by-age
-selectivity remains a separate N5 gate.
+paths include both cases. N4 closes static layouts only; N5 below adds
+year-by-age selectivity.
+
+## Independent year-by-age AgeSpecific reference (N5)
+
+`native-yearly-selectivity-oracle.rds` adds a five-year, 12-age assessment
+with a **60-logit year-by-age fishing vector and 12-logit static survey vector**.
+Ages 2, 5 and 9 are estimated in every fishing year and in the survey; other
+logits and fishing mortalities remain fixed to remove confounding. Survey
+catchability and recruitment level are also estimated, giving 20 fixed and
+four coupled recruitment random effects. No additional priors are used.
+The year and age patterns are nonuniform and differ between fleets.
+
+The native-only generator `data-raw/generate_native_yearly_selectivity_oracle.R`
+uses the preserved historical DLL and R implementation. Observations come
+from the native truth report, with largest-remainder integer multinomial
+samples and likelihood sample sizes of 1,000. Estimated logits start 0.15
+away from truth. The native fit converges with maximum fixed gradient
+`0.000138322621382`, marginal/joint objectives
+`678.360261724154/668.838910940096`, and positive-definite 24-by-24 covariance
+(smallest eigenvalue `0.000218174773060`). Estimated selectivity SEs range
+from `0.06551` to `0.61269`.
+
+The historical native numerical kernel supports year-by-age selectivity,
+but its JSON declares only `n_ages = 12` for the 60-element fishing vector.
+The historical high-level `get_estimates()` therefore cannot reshape it.
+The generator preserves the original selectivity JSON in
+`native_selectivity_metadata`, changes only the fishing vector's local
+dimension descriptor to `[n_years, n_ages] = [5, 12]`, then invokes the
+historical reshaper. Registered vector slots are matched to original canonical
+input year/age coordinates. Native JSON inputs have six-significant-digit
+serialization, so their metadata validation uses `1e-5`; registered active
+starts are independently checked at full precision (`1e-14`). Neither native
+numeric kernels nor any comparison tolerances are changed. All objective,
+gradient, Hessian, covariance and report expectations come from native TMB,
+never Julia.
+
+The fixture retains two nonoptimal points with conditional modes, joint scores/
+Hessians, marginal gradients and reports; optimized joint/marginal Hessians;
+and native AD uncertainty for 2,216 report rows in 32 families. Halving the
+gradient-differencing step from `1e-4` to `5e-5` verifies marginal covariance
+stability. Provenance includes historical revision `1e5a64a8`, native DLL MD5
+`7791104ab1295dcec1725062eb5f1f0a`, R-source, generator and input hashes,
+R 4.6.2, TMB 1.9.21 and optimizer controls. Two fresh native-only processes
+produce byte-identical pointer-free fixtures, MD5
+`1e40ac6b0ac843135356d7c81d384f57`.
+
+Regenerate from the candidate root with the prepared historical checkout/DLL
+and a **new output path**:
+
+```powershell
+$env:LC_ALL = 'C'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+& 'C:\Program Files\R\R-4.6.2\bin\x64\Rscript.exe' --vanilla data-raw\generate_native_yearly_selectivity_oracle.R C:\benchmarks\native-oracle C:\benchmarks\native-yearly-selectivity-new.rds
+```
+
+The R-only consistency test checks native fishing mortality against the
+independent R calculation `plogis(year_age_logits) * exp(yearly_log_Fmort)`,
+year/age slot ownership, original JSON metadata, covariance, conditional
+scores and Laplace placement. Its 15 assertions are not real-bridge evidence.
+
+The real configuration test reverses fleet, year and age input rows and checks
+canonical 60/12 serialization, offsets 1/61, masks, constants, fitted parameter
+ownership, conditional modes, objectives, joint/marginal derivatives and
+complete covariance. Derived estimates and SEs are joined by module, fleet,
+label, year, age and length, verifying all 32 families. Three deliberately
+corrupted layouts (year/age transpose, swapped years, swapped fleet blocks)
+must each change both joint objective and fishing mortality.
+
+Fresh real R 4.6.2/Julia 1.10.10 execution with explicit Julia selection and
+single-thread settings passes **906 assertions across nine optimized fits and
+eighteen nonoptimal points**, with no failures, errors or skips. The full R
+backend regression file also passes separately with its five opt-in bridge
+tests skipped. Use the existing opt-in command in the N2 section; the same
+integration CI paths include this new case. No production optimizer or
+derivative code changed, so the existing P6 evidence is not invalidated;
+this numerical gate is not a new performance measurement.
