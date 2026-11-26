@@ -7,7 +7,7 @@ The migration is not complete.
 ## Contract for each "continue" request
 
 1. Read this file and select at least one ready, unchecked item by its ID.
-   Name that item before starting. The default next item is **N9**.
+   Name that item before starting. The default next item is **W1**.
 2. Complete the whole item's "Done when" criteria in that work session.
    Starting a run, collecting an intermediate snapshot, writing a proposal,
    or completing one bullet of an item is not completion.
@@ -1036,7 +1036,7 @@ remain useful and must be reused.
   integration CI paths include this case; no remote CI was monitored.
   The next ready item is **N9**.
 
-- [ ] **N9 - Close the recruitment-variant support gate.**
+- [x] **N9 - Close the recruitment-variant support gate.**
   **Depends on:** none.
   **Done when:** real independent comparisons cover supported normal and
   lognormal recruitment-process semantics with multiple random effects.
@@ -1045,6 +1045,51 @@ remain useful and must be reused.
   or obtain an explicit resolution for a misleading/unsupported support claim.
   Do not silently route it through Beverton-Holt or count a standalone
   distribution identity as integrated recruitment parity.
+
+  **Completed:** implementation/reference commit `0f5a6943` adds four
+  independent native cases covering normal/lognormal processes in both
+  `log_devs` and `log_r` layouts. Each genuinely fits six fixed and four
+  random effects, with positive-definite complete 10-by-10 covariance and
+  2,216 derived rows in all 32 common report-SE families. Native observations
+  include integer multinomial samples of 1,000; there are no added priors.
+  Two native-only captures reproduce the fixture byte-identically, MD5
+  `acc4ce8659e8d8b8cc4644ada469bca1`; generator MD5 is
+  `b3dd787a975fea3ba9f984607a1fba75`.
+
+  **Historical support resolution:** the native high-level initializer
+  ignores process-family metadata and hard-codes Gaussian densities. The
+  documented harness explicitly selects its existing native lognormal
+  constructor without editing historical source or numerical code.
+  Historical JSON omits `log_r`; registered native IDs and checked input
+  values recover semantic ownership while native AD supplies all numerical
+  expectations. Native random-effect lognormal densities use `log(value)`
+  without a Jacobian, including the unusual `log(log_r)` convention.
+  Independent R densities and stock-recruit feedback reconstruct integrated
+  native likelihoods at the optimum and two nonoptimal points per case.
+
+  Historical Ricker initialization fails with
+  `object 'RickerRecruitment' not found`; the namespace exports no Ricker
+  implementation. The user explicitly chose rejection in supported R fitting
+  while retaining the standalone Julia formula as experimental. R initialization
+  now errors clearly; it neither selects unverified Ricker nor silently uses
+  Beverton-Holt. No Ricker parity or supported R fitting is claimed.
+
+  **Verification:** targeted real R 4.6.2/Julia 1.10.10 execution passes
+  787 assertions across four new fits and two random-prior controls.
+  The full real configuration gate passes **2,224 assertions across
+  seventeen fresh fits and thirty-four nonoptimal points**, with no failures,
+  errors or skips. Comparisons include joint/marginal objectives, modes,
+  gradients/Hessians, complete covariance, derived estimates/SEs and
+  process/observation component sums. Existing tolerances are unchanged.
+  Separate standalone Julia and R backend regressions pass; five disabled
+  opt-in R bridge tests are not counted as real execution evidence.
+  No remote CI was monitored. These are numerical gates, not a final-candidate
+  full-fit benchmark; migration completion and release checks remain pending.
+  [Reference design/provenance/regeneration](../tests/testthat/fixtures/native-backend-oracle.md#independent-recruitment-process-reference-n9)
+  and local `n9-native-11.log`, `n9-native-reproduced.log`, `n9-real-gate.R`,
+  `n9-targeted-01.log`, `n9-real-gate.log`, `n9-real-gate-results.rds`,
+  `n9-r-tests-final.log` and `n9-julia-tests.log` retain detailed evidence.
+  The next ready item is **W1**.
 
 ## W. Larger real R workflows and opt-in tutorials
 
