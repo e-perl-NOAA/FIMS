@@ -153,6 +153,17 @@ normal/lognormal streams with year-specific scales. Growth-derived conversions
 use one shared biological size grid; R reports and estimate/SE rows use each
 fleet's own length bins, not padded global bins. Missing observations contribute
 zero likelihood, while unobserved composition quantities remain reportable.
+Recruitment comparisons cover normal and lognormal processes in both
+`log_devs` and `log_r` layouts, each with six fixed and four random effects.
+The historical high-level initializer hard-codes Gaussian processes; the
+independent lognormal reference explicitly selects its existing native
+lognormal constructor without changing historical sources. Native
+random-effect lognormal densities evaluate `log(value)` without a Jacobian,
+including the unusual `log(log_r)` convention; positive coordinates are
+required. Complete covariance and all 32 report-SE families pass real
+R-to-Julia comparisons. Ricker is explicitly unsupported in R fitting:
+historical native `RickerRecruitment` is absent. The standalone Julia
+Ricker formula remains experimental, not a parity-verified fitting option.
 The saved complete 49-fixed/29-random fit passes native comparisons of estimates,
 full covariance and 32 derived-report standard-error families; this saved-fit
 check is not a fresh full-fit benchmark. A subsequent

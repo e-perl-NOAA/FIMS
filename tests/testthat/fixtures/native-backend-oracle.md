@@ -693,3 +693,95 @@ R fixture assertions, not counted as real-Julia evidence. The existing N2
 opt-in command and integration CI paths include the new case. Numerical
 tolerances are unchanged. This is numerical validation, not a fresh full-fit
 performance measurement; final-candidate release checks remain required.
+
+## Independent recruitment-process reference (N9)
+
+`native-recruitment-process-oracle.rds` contains four independent native
+EWAA/two-fleet configurations: normal and lognormal densities in each of
+the `log_devs` and `log_r` process layouts. Each fit jointly estimates four
+Logistic selectivity parameters, survey catchability and recruitment level,
+with four recruitment random effects and fixed process SD `0.25`. Observations
+come from native reports; compositions use integer largest-remainder samples
+of 1,000. No Julia evaluation or added priors construct these expectations.
+
+Two historical limitations require explicit treatment rather than silently
+claiming high-level support:
+
+* `initialize_modules.R` hard-codes `family = gaussian()` when initializing
+  recruitment processes, ignoring the supplied distribution column. The
+  generator temporarily replaces the namespace's distribution initializer
+  with a wrapper selecting the **existing native** normal/lognormal
+  constructor, restoring the original on exit. No historical source or
+  numerical implementation is changed. These are integrated native
+  model/density comparisons, not evidence that the unadapted historical
+  high-level initializer honors lognormal configuration.
+* Historical recruitment JSON omits `log_r`. The fixture retains the original
+  recruitment metadata and recovers its four semantic rows from registered
+  native parameter IDs, exact checked input values and supplied year labels.
+  Native TMB still supplies their estimates, gradients, Hessians and
+  covariance; synthetic metadata does not generate numerical expectations.
+
+For random effects, native lognormal density is
+`dnorm(log(value), expected, sd, log = TRUE)`, **without a Jacobian**.
+In `log_devs` mode, `expected` is zero and realized recruitment is
+stock-recruit mean times `exp(log_devs)`. In `log_r` mode, `expected` is
+the log Beverton-Holt stock-recruit mean and realized recruitment is
+`exp(log_r)`. Consequently the lognormal `log_r` process evaluates
+`log(log_r)`, not `log_r`, in the density. Positive raw process coordinates
+are required. The fixture deliberately gives this last case a small
+stock-recruit level with million-scale realized recruitment, exposing the
+historical distinction rather than relabeling it as an ordinary Gaussian
+log-recruitment process.
+
+Independent R normal/lognormal/multinomial observation densities and the
+stock-recruit formula reconstruct native process components and joint
+objectives at both nonoptimal points and the optimum. Omitting the Jacobian
+is checked separately from the integrated native comparisons. Component
+comparisons align by fleet/label rather than relying on registration order.
+
+| Case | Native marginal objective | Native joint objective |
+| --- | ---: | ---: |
+| `Recruitment-log_devs-Dnorm` | 699.131172271533 | 689.7562898189722 |
+| `Recruitment-log_devs-Dlnorm` | 691.9400188681598 | 681.7317356292543 |
+| `Recruitment-log_r-Dnorm` | 694.8880024038787 | 685.5579180689369 |
+| `Recruitment-log_r-Dlnorm` | 694.5445415142585 | 685.2706905606393 |
+
+All four native fits converge with maximum fixed gradients below `1e-3`.
+Their complete 10-by-10 covariances are positive definite and stable when
+halving marginal Hessian differencing steps from `1e-4` to `5e-5`. Each
+contains 2,216 derived rows in all 32 common report-SE families. Two fresh
+native-only processes reproduce the pointer-free fixture byte-identically:
+MD5 `acc4ce8659e8d8b8cc4644ada469bca1`. Provenance retains historical revision
+`1e5a64a8`, DLL MD5 `7791104ab1295dcec1725062eb5f1f0a`, native source/input
+hashes, generator MD5 `b3dd787a975fea3ba9f984607a1fba75`, R 4.6.2 and
+TMB 1.9.21. Regenerate from the candidate root using a **new output path**:
+
+```powershell
+$env:LC_ALL = 'C'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+& 'C:\Program Files\R\R-4.6.2\bin\x64\Rscript.exe' --vanilla data-raw\generate_native_recruitment_process_oracle.R C:\benchmarks\native-oracle C:\benchmarks\native-recruitment-process-new.rds
+Get-FileHash tests\testthat\fixtures\native-recruitment-process-oracle.rds,C:\benchmarks\native-recruitment-process-new.rds -Algorithm MD5
+```
+
+The generator also records the unadapted historical Ricker initialization
+failure, `object 'RickerRecruitment' not found`, and checks that the historical
+namespace exports no Ricker symbols. The user explicitly chose to reject
+Ricker in the supported R fitting interface while retaining the standalone
+Julia formula as experimental. R initialization now errors clearly rather
+than choosing Ricker or silently routing it through Beverton-Holt. No Ricker
+numerical parity or supported R fitting is claimed.
+
+The targeted real R 4.6.2/Julia 1.10.10 gate passes 787 assertions across the
+four new fits and two retained random-prior controls. The full configuration
+gate passes **2,224 assertions across seventeen fresh fits and thirty-four
+nonoptimal points**, without failures, errors or skips. It compares joint/
+marginal objectives, conditional modes, gradients/Hessians, estimates,
+complete covariance, all derived estimates/SEs, recruitment feedback and
+independently reconstructed process/observation likelihood components.
+Existing numerical tolerances are unchanged. The separate R backend file
+and standalone Julia suite pass; five disabled opt-in R bridge tests are not
+counted as real execution evidence. Existing integration CI paths include
+these cases; no remote CI was monitored. This is numerical validation, not
+a final-candidate full-fit performance measurement or migration completion.

@@ -1296,6 +1296,15 @@ test_that("Julia backend config preserves normal catch and lognormal index likel
   )
   expect_equal(lognormal_process_config[["recruitment_process_distribution"]], "dlnorm")
 
+  ricker_parameters <- parameters |>
+    dplyr::mutate(module_type = dplyr::if_else(
+      .data$module_name == "Recruitment", "Ricker", .data$module_type
+    ))
+  expect_error(FIMS:::as_julia_fims_model_config(ricker_parameters, data),
+    regexp = "Ricker recruitment is unsupported.*experimental only")
+  expect_error(initialize_fims(ricker_parameters, data),
+    regexp = "Ricker recruitment is unsupported")
+
   unsupported_composition_data <- data_big |>
     dplyr::mutate(
       uncertainty = dplyr::if_else(
@@ -2492,6 +2501,32 @@ test_that("native heterogeneous observations retain independent row likelihoods"
   expect_equal(solve(case[["fixed_hessian"]]), solve(case[["check_fixed_hessian"]]), tolerance = 1e-5)
 })
 
+test_that("independent recruitment references retain native process semantics", {
+  oracle <- readRDS(testthat::test_path("fixtures", "native-recruitment-process-oracle.rds"))
+  expect_match(oracle[["provenance"]][["ricker_error"]], "RickerRecruitment.*not found")
+  expect_match(oracle[["provenance"]][["method"]], "hard-codes gaussian")
+  expect_equal(length(oracle[["cases"]]), 4L)
+  for (case in oracle[["cases"]]) {
+    for (process in c(list(case[["process"]]), purrr::map(case[["points"]], "process"))) {
+      family <- case[["recruitment_process"]][["family"]]
+      density_values <- if (family == "dlnorm") log(process[["values"]]) else process[["values"]]
+      expect_equal(-sum(stats::dnorm(density_values, process[["expected"]],
+        process[["sd"]], log = TRUE)), process[["nll"]], tolerance = 1e-12)
+      if (family == "dlnorm") {
+        expect_true(all(process[["values"]] > 0))
+        expect_equal(-sum(stats::dlnorm(process[["values"]], process[["expected"]],
+          process[["sd"]], log = TRUE)) - process[["nll"]],
+          sum(log(process[["values"]])), tolerance = 1e-12)
+      }
+    }
+    expect_equal(sum(case[["parameters_table"]][["estimation_type"]] == "random_effects"), 4L)
+    expect_equal(dim(case[["covariance"]]), c(10L, 10L))
+    expect_equal(case[["report"]][["jnll"]],
+      case[["process"]][["nll"]] + sum(case[["process"]][["observation_components"]][["nll"]]),
+      tolerance = 1e-8)
+  }
+})
+
 test_that("real Julia joint configurations retain native gradients and uncertainty", {
   skip_if(Sys.getenv("FIMS_RUN_JULIA_INTEGRATION") != "true",
     "Set FIMS_RUN_JULIA_INTEGRATION=true to exercise real Julia configuration fits.")
@@ -2503,14 +2538,56 @@ test_that("real Julia joint configurations retain native gradients and uncertain
   growth_delta_oracle <- readRDS(testthat::test_path("fixtures", "native-growth-delta-oracle.rds"))
   proportion_female_oracle <- readRDS(testthat::test_path("fixtures", "native-proportion-female-oracle.rds"))
   heterogeneous_oracle <- readRDS(testthat::test_path("fixtures", "native-heterogeneous-observation-oracle.rds"))
+  recruitment_oracle <- readRDS(testthat::test_path("fixtures", "native-recruitment-process-oracle.rds"))
   cases <- c(oracle[["cases"]], random_prior_oracle[["cases"]],
     double_logistic_oracle[["cases"]], static_selectivity_oracle[["cases"]],
     yearly_selectivity_oracle[["cases"]], growth_delta_oracle[["cases"]],
-    proportion_female_oracle[["cases"]], heterogeneous_oracle[["cases"]])
+    proportion_female_oracle[["cases"]], heterogeneous_oracle[["cases"]],
+    recruitment_oracle[["cases"]])
   random_prior_results <- list()
   keys <- c("module_name", "fleet", "label", "year_i", "age", "length")
   for (case in cases) {
     name <- case[["name"]]
+    check_recruitment_process <- function(report, estimates, native_process, tolerance) {
+      mode <- case[["recruitment_process"]][["mode"]]
+      family <- case[["recruitment_process"]][["family"]]
+      values <- unname(unlist(estimates[[mode]]))
+      sigma <- exp(unname(unlist(estimates[["log_sd"]])))
+      rzero <- exp(unname(unlist(estimates[["log_rzero"]])))
+      steep <- 0.2 + 0.8 * stats::plogis(unname(unlist(estimates[["logit_steep"]])))
+      phi_0 <- unname(unlist(report[["unfished_spawning_biomass"]]))[[1]] / rzero
+      spawners <- unname(unlist(report[["spawning_biomass"]]))[1:4]
+      mean_recruitment <- 0.8 * rzero * steep * spawners /
+        (0.2 * phi_0 * rzero * (1 - steep) + spawners * (steep - 0.2))
+      expected <- if (mode == "log_devs") rep(0, 4L) else log(mean_recruitment)
+      density_values <- if (family == "dlnorm") log(values) else values
+      nll <- -sum(stats::dnorm(density_values, expected, sigma, log = TRUE))
+      expect_equal(values, native_process[["values"]], tolerance = tolerance, info = name)
+      expect_equal(expected, native_process[["expected"]], tolerance = tolerance, info = name)
+      expect_equal(nll, native_process[["nll"]], tolerance = tolerance, info = name)
+      expect_equal(sigma, native_process[["sd"]], info = name)
+      actual <- tibble::tibble(label = report[["nll_component_labels"]],
+        fleet = report[["nll_component_fleets"]], nll = report[["nll_components"]])
+      expect_equal(actual[["nll"]][actual[["label"]] == "recruitment_process"],
+        native_process[["nll"]], tolerance = tolerance, info = name)
+      components <- actual |>
+        dplyr::inner_join(native_process[["observation_components"]], by = c("fleet", "label"),
+          suffix = c("_julia", "_native"), relationship = "one-to-one")
+      expect_equal(nrow(components), nrow(native_process[["observation_components"]]))
+      expect_equal(components[["nll_julia"]], components[["nll_native"]],
+        tolerance = tolerance, info = name)
+      expect_equal(sum(actual[["nll"]]), native_process[["nll"]] +
+        sum(native_process[["observation_components"]][["nll"]]),
+        tolerance = tolerance, info = name)
+      realized <- if (mode == "log_r") exp(values) else mean_recruitment * exp(values)
+      expect_equal(unname(unlist(report[["expected_recruitment"]]))[2:5], realized,
+        tolerance = 1e-12, info = name)
+      if (family == "dlnorm") {
+        expect_true(all(values > 0))
+        expect_equal(-sum(stats::dlnorm(values, expected, sigma, log = TRUE)) - nll,
+          sum(log(values)), tolerance = 1e-10, info = name)
+      }
+    }
     check_observation_reports <- function(report, native_report, native_likelihood, tolerance) {
       for (field in c("catch_numbers", "index_numbers", "catch_weight", "index_weight",
         "catch_numbers_at_age", "index_numbers_at_age", "catch_weight_at_age", "index_weight_at_age",
@@ -2658,7 +2735,7 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         info = paste(name, label))
       if (identical(name, "DoubleLogistic-joint") || !is.null(case[["selectivity_lengths"]]) ||
           !is.null(case[["growth_variability"]]) || !is.null(case[["proportion_female_length"]]) ||
-          !is.null(case[["length_bins"]])) {
+          !is.null(case[["length_bins"]]) || !is.null(case[["recruitment_process"]])) {
         expect_equal(unname(rows[["estimated"]]), unname(rows[["estimate"]]),
           tolerance = 1e-4, info = paste(name, label))
       }
@@ -2688,6 +2765,15 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         case[["joint_hessian"]], tolerance = 1e-4, info = name)
       expect_equal(objective[["he"]](objective[["par"]])[fixed_order, fixed_order],
         unname(case[["fixed_hessian"]]), tolerance = 1e-4, info = name)
+    }
+    if (!is.null(case[["recruitment_process"]])) {
+      expect_equal(config[["recruitment"]], "beverton_holt")
+      expect_equal(config[["recruitment_process_mode"]], case[["recruitment_process"]][["mode"]])
+      expect_equal(config[["recruitment_process_distribution"]],
+        case[["recruitment_process"]][["family"]])
+      expect_equal(sum(config[["random_parameter_mask"]]), 4L)
+      check_recruitment_process(fit_result[["report"]], fit_result[["estimates"]],
+        case[["process"]], tolerance = 1e-4)
     }
     if (!is.null(case[["length_bins"]])) {
       expect_equal(julia_input[["data"]][["n_lengths_by_fleet"]],
@@ -2963,6 +3049,10 @@ test_that("real Julia joint configurations retain native gradients and uncertain
         point_curvature[[length(point_curvature) + 1L]] <- random_hessian
       }
       report <- objective[["report"]](values)
+      if (!is.null(case[["recruitment_process"]])) {
+        check_recruitment_process(evaluated[["report"]], evaluated[["estimates"]],
+          point[["process"]], tolerance = 1e-8)
+      }
       if (!is.null(case[["length_bins"]])) {
         fit_result <- FIMS:::evaluate_julia_fixed_objective(julia_input, config, values, 3L)
         check_observation_reports(report, point[["report"]],

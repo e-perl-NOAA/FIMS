@@ -1,5 +1,13 @@
 # FIMS (development version)
 
+* Normal/lognormal recruitment-process comparisons now cover both `log_devs`
+  and `log_r`, with six fixed and four random effects, complete covariance and
+  all 32 derived-report SE families. Independent native lognormal references
+  explicitly select the existing constructor because the historical
+  high-level initializer hard-codes Gaussian processes. The native
+  random-effect no-Jacobian convention is preserved. R initialization now
+  rejects Ricker explicitly; its standalone Julia formula remains experimental
+  because no historical native Ricker implementation exists.
 * The Julia-only cutover below is work in progress, not release-ready.
   Shipped optimized and internal example fits have been regenerated with
   Julia, including the complete 49-fixed/29-random example with convergence

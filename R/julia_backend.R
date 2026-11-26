@@ -1208,8 +1208,11 @@ as_julia_fims_model_config <- function(parameters, data, priors = NULL) {
   }
 
   recruitment_type <- "beverton_holt"
-  if ("Ricker" %in% parameters[["module_type"]]) {
-    recruitment_type <- "ricker"
+  if (any(parameters[["module_name"]] == "Recruitment" &
+      parameters[["module_type"]] == "Ricker", na.rm = TRUE)) {
+    cli::cli_abort(
+      "Ricker recruitment is unsupported in the R fitting interface: the historical native backend has no RickerRecruitment implementation and numerical parity is unverified. The standalone Julia formula is experimental only."
+    )
   }
   recruitment_process_parameters <- parameters |>
     dplyr::filter(
